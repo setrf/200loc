@@ -159,12 +159,11 @@ describe('App', () => {
     ).toBeInTheDocument()
 
     await screen.findByText('How a tiny GPT predicts the next token')
-    expect(screen.getByText('Original llm-viz')).toBeInTheDocument()
+    expect(screen.getByText('microgpt scene')).toBeInTheDocument()
     expect(screen.getAllByText('microgpt').length).toBeGreaterThan(0)
     expect(screen.getAllByText('CPU fallback').length).toBeGreaterThan(0)
     expect(screen.getAllByText('Tokenize Prefix').length).toBeGreaterThan(0)
-    expect(screen.getByText('Original llm-viz')).toBeInTheDocument()
-    expect(screen.getByTestId('vendored-layer-view')).toBeInTheDocument()
+    expect(await screen.findByTestId('fallback-scene')).toBeInTheDocument()
     expect(screen.getAllByText('p2:12 -> p3:stop').length).toBeGreaterThan(0)
     expect(screen.getByText('line 117').closest('li')).not.toHaveClass('is-active')
 

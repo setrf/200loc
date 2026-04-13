@@ -1,31 +1,13 @@
 import '@testing-library/jest-dom/vitest'
-import React from 'react'
 import { vi } from 'vitest'
 
-vi.mock('@llmviz/llm/LayerView', () => ({
-  LayerView: ({
-    className,
-    externalPhase,
-    showSidebar,
-    showToolbar,
-  }: {
-    className?: string
-    externalPhase?: number
-    showSidebar?: boolean
-    showToolbar?: boolean
-  }) =>
-    React.createElement(
-      'div',
-      {
-        className,
-        'data-phase': externalPhase,
-        'data-sidebar': String(showSidebar),
-        'data-testid': 'vendored-layer-view',
-        'data-toolbar': String(showToolbar),
-      },
-      `Original LayerView ${externalPhase ?? 'none'}`,
-    ),
-}))
+class ResizeObserverMock {
+  observe() {}
+  disconnect() {}
+  unobserve() {}
+}
+
+vi.stubGlobal('ResizeObserver', ResizeObserverMock)
 
 Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
   configurable: true,

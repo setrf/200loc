@@ -119,7 +119,7 @@ describe('ui components', () => {
     expect(onChange).toHaveBeenCalledWith('scene')
   })
 
-  it('renders the vendored LayerView scene and exposes code-focus affordances', () => {
+  it('renders the microgpt scene fallback and exposes code-focus affordances', async () => {
     const onFocusRanges = vi.fn()
     render(
       <ArchitectureScene
@@ -132,19 +132,11 @@ describe('ui components', () => {
       />,
     )
 
-    expect(screen.getByText('Original llm-viz')).toBeInTheDocument()
-    expect(screen.getByTestId('vendored-layer-view')).toHaveAttribute(
-      'data-sidebar',
-      'false',
-    )
-    expect(screen.getByTestId('vendored-layer-view')).toHaveAttribute(
-      'data-toolbar',
-      'false',
-    )
-    expect(screen.getByTestId('vendored-layer-view')).toHaveAttribute(
-      'data-phase',
-      '7',
-    )
+    expect(screen.getByText('microgpt scene')).toBeInTheDocument()
+    expect(await screen.findByTestId('fallback-scene')).toBeInTheDocument()
+    expect(screen.getAllByText('wte').length).toBeGreaterThan(0)
+    expect(screen.queryByText('Original llm-viz')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('vendored-layer-view')).not.toBeInTheDocument()
 
     const scene = screen.getByLabelText('Architecture scene')
     fireEvent.mouseEnter(scene)
@@ -153,7 +145,7 @@ describe('ui components', () => {
     expect(onFocusRanges).toHaveBeenLastCalledWith(null)
   })
 
-  it('maps walkthrough phases onto the upstream LayerView walkthrough', () => {
+  it('switches the microgpt focus window as phases change', async () => {
     const { rerender } = render(
       <ArchitectureScene
         trace={makeTrace()}
@@ -165,10 +157,7 @@ describe('ui components', () => {
       />,
     )
 
-    expect(screen.getByTestId('vendored-layer-view')).toHaveAttribute(
-      'data-phase',
-      '9',
-    )
+    expect(await screen.findByText('attention scores')).toBeInTheDocument()
 
     rerender(
       <ArchitectureScene
@@ -181,10 +170,7 @@ describe('ui components', () => {
       />,
     )
 
-    expect(screen.getByTestId('vendored-layer-view')).toHaveAttribute(
-      'data-phase',
-      '10',
-    )
+    expect(screen.getByText('attention weights')).toBeInTheDocument()
 
     rerender(
       <ArchitectureScene
@@ -197,10 +183,7 @@ describe('ui components', () => {
       />,
     )
 
-    expect(screen.getByTestId('vendored-layer-view')).toHaveAttribute(
-      'data-phase',
-      '12',
-    )
+    expect(screen.getByText('mlp block')).toBeInTheDocument()
 
     rerender(
       <ArchitectureScene
@@ -213,9 +196,6 @@ describe('ui components', () => {
       />,
     )
 
-    expect(screen.getByTestId('vendored-layer-view')).toHaveAttribute(
-      'data-phase',
-      '14',
-    )
+    expect(screen.getByText('append or stop')).toBeInTheDocument()
   })
 })
