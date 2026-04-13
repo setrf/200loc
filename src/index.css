@@ -1,0 +1,77 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap');
+
+:root {
+  --paper: #f5efe3;
+  --panel: rgba(255, 252, 247, 0.92);
+  --panel-strong: #fbf7ef;
+  --text: #1c1a18;
+  --muted: #6f675f;
+  --border: rgba(52, 43, 32, 0.13);
+  --accent: #1b6ee7;
+  --ink: #1c1a18;
+  --heat-1: #fff4e6;
+  --heat-2: #ffd9b5;
+  --heat-3: #ff9b4b;
+  --heat-4: #b04b00;
+  --shadow-soft: 0 16px 40px rgba(54, 45, 32, 0.08);
+  --sans: 'IBM Plex Sans', system-ui, sans-serif;
+  --heading: 'IBM Plex Sans', system-ui, sans-serif;
+  --mono: 'IBM Plex Mono', ui-monospace, monospace;
+
+  font: 400 16px/1.55 var(--sans);
+  color: var(--text);
+  background:
+    radial-gradient(circle at top left, rgba(27, 110, 231, 0.08), transparent 34%),
+    radial-gradient(circle at top right, rgba(255, 155, 75, 0.12), transparent 28%),
+    var(--paper);
+  text-rendering: optimizeLegibility;
+  font-synthesis: none;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100svh;
+}
+
+#root {
+  min-height: 100svh;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+
+h1 {
+  max-width: 16ch;
+  font: 700 clamp(2.4rem, 4vw, 4.2rem) / 0.95 var(--heading);
+  letter-spacing: -0.05em;
+}
+
+h2 {
+  font: 600 clamp(1.1rem, 2vw, 1.35rem) / 1.05 var(--heading);
+  letter-spacing: -0.03em;
+}
+
+a {
+  color: inherit;
+}
+
+@media (max-width: 1024px) {
+  h1 {
+    max-width: none;
+  }
+}
