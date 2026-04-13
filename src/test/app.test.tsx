@@ -138,12 +138,12 @@ describe('App', () => {
     expect(screen.getAllByText('Tokenize Prefix')).toHaveLength(2)
     expect(screen.getByText(/Code lines L23-27, L191-196/)).toBeInTheDocument()
     expect(screen.getByText('step 1 / 14')).toBeInTheDocument()
-    expect(screen.getByText('Token position 2 inside the model')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /p2:12 .* p3:stop/ })).toBeInTheDocument()
     expect(screen.getByText('line 117').closest('li')).not.toHaveClass('is-active')
 
-    fireEvent.mouseEnter(screen.getByText('QKV').closest('li')!)
+    fireEvent.mouseEnter(screen.getByText('Make QKV').closest('li')!)
     expect(screen.getByText('line 117').closest('li')).toHaveClass('is-active')
-    fireEvent.mouseLeave(screen.getByText('QKV').closest('li')!)
+    fireEvent.mouseLeave(screen.getByText('Make QKV').closest('li')!)
     expect(screen.getByText('line 23').closest('li')).toHaveClass('is-active')
 
     fireEvent.change(screen.getByLabelText('Prefix'), {
@@ -162,12 +162,12 @@ describe('App', () => {
     for (let index = 0; index < 4; index += 1) {
       fireEvent.click(screen.getByRole('button', { name: 'Next' }))
     }
-    expect(screen.getByText('Four heads, one causal window')).toBeInTheDocument()
+    expect(screen.getByText('Reading p2:12 against visible slots')).toBeInTheDocument()
 
     for (let index = 0; index < 5; index += 1) {
       fireEvent.click(screen.getByRole('button', { name: 'Next' }))
     }
-    expect(screen.getByText('Top candidates')).toBeInTheDocument()
+    expect(screen.getByText('Best guesses for p3')).toBeInTheDocument()
 
     for (let index = 0; index < 2; index += 1) {
       fireEvent.click(screen.getByRole('button', { name: 'Next' }))
@@ -217,6 +217,29 @@ describe('App', () => {
 
     await screen.findByText('Failed to load the walkthrough.')
     expect(screen.getByText('advance failed')).toBeInTheDocument()
+  })
+
+  it('renders the BOS-only context path at position zero', async () => {
+    const runtime = makeRuntime()
+    runtime.reset.mockResolvedValue({
+      trace: makeTrace({ tokenId: 26, positionId: 0, sampledTokenId: 26 }),
+      session: { visibleTokenIds: [], done: true },
+      diagnostics: { activeBackend: 'cpu', fallbackReason: undefined },
+    })
+
+    loadModelBundleMock.mockResolvedValue({ vocab: [] })
+    createTokenizerMock.mockReturnValue(makeTokenizer())
+    runtimeCtorMock.mockImplementation(function () {
+      return runtime
+    })
+    mockSourceFetch(sourceText)
+
+    const { default: App } = await import('../App')
+    render(<App />)
+
+    await screen.findByText('A 200-line GPT, explained one operation at a time.')
+    expect(screen.getByRole('heading', { name: 'Reading p0:BOS' })).toBeInTheDocument()
+    expect(screen.getByText('p0:BOS -> p1:stop')).toBeInTheDocument()
   })
 
   it('falls back to the generic advance error message for non-Error rejections', async () => {
@@ -395,26 +418,26 @@ describe('App', () => {
 
     fireEvent.mouseEnter(screen.getByText('Current token'))
     fireEvent.mouseLeave(screen.getByText('Current token'))
-    fireEvent.mouseEnter(screen.getByText('Token, position, residual'))
-    fireEvent.mouseLeave(screen.getByText('Token, position, residual'))
+    fireEvent.mouseEnter(screen.getByText('How p2:12 becomes a vector'))
+    fireEvent.mouseLeave(screen.getByText('How p2:12 becomes a vector'))
 
     for (let index = 0; index < 4; index += 1) {
       fireEvent.click(screen.getByRole('button', { name: 'Next' }))
     }
-    fireEvent.mouseEnter(screen.getByText('Four heads, one causal window'))
-    fireEvent.mouseLeave(screen.getByText('Four heads, one causal window'))
+    fireEvent.mouseEnter(screen.getByText('Reading p2:12 against visible slots'))
+    fireEvent.mouseLeave(screen.getByText('Reading p2:12 against visible slots'))
 
     for (let index = 0; index < 4; index += 1) {
       fireEvent.click(screen.getByRole('button', { name: 'Next' }))
     }
-    fireEvent.mouseEnter(screen.getByText('Update the stream locally'))
-    fireEvent.mouseLeave(screen.getByText('Update the stream locally'))
+    fireEvent.mouseEnter(screen.getByText('Update the state of p2:12'))
+    fireEvent.mouseLeave(screen.getByText('Update the state of p2:12'))
 
     for (let index = 0; index < 2; index += 1) {
       fireEvent.click(screen.getByRole('button', { name: 'Next' }))
     }
-    fireEvent.mouseEnter(screen.getByText('Top candidates'))
-    fireEvent.mouseLeave(screen.getByText('Top candidates'))
+    fireEvent.mouseEnter(screen.getByText('Best guesses for p3'))
+    fireEvent.mouseLeave(screen.getByText('Best guesses for p3'))
 
     for (let index = 0; index < 2; index += 1) {
       fireEvent.click(screen.getByRole('button', { name: 'Next' }))

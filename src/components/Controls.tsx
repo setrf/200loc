@@ -6,6 +6,7 @@ interface ControlsProps {
   backend: BackendName
   fallbackReason?: string
   phaseTitle: string
+  currentToken: string
   tokenPosition: number
   playing: boolean
   canPrev: boolean
@@ -23,6 +24,7 @@ export function Controls({
   backend,
   fallbackReason,
   phaseTitle,
+  currentToken,
   tokenPosition,
   playing,
   canPrev,
@@ -66,7 +68,10 @@ export function Controls({
       <p className="controls-panel__helper">{helper}</p>
 
       <div className="controls-panel__stats">
-        <span>Token position {tokenPosition}</span>
+        <span>
+          Reading p{tokenPosition}:{currentToken}
+        </span>
+        <span>Predicting p{tokenPosition + 1}</span>
         <span>1 layer · 4 heads · 16 dim · char-level</span>
       </div>
 

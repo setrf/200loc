@@ -1,36 +1,47 @@
 interface SequenceStripProps {
-  tokens: readonly string[]
-  currentToken: string
+  contextTokens: readonly string[]
+  currentPosition: number
   sampledToken: string
   terminal: boolean
 }
 
 export function SequenceStrip({
-  tokens,
-  currentToken,
+  contextTokens,
+  currentPosition,
   sampledToken,
   terminal,
 }: SequenceStripProps) {
+  const currentToken = contextTokens[contextTokens.length - 1] ?? 'BOS'
+  const nextPosition = currentPosition + 1
+
   return (
     <section className="panel sequence-strip">
       <div className="sequence-strip__header">
         <div>
           <p className="eyebrow">Sequence</p>
-          <h2>Context and next token</h2>
+          <h2>Read one slot, predict the next</h2>
         </div>
         <p className="sequence-strip__seed">deterministic seed</p>
       </div>
 
+      <p className="sequence-strip__summary">
+        Reading <strong>p{currentPosition}</strong>:{' '}
+        <strong>{currentToken}</strong> to predict <strong>p{nextPosition}</strong>.
+      </p>
+
       <div className="sequence-strip__tokens">
-        {tokens.length === 0 ? <span className="sequence-strip__empty">BOS</span> : null}
-        {tokens.map((token, index) => (
-          <span className="sequence-strip__token" key={`${token}-${index}`}>
-            {token}
+        {contextTokens.map((token, index) => (
+          <span
+            className={`sequence-strip__token ${index === currentPosition ? 'is-current' : ''}`}
+            key={`${token}-${index}`}
+          >
+            <span className="sequence-strip__token-position">p{index}</span>
+            <span>{token}</span>
           </span>
         ))}
-        <span className="sequence-strip__token is-current">{currentToken}</span>
         <span className={`sequence-strip__token ${terminal ? 'is-terminal' : 'is-next'}`}>
-          {sampledToken}
+          <span className="sequence-strip__token-position">p{nextPosition}</span>
+          <span>{sampledToken}</span>
         </span>
       </div>
     </section>

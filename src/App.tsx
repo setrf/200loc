@@ -226,6 +226,14 @@ export default function App() {
     state.activeTraceIndex < state.traces.length - 1 ||
     state.status !== 'terminal'
   const phaseNarration = phase.narration(trace, tokenLabel)
+  const currentTokenLabel = tokenLabel(trace.tokenId)
+  const sampledTokenLabel = tokenLabel(trace.sampledTokenId)
+  const contextTokens =
+    currentTokenLabel === 'BOS' && trace.positionId === 0
+      ? ['BOS']
+      : ['BOS', ...beforeCurrentTokens, currentTokenLabel]
+  const slotLabels = contextTokens.map((token, index) => `p${index} ${token}`)
+  const contextSummary = slotLabels.join(' · ')
 
   return (
     <div className="app-shell">
@@ -265,7 +273,9 @@ export default function App() {
             <NetworkTracker
               phases={inferencePhases}
               activePhaseIndex={state.activePhaseIndex}
+              contextTokens={contextTokens}
               tokenPosition={trace.positionId}
+              sampledToken={sampledTokenLabel}
               onFocusRanges={(ranges) =>
                 dispatch({ type: 'setHoverRanges', ranges })
               }
@@ -283,6 +293,7 @@ export default function App() {
               backend={state.backend}
               fallbackReason={state.fallbackReason}
               phaseTitle={phase.title}
+              currentToken={currentTokenLabel}
               tokenPosition={trace.positionId}
               playing={state.status === 'playing'}
               canPrev={canPrev}
@@ -312,8 +323,12 @@ export default function App() {
             />
 
             <section className="panel phase-panel">
-              <p className="eyebrow">Current phase</p>
+              <p className="eyebrow">What happens now</p>
               <h2>{phase.title}</h2>
+              <p>
+                Reading <strong>p{trace.positionId}:{currentTokenLabel}</strong>{' '}
+                from {contextSummary} to predict <strong>p{trace.positionId + 1}</strong>.
+              </p>
               <p>{phaseNarration.lead}</p>
               <p className="phase-panel__why">{phaseNarration.why}</p>
               <p className="phase-panel__code">
@@ -337,10 +352,10 @@ export default function App() {
             }`}
           >
             <SequenceStrip
-              tokens={beforeCurrentTokens}
-              currentToken={tokenLabel(trace.tokenId)}
-              sampledToken={tokenLabel(trace.sampledTokenId)}
-              terminal={tokenLabel(trace.sampledTokenId) === 'BOS'}
+              contextTokens={contextTokens}
+              currentPosition={trace.positionId}
+              sampledToken={sampledTokenLabel}
+              terminal={sampledTokenLabel === 'BOS'}
             />
 
             <div className="viz-grid">
@@ -352,11 +367,16 @@ export default function App() {
                 )}
               >
                 <p className="eyebrow">Current token</p>
-                <h2>{tokenLabel(trace.tokenId)}</h2>
+                <h2>
+                  Reading p{trace.positionId}:{currentTokenLabel}
+                </h2>
+                <p>Visible slots {contextSummary}</p>
                 <div className="token-card__facts">
                   <span>token id {trace.tokenId}</span>
                   <span>position {trace.positionId}</span>
-                  <span>next sample {tokenLabel(trace.sampledTokenId)}</span>
+                  <span>
+                    predicting p{trace.positionId + 1}:{sampledTokenLabel}
+                  </span>
                 </div>
               </article>
 
@@ -374,12 +394,29 @@ export default function App() {
                 <div className="panel__header">
                   <div>
                     <p className="eyebrow">Embeddings</p>
-                    <h2>Token, position, residual</h2>
+                    <h2>
+                      How p{trace.positionId}:{currentTokenLabel} becomes a vector
+                    </h2>
                   </div>
                 </div>
-                <VectorBars values={trace.tokenEmbedding} limit={8} label="token row" compact />
-                <VectorBars values={trace.positionEmbedding} limit={8} label="position row" compact />
-                <VectorBars values={trace.xAfterNorm} limit={8} label="normalized sum" compact />
+                <VectorBars
+                  values={trace.tokenEmbedding}
+                  limit={8}
+                  label={`token vector for ${currentTokenLabel}`}
+                  compact
+                />
+                <VectorBars
+                  values={trace.positionEmbedding}
+                  limit={8}
+                  label={`position vector for p${trace.positionId}`}
+                  compact
+                />
+                <VectorBars
+                  values={trace.xAfterNorm}
+                  limit={8}
+                  label="combined input stream"
+                  compact
+                />
               </article>
 
               {(phase.id === 'qkv' ||
@@ -399,7 +436,12 @@ export default function App() {
                     ],
                   )}
                 >
-                  <AttentionCard heads={trace.heads} />
+                  <AttentionCard
+                    heads={trace.heads}
+                    slotLabels={slotLabels}
+                    currentToken={currentTokenLabel}
+                    currentPosition={trace.positionId}
+                  />
                 </div>
               )}
 
@@ -417,13 +459,15 @@ export default function App() {
                   <div className="panel__header">
                     <div>
                       <p className="eyebrow">Residual / MLP</p>
-                      <h2>Update the stream locally</h2>
+                      <h2>
+                        Update the state of p{trace.positionId}:{currentTokenLabel}
+                      </h2>
                     </div>
                   </div>
-                  <VectorBars values={trace.attnOutput} limit={8} label="attention output" compact />
-                  <VectorBars values={trace.xAfterAttnResidual} limit={8} label="after attn residual" compact />
-                  <VectorBars values={trace.mlpHidden} limit={8} label="mlp hidden" compact />
-                  <VectorBars values={trace.xAfterMlpResidual} limit={8} label="final residual" compact />
+                  <VectorBars values={trace.attnOutput} limit={8} label="attention write-back" compact />
+                  <VectorBars values={trace.xAfterAttnResidual} limit={8} label="state after write-back" compact />
+                  <VectorBars values={trace.mlpHidden} limit={8} label="mlp hidden activations" compact />
+                  <VectorBars values={trace.xAfterMlpResidual} limit={8} label="final state for this slot" compact />
                 </article>
               )}
 
@@ -441,7 +485,7 @@ export default function App() {
                   <div className="panel__header">
                     <div>
                       <p className="eyebrow">Next token</p>
-                      <h2>Top candidates</h2>
+                      <h2>Best guesses for p{trace.positionId + 1}</h2>
                     </div>
                   </div>
                   <div className="logits-card__list">
@@ -473,11 +517,13 @@ export default function App() {
                   )}
                 >
                   <p className="eyebrow">Sampling</p>
-                  <h2>{tokenLabel(trace.sampledTokenId)}</h2>
+                  <h2>
+                    p{trace.positionId + 1}:{sampledTokenLabel}
+                  </h2>
                   <p>
-                    {tokenLabel(trace.sampledTokenId) === 'BOS'
+                    {sampledTokenLabel === 'BOS'
                       ? 'BOS means the model emitted the stop token and ends generation.'
-                      : 'This sampled token is appended to the context and becomes the next current token.'}
+                      : `The model sampled ${sampledTokenLabel}. That value is appended as the next visible slot.`}
                   </p>
                   <p className="sample-card__note">
                     Fixed temperature 0.5, deterministic seed, one token at a time.

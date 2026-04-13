@@ -3,41 +3,52 @@ import type { LineRange, PhaseDefinition } from '../walkthrough/phases'
 interface NetworkTrackerProps {
   phases: readonly PhaseDefinition[]
   activePhaseIndex: number
+  contextTokens: readonly string[]
   tokenPosition: number
+  sampledToken: string
   onFocusRanges: (ranges: LineRange[] | null) => void
 }
 
 const trackerMeta = [
-  { label: 'Input', group: 'context' },
-  { label: 'Tok vec', group: 'lookup' },
-  { label: 'Pos vec', group: 'lookup' },
+  { label: 'Read token', group: 'context' },
+  { label: 'Token vector', group: 'lookup' },
+  { label: 'Position vector', group: 'lookup' },
   { label: 'Add + norm', group: 'residual' },
-  { label: 'QKV', group: 'attention' },
-  { label: 'Scores', group: 'attention' },
-  { label: 'Weights', group: 'attention' },
-  { label: 'Value mix', group: 'attention' },
-  { label: 'Attn out', group: 'residual' },
-  { label: 'MLP', group: 'compute' },
-  { label: 'Logits', group: 'readout' },
-  { label: 'Prob', group: 'readout' },
-  { label: 'Sample', group: 'decode' },
-  { label: 'Append', group: 'loop' },
+  { label: 'Make QKV', group: 'attention' },
+  { label: 'Score slots', group: 'attention' },
+  { label: 'Weight slots', group: 'attention' },
+  { label: 'Mix values', group: 'attention' },
+  { label: 'Write back', group: 'residual' },
+  { label: 'Run MLP', group: 'compute' },
+  { label: 'Score vocab', group: 'readout' },
+  { label: 'Normalize', group: 'readout' },
+  { label: 'Draw token', group: 'decode' },
+  { label: 'Append / stop', group: 'loop' },
 ] as const
 
 export function NetworkTracker({
   phases,
   activePhaseIndex,
+  contextTokens,
   tokenPosition,
+  sampledToken,
   onFocusRanges,
 }: NetworkTrackerProps) {
   const activeMeta = trackerMeta[activePhaseIndex]
+  const currentToken = contextTokens[contextTokens.length - 1] ?? 'BOS'
+  const contextSummary = contextTokens
+    .map((token, index) => `p${index}:${token}`)
+    .join(' · ')
 
   return (
     <section className="panel network-tracker">
       <div className="panel__header">
         <div>
           <p className="eyebrow">Network position</p>
-          <h2>Token position {tokenPosition} inside the model</h2>
+          <h2>
+            p{tokenPosition}:{currentToken} {'->'} p{tokenPosition + 1}
+            {sampledToken === 'BOS' ? ':stop' : `:${sampledToken}`}
+          </h2>
         </div>
         <p className="network-tracker__meta">
           step {activePhaseIndex + 1} / {phases.length}
@@ -45,8 +56,8 @@ export function NetworkTracker({
       </div>
 
       <p className="network-tracker__lead">
-        Now in <strong>{activeMeta.label}</strong>. This is the model location
-        for the current walkthrough phase.
+        Now doing <strong>{activeMeta.label}</strong>. Visible slots:{' '}
+        <span className="network-tracker__context">{contextSummary}</span>.
       </p>
 
       <ol className="network-tracker__path">

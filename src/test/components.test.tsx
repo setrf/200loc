@@ -35,6 +35,7 @@ describe('ui components', () => {
         backend="cpu"
         fallbackReason="WebGPU unavailable"
         phaseTitle="Sample"
+        currentToken="BOS"
         tokenPosition={0}
         playing={false}
         canPrev={false}
@@ -49,6 +50,7 @@ describe('ui components', () => {
 
     expect(screen.getByText('CPU fallback')).toBeInTheDocument()
     expect(screen.getByText('WebGPU unavailable')).toBeInTheDocument()
+    expect(screen.getByText('Reading p0:BOS')).toBeInTheDocument()
   })
 
   it('handles the truncated helper, webgpu badge, and input changes', () => {
@@ -63,6 +65,7 @@ describe('ui components', () => {
         }}
         backend="webgpu"
         phaseTitle="Sample"
+        currentToken="m"
         tokenPosition={3}
         playing={true}
         canPrev={true}
@@ -77,6 +80,7 @@ describe('ui components', () => {
 
     expect(screen.getByText('WebGPU')).toBeInTheDocument()
     expect(screen.getByText('Prefix was capped at 15 characters.')).toBeInTheDocument()
+    expect(screen.getByText('Predicting p4')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Pause' })).toBeInTheDocument()
     fireEvent.change(screen.getByLabelText('Prefix'), { target: { value: 'em' } })
     expect(onPrefixChange).toHaveBeenCalledWith('em')
@@ -96,12 +100,17 @@ describe('ui components', () => {
     render(
       <>
         <SequenceStrip
-          tokens={['e', 'm']}
-          currentToken="m"
+          contextTokens={['BOS', 'e', 'm']}
+          currentPosition={2}
           sampledToken="BOS"
           terminal
         />
-        <AttentionCard heads={trace.heads} />
+        <AttentionCard
+          heads={trace.heads}
+          slotLabels={['p0 BOS', 'p1 e', 'p2 m']}
+          currentToken="m"
+          currentPosition={2}
+        />
         <VectorBars values={trace.tokenEmbedding} label="token row" compact />
         <Appendix
           open={true}
@@ -112,11 +121,49 @@ describe('ui components', () => {
       </>,
     )
 
-    expect(screen.getByText('Context and next token')).toBeInTheDocument()
+    expect(screen.getByText('Read one slot, predict the next')).toBeInTheDocument()
+    expect(screen.getByText('p0')).toBeInTheDocument()
+    expect(screen.getByText('Reading p2:m against visible slots')).toBeInTheDocument()
     expect(screen.getByText('Head 1')).toBeInTheDocument()
     expect(screen.getByText('token row')).toBeInTheDocument()
     fireEvent.mouseEnter(screen.getByText('Dataset + Shuffle'))
     expect(onFocusRanges).toHaveBeenCalled()
+  })
+
+  it('renders concrete fallbacks when context labels are empty', () => {
+    const trace = makeTrace()
+
+    render(
+      <>
+        <SequenceStrip
+          contextTokens={[]}
+          currentPosition={0}
+          sampledToken="BOS"
+          terminal
+        />
+        <AttentionCard
+          heads={trace.heads}
+          slotLabels={[]}
+          currentToken="BOS"
+          currentPosition={0}
+        />
+        <NetworkTracker
+          phases={inferencePhases}
+          activePhaseIndex={0}
+          contextTokens={[]}
+          tokenPosition={0}
+          sampledToken="BOS"
+          onFocusRanges={() => {}}
+        />
+      </>,
+    )
+
+    expect(document.querySelector('.sequence-strip__summary')).toHaveTextContent(
+      'Reading p0: BOS to predict p1.',
+    )
+    expect(document.querySelector('.sequence-strip__token-position')).toHaveTextContent('p1')
+    expect(screen.getAllByText(/strongest read p0/).length).toBeGreaterThan(0)
+    expect(screen.getByText('p0:BOS -> p1:stop')).toBeInTheDocument()
   })
 
   it('renders the network tracker with active and completed stages', () => {
@@ -126,16 +173,18 @@ describe('ui components', () => {
       <NetworkTracker
         phases={inferencePhases}
         activePhaseIndex={5}
+        contextTokens={['BOS', 'e', 'm']}
         tokenPosition={2}
+        sampledToken="a"
         onFocusRanges={onFocusRanges}
       />,
     )
 
-    expect(screen.getByText('Token position 2 inside the model')).toBeInTheDocument()
+    expect(screen.getByText('p2:m -> p3:a')).toBeInTheDocument()
     expect(screen.getByText('step 6 / 14')).toBeInTheDocument()
-    expect(document.querySelector('[aria-current="step"] .network-tracker__label')).toHaveTextContent('Scores')
-    expect(screen.getByText('Input').closest('li')).toHaveClass('is-complete')
-    expect(screen.getByText('Append').closest('li')).toHaveClass('is-upcoming')
+    expect(document.querySelector('[aria-current="step"] .network-tracker__label')).toHaveTextContent('Score slots')
+    expect(screen.getByText('Read token').closest('li')).toHaveClass('is-complete')
+    expect(screen.getByText('Append / stop').closest('li')).toHaveClass('is-upcoming')
 
     fireEvent.mouseEnter(document.querySelector('[aria-current="step"]')!)
     expect(onFocusRanges).toHaveBeenCalledWith(inferencePhases[5].codeRanges)
