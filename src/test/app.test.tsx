@@ -137,6 +137,8 @@ describe('App', () => {
     expect(screen.getAllByText('CPU fallback')).toHaveLength(2)
     expect(screen.getAllByText('Tokenize Prefix')).toHaveLength(2)
     expect(screen.getByText(/Code lines L23-27, L191-196/)).toBeInTheDocument()
+    expect(screen.getByText('step 1 / 14')).toBeInTheDocument()
+    expect(screen.getByText('Token position 2 inside the model')).toBeInTheDocument()
 
     fireEvent.change(screen.getByLabelText('Prefix'), {
       target: { value: 'Em!42' },
@@ -149,6 +151,7 @@ describe('App', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Next' }))
     expect(screen.getAllByText('Token Embedding')).toHaveLength(2)
     expect(screen.getByText(/Code lines L109/)).toBeInTheDocument()
+    expect(screen.getByText('step 2 / 14')).toBeInTheDocument()
 
     for (let index = 0; index < 4; index += 1) {
       fireEvent.click(screen.getByRole('button', { name: 'Next' }))

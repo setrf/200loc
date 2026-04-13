@@ -209,6 +209,99 @@ button:disabled {
   font-size: 14px;
 }
 
+.network-tracker__meta {
+  color: var(--muted);
+  font: 600 12px/1 var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.network-tracker__lead {
+  margin-top: 12px;
+  color: var(--muted);
+}
+
+.network-tracker__lead strong {
+  color: var(--text);
+}
+
+.network-tracker__path {
+  list-style: none;
+  padding: 0;
+  margin: 18px 0 0;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
+}
+
+.network-tracker__item {
+  position: relative;
+  display: grid;
+  gap: 8px;
+  min-height: 112px;
+  padding: 16px 16px 14px;
+  border-radius: 18px;
+  border: 1px solid var(--border);
+  background: var(--panel-strong);
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease,
+    transform 180ms ease;
+}
+
+.network-tracker__item::before {
+  content: '';
+  width: 100%;
+  min-height: 4px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--border) 72%, white);
+}
+
+.network-tracker__item:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--accent) 24%, var(--border));
+}
+
+.network-tracker__item.is-complete::before,
+.network-tracker__item.is-active::before {
+  background: linear-gradient(90deg, #6eb0ff, #1f7fff);
+}
+
+.network-tracker__item.is-complete {
+  background: color-mix(in srgb, var(--accent) 5%, white);
+}
+
+.network-tracker__item.is-active {
+  background: color-mix(in srgb, var(--accent) 10%, white);
+  border-color: color-mix(in srgb, var(--accent) 35%, white);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 16%, white);
+}
+
+.network-tracker__item.is-upcoming {
+  opacity: 0.76;
+}
+
+.network-tracker__group,
+.network-tracker__index {
+  font: 600 11px/1 var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.network-tracker__group {
+  color: var(--muted);
+}
+
+.network-tracker__label {
+  font: 600 15px/1.1 var(--heading);
+  letter-spacing: -0.03em;
+}
+
+.network-tracker__index {
+  margin-top: auto;
+  color: var(--accent);
+}
+
 .sequence-strip__seed {
   color: var(--muted);
   font: 500 12px/1.4 var(--mono);

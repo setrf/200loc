@@ -8,6 +8,7 @@ import { AttentionCard } from './components/AttentionCard'
 import { Appendix } from './components/Appendix'
 import { CodeViewer } from './components/CodeViewer'
 import { Controls } from './components/Controls'
+import { NetworkTracker } from './components/NetworkTracker'
 import { SegmentTabs } from './components/SegmentTabs'
 import { SequenceStrip } from './components/SequenceStrip'
 import { VectorBars } from './components/VectorBars'
@@ -260,6 +261,17 @@ export default function App() {
         </aside>
 
         <section className="app-main-pane">
+          {state.mobileTab !== 'code' ? (
+            <NetworkTracker
+              phases={inferencePhases}
+              activePhaseIndex={state.activePhaseIndex}
+              tokenPosition={trace.positionId}
+              onFocusRanges={(ranges) =>
+                dispatch({ type: 'setHoverRanges', ranges })
+              }
+            />
+          ) : null}
+
           <div
             className={`story-pane ${
               state.mobileTab === 'story' ? 'is-active' : ''

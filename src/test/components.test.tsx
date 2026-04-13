@@ -4,10 +4,11 @@ import { Appendix } from '../components/Appendix'
 import { AttentionCard } from '../components/AttentionCard'
 import { CodeViewer } from '../components/CodeViewer'
 import { Controls } from '../components/Controls'
+import { NetworkTracker } from '../components/NetworkTracker'
 import { SequenceStrip } from '../components/SequenceStrip'
 import { SegmentTabs } from '../components/SegmentTabs'
 import { VectorBars } from '../components/VectorBars'
-import { trainingAppendix } from '../walkthrough/phases'
+import { inferencePhases, trainingAppendix } from '../walkthrough/phases'
 import { makeTrace } from './helpers/fixtures'
 
 describe('ui components', () => {
@@ -116,6 +117,30 @@ describe('ui components', () => {
     expect(screen.getByText('token row')).toBeInTheDocument()
     fireEvent.mouseEnter(screen.getByText('Dataset + Shuffle'))
     expect(onFocusRanges).toHaveBeenCalled()
+  })
+
+  it('renders the network tracker with active and completed stages', () => {
+    const onFocusRanges = vi.fn()
+
+    render(
+      <NetworkTracker
+        phases={inferencePhases}
+        activePhaseIndex={5}
+        tokenPosition={2}
+        onFocusRanges={onFocusRanges}
+      />,
+    )
+
+    expect(screen.getByText('Token position 2 inside the model')).toBeInTheDocument()
+    expect(screen.getByText('step 6 / 14')).toBeInTheDocument()
+    expect(document.querySelector('[aria-current="step"] .network-tracker__label')).toHaveTextContent('Scores')
+    expect(screen.getByText('Input').closest('li')).toHaveClass('is-complete')
+    expect(screen.getByText('Append').closest('li')).toHaveClass('is-upcoming')
+
+    fireEvent.mouseEnter(document.querySelector('[aria-current="step"]')!)
+    expect(onFocusRanges).toHaveBeenCalledWith(inferencePhases[5].codeRanges)
+    fireEvent.mouseLeave(document.querySelector('[aria-current="step"]')!)
+    expect(onFocusRanges).toHaveBeenLastCalledWith(null)
   })
 
   it('renders vector bars without optional label metadata', () => {
