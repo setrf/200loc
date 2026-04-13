@@ -59,6 +59,13 @@ Start the app:
 npm run dev
 ```
 
+React Grab is enabled in development. Once the app is running, hover any element and press:
+
+- `Cmd+C` on macOS
+- `Ctrl+C` on Windows/Linux
+
+to copy the grabbed UI context from the page.
+
 Rebuild the exported model bundle:
 
 ```bash
