@@ -16,11 +16,15 @@ export function CodeViewer({ source, activeRanges }: CodeViewerProps) {
 
   return (
     <div className="code-viewer">
-      <div className="code-viewer__header">
-        <div>
-          <p className="eyebrow">Canonical source</p>
-          <h2>Karpathy’s exact `microgpt.py`</h2>
+      <div className="code-viewer__tabs">
+        <div className="code-viewer__tab is-active">
+          <span className="code-viewer__tab-icon" aria-hidden="true" />
+          <span>microgpt</span>
         </div>
+      </div>
+
+      <div className="code-viewer__header">
+        <p className="code-viewer__breadcrumbs">assets {'>'} microgpt.py</p>
         <p className="code-viewer__meta">{lines.length} lines</p>
       </div>
 

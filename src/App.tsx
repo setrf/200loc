@@ -283,6 +283,7 @@ export default function App() {
   }
 
   const tokenLabel = tokenizerRef.current!.tokenLabel
+  const backendStatusLabel = state.backend === 'webgpu' ? 'GPU' : 'CPU'
   const prefixChars = [...state.normalization.normalized]
   const generatedBeforeCurrent =
     state.activeTraceIndex > 0
@@ -319,6 +320,22 @@ export default function App() {
 
   return (
     <div className="app-shell">
+      <header className="workbench-titlebar">
+        <div className="titlebar__window-controls" aria-hidden="true">
+          <span />
+          <span />
+          <span />
+        </div>
+        <div className="titlebar__title">200loc · microgpt walkthrough</div>
+        <div className="titlebar__meta">
+          <span>{backendStatusLabel}</span>
+          <span>{phase.title}</span>
+          <span>
+            p{trace.positionId}:{currentTokenLabel}
+          </span>
+        </div>
+      </header>
+
       <div className="mobile-only">
         <SegmentTabs
           activeTab={state.mobileTab}
@@ -326,77 +343,137 @@ export default function App() {
         />
       </div>
 
-      <main className="app-layout">
-        <aside
-          className={`app-code-pane ${
-            state.mobileTab === 'code' ? 'is-active' : ''
-          }`}
-        >
-          <CodeViewer source={source} activeRanges={activeRanges} />
+      <main className="workbench-main">
+        <aside className="activity-bar" aria-label="Workbench activity">
+          <button type="button" className="activity-bar__item is-active" aria-label="Explorer">
+            F
+          </button>
+          <button type="button" className="activity-bar__item" aria-label="Search">
+            S
+          </button>
+          <button type="button" className="activity-bar__item" aria-label="Graph">
+            G
+          </button>
+          <button type="button" className="activity-bar__item" aria-label="Extensions">
+            X
+          </button>
+        </aside>
+
+        <aside className="workbench-sidebar" aria-label="Workbench sidebar">
+          <div className="sidebar__section">
+            <p className="sidebar__label">Explorer</p>
+            <h1 className="sidebar__title">200loc</h1>
+          </div>
+
+          <div className="sidebar__group">
+            <p className="sidebar__label">Open Editors</p>
+            <div className="sidebar__item is-active">
+              <span className="sidebar__tree">▾</span>
+              <span className="sidebar__bullet" aria-hidden="true" />
+              microgpt
+            </div>
+            <div className="sidebar__item">
+              <span className="sidebar__tree">▸</span>
+              walkthrough
+            </div>
+            <div className="sidebar__item">
+              <span className="sidebar__tree">▸</span>
+              weights
+            </div>
+          </div>
+
+          <div className="sidebar__group">
+            <p className="sidebar__label">Outline</p>
+            <div className="sidebar__item">{phase.title}</div>
+            <p className="sidebar__meta">
+              p{trace.positionId}:{currentTokenLabel} {'->'} p{trace.positionId + 1}
+              {sampledTokenLabel === 'BOS' ? ':stop' : `:${sampledTokenLabel}`}
+            </p>
+            <p className="sidebar__meta">Visible {contextSummary}</p>
+          </div>
         </aside>
 
         <section className="app-main-pane">
-          <div
-            className={`story-pane ${
-              state.mobileTab === 'story' ? 'is-active' : ''
+          <aside
+            className={`app-code-pane ${
+              state.mobileTab === 'code' ? 'is-active' : ''
             }`}
           >
-            <section className="slab control-rail">
-              <div className="control-rail__masthead">
-                <div className="control-rail__title-block">
-                  <p className="app-header__wordmark">200loc</p>
-                  <h1>A 200-line GPT, explained one operation at a time.</h1>
-                </div>
-                <div className="control-rail__meta">
-                  <span className="control-rail__config">
-                    1 layer · 4 heads · 16 dim · char-level
-                  </span>
-                </div>
-              </div>
+            <CodeViewer source={source} activeRanges={activeRanges} />
+          </aside>
 
-              <p className="control-rail__thesis">
-                Swiss poster layout, hard rules, one live inference step, and the canonical source always in view.
-              </p>
+          <div
+            className={`panel-area ${
+              state.mobileTab === 'code' ? '' : 'is-active'
+            }`}
+          >
+            <div className="panel-area__tabs">
+              <div className="panel-area__tab is-active">Walkthrough</div>
+              <div className="panel-area__tab">Problems</div>
+              <div className="panel-area__tab">Output</div>
+            </div>
 
-              <div className="control-rail__grid">
-                <Controls
-                  prefix={state.prefixInput}
-                  normalization={state.normalization}
-                  backend={state.backend}
-                  fallbackReason={state.fallbackReason}
-                  phaseTitle={phase.title}
-                  currentToken={currentTokenLabel}
-                  tokenPosition={trace.positionId}
-                  playing={state.status === 'playing'}
-                  canPrev={canPrev}
-                  canNext={canNext}
-                  onPrefixChange={(value) =>
-                    dispatch({ type: 'setPrefixInput', prefixInput: value })
-                  }
-                  onReset={() => {
-                    dispatch({ type: 'setPlaying', playing: false })
-                    void hydrate(state.prefixInput)
-                  }}
-                  onPrev={() => {
-                    dispatch({ type: 'setPlaying', playing: false })
-                    dispatch({ type: 'phasePrev', phaseCount })
-                  }}
-                  onNext={() => {
-                    dispatch({ type: 'setPlaying', playing: false })
-                    void advance()
-                  }}
-                  onTogglePlay={() => {
-                    if (state.status === 'playing') {
-                      dispatch({ type: 'setPlaying', playing: false })
-                    } else {
-                      dispatch({ type: 'setPlaying', playing: true })
+            <div className="panel-area__content">
+              <div
+                className={`story-pane ${
+                  state.mobileTab === 'story' ? 'is-active' : ''
+                }`}
+              >
+                <section className="workbench-pane">
+                  <div className="panel-section__header">
+                    <div>
+                      <p className="eyebrow">Walkthrough</p>
+                      <h2>{phase.title}</h2>
+                    </div>
+                    <p className="panel-section__meta">{backendStatusLabel}</p>
+                  </div>
+
+                  <Controls
+                    prefix={state.prefixInput}
+                    normalization={state.normalization}
+                    backend={state.backend}
+                    fallbackReason={state.fallbackReason}
+                    phaseTitle={phase.title}
+                    currentToken={currentTokenLabel}
+                    tokenPosition={trace.positionId}
+                    playing={state.status === 'playing'}
+                    canPrev={canPrev}
+                    canNext={canNext}
+                    onPrefixChange={(value) =>
+                      dispatch({ type: 'setPrefixInput', prefixInput: value })
                     }
-                  }}
-                />
+                    onReset={() => {
+                      dispatch({ type: 'setPlaying', playing: false })
+                      void hydrate(state.prefixInput)
+                    }}
+                    onPrev={() => {
+                      dispatch({ type: 'setPlaying', playing: false })
+                      dispatch({ type: 'phasePrev', phaseCount })
+                    }}
+                    onNext={() => {
+                      dispatch({ type: 'setPlaying', playing: false })
+                      void advance()
+                    }}
+                    onTogglePlay={() => {
+                      if (state.status === 'playing') {
+                        dispatch({ type: 'setPlaying', playing: false })
+                      } else {
+                        dispatch({ type: 'setPlaying', playing: true })
+                      }
+                    }}
+                  />
+                </section>
 
-                <div className="phase-brief">
-                  <p className="eyebrow">What happens now</p>
-                  <h2>{phase.title}</h2>
+                <section className="workbench-pane phase-brief">
+                  <div className="panel-section__header">
+                    <div>
+                      <p className="eyebrow">Current Phase</p>
+                      <h2>{phase.title}</h2>
+                    </div>
+                    <p className="panel-section__meta">
+                      Code lines {formatRanges(phase.codeRanges)}
+                    </p>
+                  </div>
                   <p className="phase-brief__summary">
                     Reading <strong>p{trace.positionId}:{currentTokenLabel}</strong>{' '}
                     from {contextSummary} to predict{' '}
@@ -404,241 +481,253 @@ export default function App() {
                   </p>
                   <p>{phaseNarration.lead}</p>
                   <p className="phase-panel__why">{phaseNarration.why}</p>
-                  <p className="phase-panel__code">
-                    Code lines {formatRanges(phase.codeRanges)}
-                  </p>
-                </div>
-              </div>
-            </section>
+                </section>
 
-            <section className="slab state-board">
-              <div className="state-board__header">
-                <div>
-                  <p className="eyebrow">State board</p>
-                  <h2>
-                    Reading p{trace.positionId}:{currentTokenLabel} to predict p
-                    {trace.positionId + 1}:{sampledTokenLabel}
-                  </h2>
-                </div>
+                <Appendix
+                  open={state.appendixOpen}
+                  sections={trainingAppendix}
+                  onToggle={() => dispatch({ type: 'toggleAppendix' })}
+                  onFocusRanges={(ranges) =>
+                    dispatch({ type: 'setHoverRanges', ranges })
+                  }
+                />
               </div>
 
-              <NetworkTracker
-                phases={inferencePhases}
-                activePhaseIndex={state.activePhaseIndex}
-                contextTokens={contextTokens}
-                tokenPosition={trace.positionId}
-                sampledToken={sampledTokenLabel}
-                onFocusRanges={(ranges) =>
-                  dispatch({ type: 'setHoverRanges', ranges })
-                }
-              />
+              <div
+                className={`viz-pane ${
+                  state.mobileTab === 'viz' ? 'is-active' : ''
+                }`}
+              >
+                <section className="workbench-pane state-board">
+                  <div className="panel-section__header">
+                    <div>
+                      <p className="eyebrow">State board</p>
+                      <h2>
+                        Reading p{trace.positionId}:{currentTokenLabel} to predict p
+                        {trace.positionId + 1}:{sampledTokenLabel}
+                      </h2>
+                    </div>
+                    <p className="panel-section__meta">
+                      step {state.activePhaseIndex + 1} / {phaseCount}
+                    </p>
+                  </div>
 
-              <div className="state-board__grid">
-                <div
-                  className="state-board__sequence"
-                  {...cardProps(
-                    (ranges) => dispatch({ type: 'setHoverRanges', ranges }),
-                    inferencePhases[0].codeRanges,
-                  )}
-                >
-                  <SequenceStrip
+                  <NetworkTracker
+                    phases={inferencePhases}
+                    activePhaseIndex={state.activePhaseIndex}
                     contextTokens={contextTokens}
-                    currentPosition={trace.positionId}
+                    tokenPosition={trace.positionId}
                     sampledToken={sampledTokenLabel}
-                    terminal={sampledTokenLabel === 'BOS'}
+                    onFocusRanges={(ranges) =>
+                      dispatch({ type: 'setHoverRanges', ranges })
+                    }
                   />
-                </div>
 
-                <div
-                  className="state-board__facts"
-                  {...cardProps(
-                    (ranges) => dispatch({ type: 'setHoverRanges', ranges }),
-                    [
-                      ...inferencePhases[0].codeRanges,
-                      ...phase.codeRanges,
-                    ],
-                  )}
-                >
-                  <p className="eyebrow">Current slot</p>
-                  <h2>
-                    Reading p{trace.positionId}:{currentTokenLabel}
-                  </h2>
-                  <p className="state-board__context">Visible slots {contextSummary}</p>
-                  <div className="token-card__facts">
-                    <span>token id {trace.tokenId}</span>
-                    <span>position {trace.positionId}</span>
-                    <span>predicting p{trace.positionId + 1}:{sampledTokenLabel}</span>
-                  </div>
-                </div>
-              </div>
-            </section>
-
-            <Appendix
-              open={state.appendixOpen}
-              sections={trainingAppendix}
-              onToggle={() => dispatch({ type: 'toggleAppendix' })}
-              onFocusRanges={(ranges) =>
-                dispatch({ type: 'setHoverRanges', ranges })
-              }
-            />
-          </div>
-
-          <div
-            className={`viz-pane ${
-              state.mobileTab === 'viz' ? 'is-active' : ''
-            }`}
-          >
-            <section className="slab computation-board">
-              <div className="computation-board__header">
-                <div>
-                  <p className="eyebrow">{boardCopy.eyebrow}</p>
-                  <h2>{boardCopy.title}</h2>
-                </div>
-                <p className="computation-board__code">
-                  {phase.title} · {formatRanges(phase.codeRanges)}
-                </p>
-              </div>
-
-              <p className="computation-board__lead">{boardCopy.lead}</p>
-
-              {computationGroup === 'embeddings' && (
-                <div
-                  className="computation-board__body computation-board__body--embeddings"
-                  {...cardProps(
-                    (ranges) => dispatch({ type: 'setHoverRanges', ranges }),
-                    [
-                      ...inferencePhases[1].codeRanges,
-                      ...inferencePhases[2].codeRanges,
-                      ...inferencePhases[3].codeRanges,
-                    ],
-                  )}
-                >
-                  <VectorBars
-                    values={trace.tokenEmbedding}
-                    limit={8}
-                    label={`token vector for ${currentTokenLabel}`}
-                    compact
-                  />
-                  <VectorBars
-                    values={trace.positionEmbedding}
-                    limit={8}
-                    label={`position vector for p${trace.positionId}`}
-                    compact
-                  />
-                  <VectorBars
-                    values={trace.xAfterNorm}
-                    limit={8}
-                    label="combined input stream"
-                    compact
-                  />
-                </div>
-              )}
-
-              {computationGroup === 'attention' && (
-                <div
-                  className="computation-board__body"
-                  {...cardProps(
-                    (ranges) => dispatch({ type: 'setHoverRanges', ranges }),
-                    [
-                      ...inferencePhases[4].codeRanges,
-                      ...inferencePhases[5].codeRanges,
-                      ...inferencePhases[6].codeRanges,
-                      ...inferencePhases[7].codeRanges,
-                    ],
-                  )}
-                >
-                  <AttentionCard
-                    heads={trace.heads}
-                    slotLabels={slotLabels}
-                    currentToken={currentTokenLabel}
-                    currentPosition={trace.positionId}
-                  />
-                </div>
-              )}
-
-              {computationGroup === 'residual' && (
-                <div
-                  className="computation-board__body computation-board__body--residual"
-                  {...cardProps(
-                    (ranges) => dispatch({ type: 'setHoverRanges', ranges }),
-                    [
-                      ...inferencePhases[8].codeRanges,
-                      ...inferencePhases[9].codeRanges,
-                    ],
-                  )}
-                >
-                  <VectorBars values={trace.attnOutput} limit={8} label="attention write-back" compact />
-                  <VectorBars values={trace.xAfterAttnResidual} limit={8} label="state after write-back" compact />
-                  <VectorBars values={trace.mlpHidden} limit={8} label="mlp hidden activations" compact />
-                  <VectorBars values={trace.xAfterMlpResidual} limit={8} label="final state for this slot" compact />
-                </div>
-              )}
-
-              {computationGroup === 'readout' && (
-                <div
-                  className="computation-board__body"
-                  {...cardProps(
-                    (ranges) => dispatch({ type: 'setHoverRanges', ranges }),
-                    [
-                      ...inferencePhases[10].codeRanges,
-                      ...inferencePhases[11].codeRanges,
-                    ],
-                  )}
-                >
-                  <div className="logits-card">
-                    <div className="logits-card__header">
-                      <p className="eyebrow">Next token</p>
-                      <h2>Best guesses for p{trace.positionId + 1}</h2>
+                  <div className="state-board__grid">
+                    <div
+                      className="state-board__sequence"
+                      {...cardProps(
+                        (ranges) => dispatch({ type: 'setHoverRanges', ranges }),
+                        inferencePhases[0].codeRanges,
+                      )}
+                    >
+                      <SequenceStrip
+                        contextTokens={contextTokens}
+                        currentPosition={trace.positionId}
+                        sampledToken={sampledTokenLabel}
+                        terminal={sampledTokenLabel === 'BOS'}
+                      />
                     </div>
-                    <div className="logits-card__list">
-                      {trace.topCandidates.map((candidate) => (
-                        <div className="logits-card__row" key={candidate.tokenId}>
-                          <span>{tokenLabel(candidate.tokenId)}</span>
-                          <div className="logits-card__track">
-                            <div
-                              className="logits-card__fill"
-                              style={{ width: `${candidate.probability * 100}%` }}
-                            />
-                          </div>
-                          <span>{(candidate.probability * 100).toFixed(1)}%</span>
+
+                    <div
+                      className="state-board__facts"
+                      {...cardProps(
+                        (ranges) => dispatch({ type: 'setHoverRanges', ranges }),
+                        [
+                          ...inferencePhases[0].codeRanges,
+                          ...phase.codeRanges,
+                        ],
+                      )}
+                    >
+                      <p className="eyebrow">Current slot</p>
+                      <h2>
+                        Reading p{trace.positionId}:{currentTokenLabel}
+                      </h2>
+                      <p className="state-board__context">Visible slots {contextSummary}</p>
+                      <div className="token-card__facts">
+                        <span>token id {trace.tokenId}</span>
+                        <span>position {trace.positionId}</span>
+                        <span>predicting p{trace.positionId + 1}:{sampledTokenLabel}</span>
+                      </div>
+                    </div>
+                  </div>
+                </section>
+
+                <section className="workbench-pane computation-board">
+                  <div className="panel-section__header">
+                    <div>
+                      <p className="eyebrow">{boardCopy.eyebrow}</p>
+                      <h2>{boardCopy.title}</h2>
+                    </div>
+                    <p className="computation-board__code">
+                      {phase.title} · {formatRanges(phase.codeRanges)}
+                    </p>
+                  </div>
+
+                  <p className="computation-board__lead">{boardCopy.lead}</p>
+
+                  {computationGroup === 'embeddings' && (
+                    <div
+                      className="computation-board__body computation-board__body--embeddings"
+                      {...cardProps(
+                        (ranges) => dispatch({ type: 'setHoverRanges', ranges }),
+                        [
+                          ...inferencePhases[1].codeRanges,
+                          ...inferencePhases[2].codeRanges,
+                          ...inferencePhases[3].codeRanges,
+                        ],
+                      )}
+                    >
+                      <VectorBars
+                        values={trace.tokenEmbedding}
+                        limit={8}
+                        label={`token vector for ${currentTokenLabel}`}
+                        compact
+                      />
+                      <VectorBars
+                        values={trace.positionEmbedding}
+                        limit={8}
+                        label={`position vector for p${trace.positionId}`}
+                        compact
+                      />
+                      <VectorBars
+                        values={trace.xAfterNorm}
+                        limit={8}
+                        label="combined input stream"
+                        compact
+                      />
+                    </div>
+                  )}
+
+                  {computationGroup === 'attention' && (
+                    <div
+                      className="computation-board__body"
+                      {...cardProps(
+                        (ranges) => dispatch({ type: 'setHoverRanges', ranges }),
+                        [
+                          ...inferencePhases[4].codeRanges,
+                          ...inferencePhases[5].codeRanges,
+                          ...inferencePhases[6].codeRanges,
+                          ...inferencePhases[7].codeRanges,
+                        ],
+                      )}
+                    >
+                      <AttentionCard
+                        heads={trace.heads}
+                        slotLabels={slotLabels}
+                        currentToken={currentTokenLabel}
+                        currentPosition={trace.positionId}
+                      />
+                    </div>
+                  )}
+
+                  {computationGroup === 'residual' && (
+                    <div
+                      className="computation-board__body computation-board__body--residual"
+                      {...cardProps(
+                        (ranges) => dispatch({ type: 'setHoverRanges', ranges }),
+                        [
+                          ...inferencePhases[8].codeRanges,
+                          ...inferencePhases[9].codeRanges,
+                        ],
+                      )}
+                    >
+                      <VectorBars values={trace.attnOutput} limit={8} label="attention write-back" compact />
+                      <VectorBars values={trace.xAfterAttnResidual} limit={8} label="state after write-back" compact />
+                      <VectorBars values={trace.mlpHidden} limit={8} label="mlp hidden activations" compact />
+                      <VectorBars values={trace.xAfterMlpResidual} limit={8} label="final state for this slot" compact />
+                    </div>
+                  )}
+
+                  {computationGroup === 'readout' && (
+                    <div
+                      className="computation-board__body"
+                      {...cardProps(
+                        (ranges) => dispatch({ type: 'setHoverRanges', ranges }),
+                        [
+                          ...inferencePhases[10].codeRanges,
+                          ...inferencePhases[11].codeRanges,
+                        ],
+                      )}
+                    >
+                      <div className="logits-card">
+                        <div className="logits-card__header">
+                          <p className="eyebrow">Next token</p>
+                          <h2>Best guesses for p{trace.positionId + 1}</h2>
                         </div>
-                      ))}
+                        <div className="logits-card__list">
+                          {trace.topCandidates.map((candidate) => (
+                            <div className="logits-card__row" key={candidate.tokenId}>
+                              <span>{tokenLabel(candidate.tokenId)}</span>
+                              <div className="logits-card__track">
+                                <div
+                                  className="logits-card__fill"
+                                  style={{ width: `${candidate.probability * 100}%` }}
+                                />
+                              </div>
+                              <span>{(candidate.probability * 100).toFixed(1)}%</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
-              )}
-
-              {computationGroup === 'sample' && (
-                <div
-                  className="computation-board__body"
-                  {...cardProps(
-                    (ranges) => dispatch({ type: 'setHoverRanges', ranges }),
-                    [
-                      ...inferencePhases[12].codeRanges,
-                      ...inferencePhases[13].codeRanges,
-                    ],
                   )}
-                >
-                  <article className="sample-card">
-                    <p className="eyebrow">Sampling</p>
-                    <h2>
-                      p{trace.positionId + 1}:{sampledTokenLabel}
-                    </h2>
-                    <p>
-                      {sampledTokenLabel === 'BOS'
-                        ? 'BOS means the model emitted the stop token and ends generation.'
-                        : `The model sampled ${sampledTokenLabel}. That value is appended as the next visible slot.`}
-                    </p>
-                    <p className="sample-card__note">
-                      Fixed temperature 0.5, deterministic seed, one token at a time.
-                    </p>
-                  </article>
-                </div>
-              )}
-            </section>
+
+                  {computationGroup === 'sample' && (
+                    <div
+                      className="computation-board__body"
+                      {...cardProps(
+                        (ranges) => dispatch({ type: 'setHoverRanges', ranges }),
+                        [
+                          ...inferencePhases[12].codeRanges,
+                          ...inferencePhases[13].codeRanges,
+                        ],
+                      )}
+                    >
+                      <article className="sample-card">
+                        <p className="eyebrow">Sampling</p>
+                        <h2>
+                          p{trace.positionId + 1}:{sampledTokenLabel}
+                        </h2>
+                        <p>
+                          {sampledTokenLabel === 'BOS'
+                            ? 'BOS means the model emitted the stop token and ends generation.'
+                            : `The model sampled ${sampledTokenLabel}. That value is appended as the next visible slot.`}
+                        </p>
+                        <p className="sample-card__note">
+                          Fixed temperature 0.5, deterministic seed, one token at a time.
+                        </p>
+                      </article>
+                    </div>
+                  )}
+                </section>
+              </div>
+            </div>
           </div>
         </section>
       </main>
+
+      <footer className="status-bar">
+        <div className="status-bar__left">
+          <span>{backendStatusLabel}</span>
+          <span>{phase.title}</span>
+          <span>1 layer · 4 heads · 16 dim</span>
+        </div>
+        <div className="status-bar__right">
+          <span>{formatRanges(phase.codeRanges)}</span>
+          <span>step {state.activePhaseIndex + 1} / {phaseCount}</span>
+        </div>
+      </footer>
     </div>
   )
 }

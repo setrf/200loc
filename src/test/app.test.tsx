@@ -68,6 +68,7 @@ function mockSourceFetch(sourceText: string, ok = true) {
 
 describe('App', () => {
   const sourceText = Array.from({ length: 220 }, (_, index) => `line ${index + 1}`).join('\n')
+  const workbenchTitle = '200loc · microgpt walkthrough'
 
   beforeEach(() => {
     vi.resetModules()
@@ -133,11 +134,15 @@ describe('App', () => {
       screen.getByText('Loading the model and canonical source…'),
     ).toBeInTheDocument()
 
-    await screen.findByText('A 200-line GPT, explained one operation at a time.')
+    await screen.findByText(workbenchTitle)
+    expect(screen.getByText('Explorer')).toBeInTheDocument()
+    expect(screen.getAllByText('Walkthrough').length).toBeGreaterThan(0)
+    expect(screen.getByText('Problems')).toBeInTheDocument()
+    expect(screen.getByText('Output')).toBeInTheDocument()
     expect(screen.getAllByText('CPU fallback')).toHaveLength(1)
-    expect(screen.getAllByText('Tokenize Prefix')).toHaveLength(2)
+    expect(screen.getAllByText('Tokenize Prefix').length).toBeGreaterThanOrEqual(2)
     expect(screen.getByText(/Code lines L23-27, L191-196/)).toBeInTheDocument()
-    expect(screen.getByText('step 1 / 14')).toBeInTheDocument()
+    expect(screen.getAllByText('step 1 / 14').length).toBeGreaterThan(0)
     expect(screen.getByRole('heading', { name: /p2:12 .* p3:stop/ })).toBeInTheDocument()
     expect(screen.getByText('line 117').closest('li')).not.toHaveClass('is-active')
 
@@ -158,9 +163,9 @@ describe('App', () => {
     })
 
     fireEvent.click(screen.getByRole('button', { name: 'Next' }))
-    expect(screen.getAllByText('Token Embedding')).toHaveLength(2)
+    expect(screen.getAllByText('Token Embedding').length).toBeGreaterThanOrEqual(2)
     expect(screen.getByText(/Code lines L109/)).toBeInTheDocument()
-    expect(screen.getByText('step 2 / 14')).toBeInTheDocument()
+    expect(screen.getAllByText('step 2 / 14').length).toBeGreaterThan(0)
 
     for (let index = 0; index < 4; index += 1) {
       fireEvent.click(screen.getByRole('button', { name: 'Next' }))
@@ -212,7 +217,7 @@ describe('App', () => {
 
     const { default: App } = await import('../App')
     render(<App />)
-    await screen.findByText('A 200-line GPT, explained one operation at a time.')
+    await screen.findByText(workbenchTitle)
 
     for (let index = 0; index < 14; index += 1) {
       fireEvent.click(screen.getByRole('button', { name: 'Next' }))
@@ -240,9 +245,9 @@ describe('App', () => {
     const { default: App } = await import('../App')
     render(<App />)
 
-    await screen.findByText('A 200-line GPT, explained one operation at a time.')
+    await screen.findByText(workbenchTitle)
     expect(screen.getByRole('heading', { name: 'Reading p0:BOS' })).toBeInTheDocument()
-    expect(screen.getByText('p0:BOS -> p1:stop')).toBeInTheDocument()
+    expect(screen.getAllByText('p0:BOS -> p1:stop').length).toBeGreaterThan(0)
   })
 
   it('falls back to the generic advance error message for non-Error rejections', async () => {
@@ -263,7 +268,7 @@ describe('App', () => {
 
     const { default: App } = await import('../App')
     render(<App />)
-    await screen.findByText('A 200-line GPT, explained one operation at a time.')
+    await screen.findByText(workbenchTitle)
 
     for (let index = 0; index < 14; index += 1) {
       fireEvent.click(screen.getByRole('button', { name: 'Next' }))
@@ -365,7 +370,7 @@ describe('App', () => {
     const { default: App } = await import('../App')
     render(<App />)
 
-    await screen.findByText('A 200-line GPT, explained one operation at a time.')
+    await screen.findByText(workbenchTitle)
     expect(screen.getAllByText('WebGPU')).toHaveLength(1)
 
     fireEvent.click(screen.getByRole('button', { name: 'Reset' }))
@@ -377,7 +382,7 @@ describe('App', () => {
     expect(screen.getByRole('button', { name: 'Pause' })).toBeInTheDocument()
 
     await waitFor(() => {
-      expect(screen.getAllByText('Token Embedding')).toHaveLength(2)
+      expect(screen.getAllByText('Token Embedding').length).toBeGreaterThanOrEqual(2)
     })
 
     fireEvent.click(screen.getByRole('button', { name: 'Pause' }))
@@ -417,7 +422,7 @@ describe('App', () => {
 
     const { default: App } = await import('../App')
     render(<App />)
-    await screen.findByText('A 200-line GPT, explained one operation at a time.')
+    await screen.findByText(workbenchTitle)
 
     fireEvent.mouseEnter(screen.getByRole('heading', { name: 'Reading p2:12' }))
     fireEvent.mouseLeave(screen.getByRole('heading', { name: 'Reading p2:12' }))

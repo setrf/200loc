@@ -146,7 +146,7 @@ describe('App forced control branches', () => {
     }
 
     await waitFor(() => {
-      expect(screen.getAllByText('Append Or Stop')).toHaveLength(2)
+      expect(screen.getAllByText('Append Or Stop').length).toBeGreaterThanOrEqual(2)
     })
 
     expect(runtime.advance).not.toHaveBeenCalled()
