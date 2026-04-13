@@ -159,20 +159,21 @@ describe('App', () => {
     ).toBeInTheDocument()
 
     await screen.findByText('How a tiny GPT predicts the next token')
-    expect(screen.getByText('microgpt architecture')).toBeInTheDocument()
+    expect(screen.getByText('Original llm-viz')).toBeInTheDocument()
     expect(screen.getAllByText('microgpt').length).toBeGreaterThan(0)
     expect(screen.getAllByText('CPU fallback').length).toBeGreaterThan(0)
     expect(screen.getAllByText('Tokenize Prefix').length).toBeGreaterThan(0)
-    expect(screen.getByText('Projected 2D fallback')).toBeInTheDocument()
+    expect(screen.getByText('Original llm-viz')).toBeInTheDocument()
+    expect(screen.getByTestId('vendored-layer-view')).toBeInTheDocument()
     expect(screen.getAllByText('p2:12 -> p3:stop').length).toBeGreaterThan(0)
     expect(screen.getByText('line 117').closest('li')).not.toHaveClass('is-active')
 
     fireEvent.mouseEnter(screen.getAllByText('step 1 / 14')[0])
     expect(screen.getByText('line 23').closest('li')).toHaveClass('is-active')
     fireEvent.mouseLeave(screen.getAllByText('step 1 / 14')[0])
-    fireEvent.mouseEnter(screen.getByText('weights came from offline training'))
+    fireEvent.mouseEnter(screen.getByLabelText('Architecture scene'))
     expect(document.querySelectorAll('.code-viewer__line.is-active').length).toBeGreaterThan(0)
-    fireEvent.mouseLeave(screen.getByText('weights came from offline training'))
+    fireEvent.mouseLeave(screen.getByLabelText('Architecture scene'))
 
     fireEvent.change(screen.getByLabelText('Prefix'), {
       target: { value: 'Em!42' },

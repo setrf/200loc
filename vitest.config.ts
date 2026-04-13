@@ -1,6 +1,15 @@
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vitest/config'
 
+const rootDir = fileURLToPath(new URL('.', import.meta.url))
+
 export default defineConfig({
+  resolve: {
+    alias: {
+      '@llmviz': path.resolve(rootDir, 'src/vendor/llmVizOriginal'),
+    },
+  },
   test: {
     environment: 'jsdom',
     globals: true,
@@ -14,6 +23,7 @@ export default defineConfig({
         'src/**/*.d.ts',
         'src/test/**',
         'src/assets/**',
+        'src/vendor/**',
       ],
     },
   },

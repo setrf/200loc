@@ -4,7 +4,6 @@ import { ArchitectureScene } from '../components/ArchitectureScene'
 import { CodeViewer } from '../components/CodeViewer'
 import { Controls } from '../components/Controls'
 import { SegmentTabs } from '../components/SegmentTabs'
-import { VizRenderer } from '../viz/llmViz/renderer'
 import { inferencePhases, trainingAppendix } from '../walkthrough/phases'
 import { loadBundle, makeTrace } from './helpers/fixtures'
 
@@ -42,47 +41,6 @@ function makeControlsProps() {
     onTogglePlay: vi.fn(),
     onToggleAppendix: vi.fn(),
     onFocusRanges: vi.fn(),
-  }
-}
-
-function makeWebGlContext() {
-  return {
-    VERTEX_SHADER: 0x8b31,
-    FRAGMENT_SHADER: 0x8b30,
-    COMPILE_STATUS: 0x8b81,
-    LINK_STATUS: 0x8b82,
-    ARRAY_BUFFER: 0x8892,
-    STREAM_DRAW: 0x88e0,
-    COLOR_BUFFER_BIT: 0x4000,
-    TRIANGLES: 0x0004,
-    LINES: 0x0001,
-    FLOAT: 0x1406,
-    createShader: vi.fn(() => ({})),
-    shaderSource: vi.fn(),
-    compileShader: vi.fn(),
-    getShaderParameter: vi.fn(() => true),
-    getShaderInfoLog: vi.fn(() => ''),
-    deleteShader: vi.fn(),
-    createProgram: vi.fn(() => ({})),
-    createBuffer: vi.fn(() => ({})),
-    attachShader: vi.fn(),
-    linkProgram: vi.fn(),
-    getProgramParameter: vi.fn(() => true),
-    getProgramInfoLog: vi.fn(() => ''),
-    getAttribLocation: vi.fn(() => 0),
-    getUniformLocation: vi.fn(() => ({})),
-    useProgram: vi.fn(),
-    bindBuffer: vi.fn(),
-    bufferData: vi.fn(),
-    enableVertexAttribArray: vi.fn(),
-    vertexAttribPointer: vi.fn(),
-    uniform2f: vi.fn(),
-    drawArrays: vi.fn(),
-    clearColor: vi.fn(),
-    clear: vi.fn(),
-    viewport: vi.fn(),
-    deleteBuffer: vi.fn(),
-    deleteProgram: vi.fn(),
   }
 }
 
@@ -161,21 +119,8 @@ describe('ui components', () => {
     expect(onChange).toHaveBeenCalledWith('scene')
   })
 
-  it('renders the projected fallback scene and exposes code-focus affordances', () => {
-    vi.stubGlobal('requestAnimationFrame', vi.fn(() => 1))
-    vi.stubGlobal('cancelAnimationFrame', vi.fn())
-    vi.stubGlobal(
-      'ResizeObserver',
-      class {
-        observe() {}
-        disconnect() {}
-      },
-    )
+  it('renders the vendored LayerView scene and exposes code-focus affordances', () => {
     const onFocusRanges = vi.fn()
-    vi.spyOn(VizRenderer.prototype, 'pick').mockReturnValueOnce({
-      kind: 'node',
-      id: 'context',
-    })
     render(
       <ArchitectureScene
         trace={makeTrace()}
@@ -187,27 +132,28 @@ describe('ui components', () => {
       />,
     )
 
-    expect(screen.getByText('Projected 2D fallback')).toBeInTheDocument()
-    expect(screen.getByText('weights came from offline training')).toBeInTheDocument()
+    expect(screen.getByText('Original llm-viz')).toBeInTheDocument()
+    expect(screen.getByTestId('vendored-layer-view')).toHaveAttribute(
+      'data-sidebar',
+      'false',
+    )
+    expect(screen.getByTestId('vendored-layer-view')).toHaveAttribute(
+      'data-toolbar',
+      'false',
+    )
+    expect(screen.getByTestId('vendored-layer-view')).toHaveAttribute(
+      'data-phase',
+      '7',
+    )
 
-    const viewport = screen.getByTestId('scene-viewport')
-    fireEvent.pointerMove(viewport, {
-      clientX: 120,
-      clientY: 120,
-    })
-    expect(onFocusRanges).toHaveBeenCalledWith([
-      { start: 23, end: 27 },
-      { start: 191, end: 196 },
-    ])
-
-    fireEvent.mouseEnter(screen.getByText('weights came from offline training'))
-    expect(onFocusRanges).toHaveBeenCalledWith(trainingAppendix[0].codeRanges)
-    fireEvent.mouseLeave(screen.getByText('weights came from offline training'))
-    fireEvent.pointerLeave(viewport)
+    const scene = screen.getByLabelText('Architecture scene')
+    fireEvent.mouseEnter(scene)
+    expect(onFocusRanges).toHaveBeenCalledWith(inferencePhases[1].codeRanges)
+    fireEvent.mouseLeave(scene)
     expect(onFocusRanges).toHaveBeenLastCalledWith(null)
   })
 
-  it('renders tensor windows in the scene layer', () => {
+  it('maps walkthrough phases onto the upstream LayerView walkthrough', () => {
     const { rerender } = render(
       <ArchitectureScene
         trace={makeTrace()}
@@ -219,31 +165,15 @@ describe('ui components', () => {
       />,
     )
 
-    expect(screen.getByTestId('scene-focus-window')).toBeInTheDocument()
-    expect(screen.getByText('attention scores')).toBeInTheDocument()
-    expect(screen.getByTestId('tensor-surface-scores-h1')).toBeInTheDocument()
+    expect(screen.getByTestId('vendored-layer-view')).toHaveAttribute(
+      'data-phase',
+      '9',
+    )
 
     rerender(
       <ArchitectureScene
-        trace={makeTrace({ sampledTokenId: 7 })}
-        phase={inferencePhases[13]}
-        contextTokens={['BOS', 'e', 'm']}
-        tokenLabel={(tokenId) => (tokenId === 26 ? 'BOS' : String(tokenId))}
-        sceneModelData={bundle}
-        onFocusRanges={() => {}}
-      />,
-    )
-
-    expect(screen.getByText('picked 7')).toBeInTheDocument()
-  })
-
-  it(
-    'renders residual, mlp, and logits overlay states',
-    () => {
-    const { rerender } = render(
-      <ArchitectureScene
         trace={makeTrace()}
-        phase={inferencePhases[8]}
+        phase={inferencePhases[6]}
         contextTokens={['BOS', 'e', 'm']}
         tokenLabel={(tokenId) => (tokenId === 26 ? 'BOS' : String(tokenId))}
         sceneModelData={bundle}
@@ -251,7 +181,10 @@ describe('ui components', () => {
       />,
     )
 
-    expect(screen.getByTestId('tensor-surface-attn_wo')).toBeInTheDocument()
+    expect(screen.getByTestId('vendored-layer-view')).toHaveAttribute(
+      'data-phase',
+      '10',
+    )
 
     rerender(
       <ArchitectureScene
@@ -264,13 +197,15 @@ describe('ui components', () => {
       />,
     )
 
-    expect(screen.getByTestId('tensor-surface-mlp_fc1')).toBeInTheDocument()
-    expect(screen.getByTestId('tensor-surface-mlp_fc2')).toBeInTheDocument()
+    expect(screen.getByTestId('vendored-layer-view')).toHaveAttribute(
+      'data-phase',
+      '12',
+    )
 
     rerender(
       <ArchitectureScene
-        trace={makeTrace()}
-        phase={inferencePhases[10]}
+        trace={makeTrace({ sampledTokenId: 7 })}
+        phase={inferencePhases[13]}
         contextTokens={['BOS', 'e', 'm']}
         tokenLabel={(tokenId) => (tokenId === 26 ? 'BOS' : String(tokenId))}
         sceneModelData={bundle}
@@ -278,44 +213,9 @@ describe('ui components', () => {
       />,
     )
 
-    expect(screen.getByTestId('tensor-surface-lm_head')).toBeInTheDocument()
-    expect(screen.getByTestId('tensor-vector-logits')).toBeInTheDocument()
-    },
-    15000,
-  )
-
-  it('uses the webgl2 renderer path when a context is available', () => {
-    const gl = makeWebGlContext()
-    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(function (
-      kind: string,
-    ) {
-      if (kind === 'webgl2') {
-        return gl as never
-      }
-      return {
-        setTransform() {},
-        clearRect() {},
-        fillRect() {},
-        beginPath() {},
-        moveTo() {},
-        lineTo() {},
-        stroke() {},
-        fill() {},
-        closePath() {},
-      } as never
-    })
-
-    render(
-      <ArchitectureScene
-        trace={makeTrace()}
-        phase={inferencePhases[10]}
-        contextTokens={['BOS', 'e', 'm']}
-        tokenLabel={(tokenId) => (tokenId === 26 ? 'BOS' : String(tokenId))}
-        sceneModelData={bundle}
-        onFocusRanges={() => {}}
-      />,
+    expect(screen.getByTestId('vendored-layer-view')).toHaveAttribute(
+      'data-phase',
+      '14',
     )
-
-    expect(screen.getByText('WebGL2 scene')).toBeInTheDocument()
   })
 })
