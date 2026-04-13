@@ -1,14 +1,24 @@
-import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+  type PointerEvent as ReactPointerEvent,
+  type RefObject,
+} from 'react'
 import type { TokenStepTrace } from '../model'
 import { vizFocusRanges, type PhaseDefinition, type LineRange } from '../walkthrough/phases'
 import { buildVizFrame } from '../viz/llmViz/frame'
 import {
   buildMicrogptLayout,
+  getProjectedScale,
   getCameraPose,
   projectScene,
 } from '../viz/llmViz/layout'
 import type {
   AttentionGridOverlay,
+  CameraPose,
   ContextOverlaySlot,
   ProjectedNode,
   ProjectedScene,
@@ -138,6 +148,38 @@ class MicroVizCanvasController {
 
   resize() {
     this.canvasSizeDirty = true
+    this.markDirty()
+  }
+
+  panByPixels(deltaX: number, deltaY: number) {
+    const camAngle = this.renderContext.camera.angle
+    const sideMul = Math.sin((camAngle.x * Math.PI) / 180) > 0 ? 1 : -1
+    this.renderContext.camera.desiredCamera = undefined
+    this.renderContext.camera.desiredCameraTransition = undefined
+    this.renderContext.camera.center = new Vec3(
+      this.renderContext.camera.center.x + sideMul * deltaX * 0.1 * camAngle.z,
+      this.renderContext.camera.center.y,
+      this.renderContext.camera.center.z + deltaY * 0.1 * camAngle.z,
+    )
+    this.markDirty()
+  }
+
+  zoomByDelta(deltaY: number) {
+    const camAngle = this.renderContext.camera.angle
+    this.renderContext.camera.desiredCamera = undefined
+    this.renderContext.camera.desiredCameraTransition = undefined
+    this.renderContext.camera.angle = new Vec3(
+      camAngle.x,
+      camAngle.y,
+      clamp(camAngle.z * Math.pow(1.0013, deltaY), 0.01, 100000),
+    )
+    this.markDirty()
+  }
+
+  resetToCameraPose(cameraPoseId: PhaseDefinition['viz']['cameraPoseId']) {
+    this.renderContext.camera.desiredCamera =
+      this.renderContext.layout.cameraPoses[cameraPoseId]
+    this.lastCameraPoseId = cameraPoseId
     this.markDirty()
   }
 
@@ -597,13 +639,63 @@ export function ArchitectureScene({
   const viewportRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const controllerRef = useRef<MicroVizCanvasController | null>(null)
+  const dragStateRef = useRef<{
+    pointerId: number
+    lastX: number
+    lastY: number
+  } | null>(null)
   const [renderMode, setRenderMode] = useState<'loading' | 'webgl' | 'fallback'>(
     'loading',
   )
-  const [hoverFocusId, setHoverFocusId] = useState<
-    keyof typeof vizFocusRanges | null
-  >(null)
+  const [hoverFocusId, setHoverFocusId] = useState<{
+    phaseId: PhaseDefinition['id']
+    focusId: keyof typeof vizFocusRanges | null
+  }>({
+    phaseId: phase.id,
+    focusId: null,
+  })
+  const [isDraggingScene, setIsDraggingScene] = useState(false)
+  const phaseCameraPose = useMemo(
+    () => getCameraPose(phase.viz.cameraPoseId),
+    [phase.viz.cameraPoseId],
+  )
+  const [interactiveOverride, setInteractiveOverride] = useState<{
+    cameraPoseId: PhaseDefinition['viz']['cameraPoseId']
+    panX: number
+    panY: number
+    scaleMul: number
+  }>({
+    cameraPoseId: phase.viz.cameraPoseId,
+    panX: 0,
+    panY: 0,
+    scaleMul: 1,
+  })
   const viewportSize = useViewportSize(viewportRef)
+
+  const activeInteractiveOverride = useMemo(
+    () =>
+      interactiveOverride.cameraPoseId === phase.viz.cameraPoseId
+        ? interactiveOverride
+        : {
+            cameraPoseId: phase.viz.cameraPoseId,
+            panX: 0,
+            panY: 0,
+            scaleMul: 1,
+          },
+    [interactiveOverride, phase.viz.cameraPoseId],
+  )
+
+  const interactivePose = useMemo<CameraPose>(
+    () => ({
+      panX: phaseCameraPose.panX + activeInteractiveOverride.panX,
+      panY: phaseCameraPose.panY + activeInteractiveOverride.panY,
+      scale: phaseCameraPose.scale * activeInteractiveOverride.scaleMul,
+    }),
+    [activeInteractiveOverride, phaseCameraPose],
+  )
+
+  const activeHoverFocusId =
+    hoverFocusId.phaseId === phase.id ? hoverFocusId.focusId : null
 
   const vizFrame = useMemo(
     () =>
@@ -620,11 +712,11 @@ export function ArchitectureScene({
     () =>
       projectScene(
         abstractLayout,
-        getCameraPose(phase.viz.cameraPoseId),
+        interactivePose,
         viewportSize.width,
         viewportSize.height,
       ),
-    [abstractLayout, phase.viz.cameraPoseId, viewportSize],
+    [abstractLayout, interactivePose, viewportSize],
   )
 
   useEffect(() => {
@@ -693,11 +785,151 @@ export function ArchitectureScene({
   }, [phase, trace, contextTokens, sceneModelData, vizFrame])
 
   useEffect(() => {
-    if (!hoverFocusId) {
+    if (!activeHoverFocusId) {
       return
     }
-    onFocusRanges(vizFocusRanges[hoverFocusId] ?? phase.codeRanges)
-  }, [hoverFocusId, onFocusRanges, phase.codeRanges])
+    onFocusRanges(vizFocusRanges[activeHoverFocusId] ?? phase.codeRanges)
+  }, [activeHoverFocusId, onFocusRanges, phase.codeRanges])
+
+  function updateHoverFromPoint(clientX: number, clientY: number) {
+    const viewport = viewportRef.current
+    if (!viewport) {
+      return
+    }
+    const bounds = viewport.getBoundingClientRect()
+    const x = clientX - bounds.left
+    const y = clientY - bounds.top
+    setHoverFocusId({
+      phaseId: phase.id,
+      focusId: pickProjectedFocus(projectedScene, { x, y }) as
+        | keyof typeof vizFocusRanges
+        | null,
+    })
+  }
+
+  function applyPanToProjectedPose(deltaX: number, deltaY: number) {
+    setInteractiveOverride((prev) => {
+      const base =
+        prev.cameraPoseId === phase.viz.cameraPoseId
+          ? prev
+          : {
+              cameraPoseId: phase.viz.cameraPoseId,
+              panX: 0,
+              panY: 0,
+              scaleMul: 1,
+            }
+      const pose = {
+        panX: phaseCameraPose.panX + base.panX,
+        panY: phaseCameraPose.panY + base.panY,
+        scale: phaseCameraPose.scale * base.scaleMul,
+      }
+      const scale = getProjectedScale(viewportSize.width, viewportSize.height, pose)
+      return {
+        ...base,
+        cameraPoseId: phase.viz.cameraPoseId,
+        panX: base.panX + deltaX / Math.max(scale, 0.0001),
+        panY: base.panY + deltaY / Math.max(scale, 0.0001),
+      }
+    })
+  }
+
+  useEffect(() => {
+    const viewport = viewportRef.current
+    if (!viewport) {
+      return
+    }
+
+    const handleWheel = (event: WheelEvent) => {
+      const target = event.target as HTMLElement | null
+      if (target?.closest('.scene-focus-window')) {
+        return
+      }
+      controllerRef.current?.zoomByDelta(event.deltaY)
+      setInteractiveOverride((prev) => {
+        const base =
+          prev.cameraPoseId === phase.viz.cameraPoseId
+            ? prev
+            : {
+                cameraPoseId: phase.viz.cameraPoseId,
+                panX: 0,
+                panY: 0,
+                scaleMul: 1,
+              }
+        const nextScale = clamp(
+          (phaseCameraPose.scale * base.scaleMul) / Math.pow(1.0013, event.deltaY),
+          0.28,
+          2.4,
+        )
+        return {
+          ...base,
+          cameraPoseId: phase.viz.cameraPoseId,
+          scaleMul: nextScale / phaseCameraPose.scale,
+        }
+      })
+      event.preventDefault()
+    }
+
+    viewport.addEventListener('wheel', handleWheel, { passive: false })
+    return () => viewport.removeEventListener('wheel', handleWheel)
+  }, [phase.viz.cameraPoseId, phaseCameraPose.scale])
+
+  const handleViewportPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const target = event.target as HTMLElement
+    if (target.closest('.scene-focus-window')) {
+      return
+    }
+    dragStateRef.current = {
+      pointerId: event.pointerId,
+      lastX: event.clientX,
+      lastY: event.clientY,
+    }
+    setIsDraggingScene(true)
+    event.currentTarget.setPointerCapture(event.pointerId)
+  }
+
+  const handleViewportPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const dragState = dragStateRef.current
+    if (dragState && dragState.pointerId === event.pointerId) {
+      const deltaX = event.clientX - dragState.lastX
+      const deltaY = event.clientY - dragState.lastY
+      dragState.lastX = event.clientX
+      dragState.lastY = event.clientY
+      controllerRef.current?.panByPixels(deltaX, deltaY)
+      applyPanToProjectedPose(deltaX, deltaY)
+      event.preventDefault()
+      return
+    }
+
+    updateHoverFromPoint(event.clientX, event.clientY)
+  }
+
+  const stopViewportDrag = (event?: ReactPointerEvent<HTMLDivElement>) => {
+    if (dragStateRef.current && event) {
+      try {
+        event.currentTarget.releasePointerCapture(dragStateRef.current.pointerId)
+      } catch {
+        // No-op if the pointer was already released.
+      }
+    }
+    dragStateRef.current = null
+    setIsDraggingScene(false)
+  }
+
+  const handleViewportDoubleClick = (
+    event: ReactMouseEvent<HTMLDivElement, MouseEvent>,
+  ) => {
+    const target = event.target as HTMLElement
+    if (target.closest('.scene-focus-window')) {
+      return
+    }
+    controllerRef.current?.resetToCameraPose(phase.viz.cameraPoseId)
+    setInteractiveOverride({
+      cameraPoseId: phase.viz.cameraPoseId,
+      panX: 0,
+      panY: 0,
+      scaleMul: 1,
+    })
+  }
 
   const sampledToken = tokenLabel(trace.sampledTokenId)
   const transitionLabel = `p${trace.positionId}:${tokenLabel(trace.tokenId)} -> p${
@@ -726,7 +958,7 @@ export function ArchitectureScene({
       aria-label="Architecture scene"
       onMouseEnter={() => onFocusRanges(phase.codeRanges)}
       onMouseLeave={() => {
-        setHoverFocusId(null)
+        setHoverFocusId({ phaseId: phase.id, focusId: null })
         onFocusRanges(null)
       }}
     >
@@ -749,16 +981,17 @@ export function ArchitectureScene({
         className="scene-panel__viewport"
         data-testid="scene-viewport"
         ref={viewportRef}
-        onMouseMove={(event) => {
-          const bounds = event.currentTarget.getBoundingClientRect()
-          const x = event.clientX - bounds.left
-          const y = event.clientY - bounds.top
-          setHoverFocusId(
-            pickProjectedFocus(projectedScene, { x, y }) as
-              | keyof typeof vizFocusRanges
-              | null,
-          )
+        onPointerDown={handleViewportPointerDown}
+        onPointerMove={handleViewportPointerMove}
+        onPointerUp={stopViewportDrag}
+        onPointerCancel={stopViewportDrag}
+        onPointerLeave={(event) => {
+          stopViewportDrag(event)
+          setHoverFocusId({ phaseId: phase.id, focusId: null })
         }}
+        onDoubleClick={handleViewportDoubleClick}
+        onContextMenu={(event) => event.preventDefault()}
+        style={{ cursor: isDraggingScene ? 'grabbing' : 'grab' }}
       >
         {renderMode === 'fallback' ? (
           renderFallbackScene(projectedScene, vizFrame.overlay, phase, onFocusRanges)
@@ -772,6 +1005,9 @@ export function ArchitectureScene({
 
         <div className="scene-panel__overlay-layer">
           {overlayWithSlots ? renderSlots(overlayWithSlots, projectedScene) : null}
+          <div className="scene-panel__interaction-hint">
+            drag to pan · wheel to zoom · double click to reset
+          </div>
 
           <div className="scene-focus-window" style={focusWindowStyle}>
             <div className="scene-focus-window__header">
