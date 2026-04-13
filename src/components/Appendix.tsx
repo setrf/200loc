@@ -14,7 +14,7 @@ export function Appendix({
   onFocusRanges,
 }: AppendixProps) {
   return (
-    <section className="panel appendix">
+    <section className="appendix">
       <div className="appendix__top">
         <div>
           <p className="eyebrow">Appendix</p>

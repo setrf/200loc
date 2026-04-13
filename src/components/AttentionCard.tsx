@@ -14,8 +14,8 @@ export function AttentionCard({
   currentPosition,
 }: AttentionCardProps) {
   return (
-    <section className="panel attention-card">
-      <div className="panel__header">
+    <div className="attention-card">
+      <div className="attention-card__header">
         <div>
           <p className="eyebrow">Attention</p>
           <h2>
@@ -66,6 +66,6 @@ export function AttentionCard({
           )
         })}
       </div>
-    </section>
+    </div>
   )
 }

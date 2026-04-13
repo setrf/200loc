@@ -1,29 +1,28 @@
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap');
 
 :root {
-  --paper: #f5efe3;
-  --panel: rgba(255, 252, 247, 0.92);
-  --panel-strong: #fbf7ef;
-  --text: #1c1a18;
-  --muted: #6f675f;
-  --border: rgba(52, 43, 32, 0.13);
-  --accent: #1b6ee7;
-  --ink: #1c1a18;
-  --heat-1: #fff4e6;
-  --heat-2: #ffd9b5;
-  --heat-3: #ff9b4b;
-  --heat-4: #b04b00;
-  --shadow-soft: 0 16px 40px rgba(54, 45, 32, 0.08);
-  --sans: 'IBM Plex Sans', system-ui, sans-serif;
-  --heading: 'IBM Plex Sans', system-ui, sans-serif;
+  --paper: #f3f0e8;
+  --panel: #f7f4ec;
+  --surface: #fffdf8;
+  --concrete: #dcd5ca;
+  --ink: #111111;
+  --text: #111111;
+  --muted: #5c554a;
+  --rule: #111111;
+  --rule-soft: rgba(17, 17, 17, 0.22);
+  --signal: #d61f26;
+  --shadow-hard: 8px 8px 0 #111111;
+  --sans: 'Archivo', system-ui, sans-serif;
+  --heading: 'Archivo', system-ui, sans-serif;
   --mono: 'IBM Plex Mono', ui-monospace, monospace;
 
-  font: 400 16px/1.55 var(--sans);
+  font: 400 16px/1.5 var(--sans);
   color: var(--text);
   background:
-    radial-gradient(circle at top left, rgba(27, 110, 231, 0.08), transparent 34%),
-    radial-gradient(circle at top right, rgba(255, 155, 75, 0.12), transparent 28%),
+    linear-gradient(rgba(17, 17, 17, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(17, 17, 17, 0.05) 1px, transparent 1px),
     var(--paper);
+  background-size: 32px 32px, 32px 32px, auto;
   text-rendering: optimizeLegibility;
   font-synthesis: none;
   -webkit-font-smoothing: antialiased;
@@ -56,22 +55,30 @@ p {
 }
 
 h1 {
-  max-width: 16ch;
-  font: 700 clamp(2.4rem, 4vw, 4.2rem) / 0.95 var(--heading);
-  letter-spacing: -0.05em;
+  font: 800 clamp(3.4rem, 8vw, 6.8rem) / 0.88 var(--heading);
+  letter-spacing: -0.08em;
+  text-transform: uppercase;
 }
 
 h2 {
-  font: 600 clamp(1.1rem, 2vw, 1.35rem) / 1.05 var(--heading);
-  letter-spacing: -0.03em;
+  font: 700 clamp(1.2rem, 2vw, 1.65rem) / 0.98 var(--heading);
+  letter-spacing: -0.05em;
+}
+
+h3 {
+  font: 700 1rem/1 var(--heading);
 }
 
 a {
   color: inherit;
 }
 
+strong {
+  font-weight: 700;
+}
+
 @media (max-width: 1024px) {
   h1 {
-    max-width: none;
+    font-size: clamp(2.4rem, 12vw, 4.2rem);
   }
 }

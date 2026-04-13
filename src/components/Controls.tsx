@@ -42,10 +42,10 @@ export function Controls({
       : 'Lowercase a-z only. Empty means BOS.'
 
   return (
-    <section className="panel controls-panel">
+    <div className="controls-panel">
       <div className="controls-panel__intro">
         <div>
-          <p className="eyebrow">Walkthrough</p>
+          <p className="eyebrow">Controls</p>
           <h2>{phaseTitle}</h2>
         </div>
         <div className={`backend-badge backend-badge--${backend}`}>
@@ -93,6 +93,6 @@ export function Controls({
       {fallbackReason ? (
         <p className="controls-panel__fallback">{fallbackReason}</p>
       ) : null}
-    </section>
+    </div>
   )
 }

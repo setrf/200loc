@@ -41,8 +41,8 @@ export function NetworkTracker({
     .join(' · ')
 
   return (
-    <section className="panel network-tracker">
-      <div className="panel__header">
+    <div className="network-tracker">
+      <div className="network-tracker__header">
         <div>
           <p className="eyebrow">Network position</p>
           <h2>
@@ -87,6 +87,6 @@ export function NetworkTracker({
           )
         })}
       </ol>
-    </section>
+    </div>
   )
 }

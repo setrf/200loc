@@ -134,7 +134,7 @@ describe('App', () => {
     ).toBeInTheDocument()
 
     await screen.findByText('A 200-line GPT, explained one operation at a time.')
-    expect(screen.getAllByText('CPU fallback')).toHaveLength(2)
+    expect(screen.getAllByText('CPU fallback')).toHaveLength(1)
     expect(screen.getAllByText('Tokenize Prefix')).toHaveLength(2)
     expect(screen.getByText(/Code lines L23-27, L191-196/)).toBeInTheDocument()
     expect(screen.getByText('step 1 / 14')).toBeInTheDocument()
@@ -145,6 +145,9 @@ describe('App', () => {
     expect(screen.getByText('line 117').closest('li')).toHaveClass('is-active')
     fireEvent.mouseLeave(screen.getByText('Make QKV').closest('li')!)
     expect(screen.getByText('line 23').closest('li')).toHaveClass('is-active')
+    fireEvent.mouseEnter(screen.getByText('Read one slot, predict the next'))
+    expect(document.querySelectorAll('.code-viewer__line.is-active').length).toBeGreaterThan(0)
+    fireEvent.mouseLeave(screen.getByText('Read one slot, predict the next'))
 
     fireEvent.change(screen.getByLabelText('Prefix'), {
       target: { value: 'Em!42' },
@@ -363,7 +366,7 @@ describe('App', () => {
     render(<App />)
 
     await screen.findByText('A 200-line GPT, explained one operation at a time.')
-    expect(screen.getAllByText('WebGPU')).toHaveLength(2)
+    expect(screen.getAllByText('WebGPU')).toHaveLength(1)
 
     fireEvent.click(screen.getByRole('button', { name: 'Reset' }))
     await waitFor(() => {
@@ -416,10 +419,10 @@ describe('App', () => {
     render(<App />)
     await screen.findByText('A 200-line GPT, explained one operation at a time.')
 
-    fireEvent.mouseEnter(screen.getByText('Current token'))
-    fireEvent.mouseLeave(screen.getByText('Current token'))
-    fireEvent.mouseEnter(screen.getByText('How p2:12 becomes a vector'))
-    fireEvent.mouseLeave(screen.getByText('How p2:12 becomes a vector'))
+    fireEvent.mouseEnter(screen.getByRole('heading', { name: 'Reading p2:12' }))
+    fireEvent.mouseLeave(screen.getByRole('heading', { name: 'Reading p2:12' }))
+    fireEvent.mouseEnter(screen.getByText('combined input stream'))
+    fireEvent.mouseLeave(screen.getByText('combined input stream'))
 
     for (let index = 0; index < 4; index += 1) {
       fireEvent.click(screen.getByRole('button', { name: 'Next' }))
@@ -430,8 +433,8 @@ describe('App', () => {
     for (let index = 0; index < 4; index += 1) {
       fireEvent.click(screen.getByRole('button', { name: 'Next' }))
     }
-    fireEvent.mouseEnter(screen.getByText('Update the state of p2:12'))
-    fireEvent.mouseLeave(screen.getByText('Update the state of p2:12'))
+    fireEvent.mouseEnter(screen.getByText('final state for this slot'))
+    fireEvent.mouseLeave(screen.getByText('final state for this slot'))
 
     for (let index = 0; index < 2; index += 1) {
       fireEvent.click(screen.getByRole('button', { name: 'Next' }))

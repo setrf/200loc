@@ -15,7 +15,7 @@ export function SequenceStrip({
   const nextPosition = currentPosition + 1
 
   return (
-    <section className="panel sequence-strip">
+    <div className="sequence-strip">
       <div className="sequence-strip__header">
         <div>
           <p className="eyebrow">Sequence</p>
@@ -44,6 +44,6 @@ export function SequenceStrip({
           <span>{sampledToken}</span>
         </span>
       </div>
-    </section>
+    </div>
   )
 }
