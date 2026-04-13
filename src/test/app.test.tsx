@@ -139,6 +139,12 @@ describe('App', () => {
     expect(screen.getByText(/Code lines L23-27, L191-196/)).toBeInTheDocument()
     expect(screen.getByText('step 1 / 14')).toBeInTheDocument()
     expect(screen.getByText('Token position 2 inside the model')).toBeInTheDocument()
+    expect(screen.getByText('line 117').closest('li')).not.toHaveClass('is-active')
+
+    fireEvent.mouseEnter(screen.getByText('QKV').closest('li')!)
+    expect(screen.getByText('line 117').closest('li')).toHaveClass('is-active')
+    fireEvent.mouseLeave(screen.getByText('QKV').closest('li')!)
+    expect(screen.getByText('line 23').closest('li')).toHaveClass('is-active')
 
     fireEvent.change(screen.getByLabelText('Prefix'), {
       target: { value: 'Em!42' },
