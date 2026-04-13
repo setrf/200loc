@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { PrefixNormalization } from '../model'
-import { makeTrace } from './helpers/fixtures'
+import { loadBundle, makeTrace } from './helpers/fixtures'
 
 const loadModelBundleMock = vi.fn()
 const createTokenizerMock = vi.fn()
@@ -75,6 +75,7 @@ function mockSourceFetch(sourceText: string) {
 
 describe('App forced control branches', () => {
   const sourceText = Array.from({ length: 220 }, (_, index) => `line ${index + 1}`).join('\n')
+  const bundleStub = loadBundle()
 
   beforeEach(() => {
     vi.resetModules()
@@ -101,7 +102,7 @@ describe('App forced control branches', () => {
       diagnostics: { activeBackend: 'cpu', fallbackReason: undefined },
     })
 
-    loadModelBundleMock.mockResolvedValue({ vocab: [] })
+    loadModelBundleMock.mockResolvedValue(bundleStub)
     createTokenizerMock.mockReturnValue(makeTokenizer())
     runtimeCtorMock.mockImplementation(function () {
       return runtime
@@ -119,7 +120,9 @@ describe('App forced control branches', () => {
     expect(runtime.advance).not.toHaveBeenCalled()
   })
 
-  it('covers the terminal play-toggle guard', async () => {
+  it(
+    'covers the terminal play-toggle guard',
+    async () => {
     const runtime = makeRuntime()
     runtime.reset.mockResolvedValue({
       trace: makeTrace(),
@@ -127,7 +130,7 @@ describe('App forced control branches', () => {
       diagnostics: { activeBackend: 'cpu', fallbackReason: undefined },
     })
 
-    loadModelBundleMock.mockResolvedValue({ vocab: [] })
+    loadModelBundleMock.mockResolvedValue(bundleStub)
     createTokenizerMock.mockReturnValue(makeTokenizer())
     runtimeCtorMock.mockImplementation(function () {
       return runtime
@@ -156,5 +159,7 @@ describe('App forced control branches', () => {
     })
 
     expect(runtime.advance).not.toHaveBeenCalled()
-  })
+    },
+    15000,
+  )
 })

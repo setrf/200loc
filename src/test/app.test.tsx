@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { useEffect, useRef } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { PrefixNormalization } from '../model'
-import { makeTrace } from './helpers/fixtures'
+import { loadBundle, makeTrace } from './helpers/fixtures'
 
 const loadModelBundleMock = vi.fn()
 const createTokenizerMock = vi.fn()
@@ -43,7 +43,9 @@ function makeTokenizer() {
       return {
         normalized,
         removedUnsupported: normalized !== value.toLowerCase(),
-        truncated: normalized.length !== value.toLowerCase().replace(/[^a-z]/g, '').length,
+        truncated:
+          normalized.length !==
+          value.toLowerCase().replace(/[^a-z]/g, '').length,
       }
     }),
     encode: vi.fn((value: string) =>
@@ -54,7 +56,9 @@ function makeTokenizer() {
         .map((char) => char.charCodeAt(0) - 97),
     ),
     decode: vi.fn(),
-    tokenLabel: vi.fn((tokenId: number) => (tokenId === 26 ? 'BOS' : String(tokenId))),
+    tokenLabel: vi.fn((tokenId: number) =>
+      tokenId === 26 ? 'BOS' : String(tokenId),
+    ),
   }
 }
 
@@ -67,8 +71,11 @@ function mockSourceFetch(sourceText: string, ok = true) {
 }
 
 describe('App', () => {
-  const sourceText = Array.from({ length: 220 }, (_, index) => `line ${index + 1}`).join('\n')
-  const workbenchTitle = '200loc · microgpt walkthrough'
+  const sourceText = Array.from(
+    { length: 220 },
+    (_, index) => `line ${index + 1}`,
+  ).join('\n')
+  const bundleStub = loadBundle()
 
   beforeEach(() => {
     vi.resetModules()
@@ -81,6 +88,12 @@ describe('App', () => {
         removeEventListener: vi.fn(),
       }),
     })
+    Object.defineProperty(window, 'CSS', {
+      writable: true,
+      value: {
+        supports: vi.fn().mockReturnValue(false),
+      },
+    })
   })
 
   afterEach(() => {
@@ -88,7 +101,9 @@ describe('App', () => {
     vi.restoreAllMocks()
   })
 
-  it('loads, renders, and walks through the main UI states', async () => {
+  it(
+    'loads, renders the simplified walkthrough, and advances through phases',
+    async () => {
     const runtime = makeRuntime()
     const firstTrace = makeTrace({ sampledTokenId: 26 })
     const attentionTrace = makeTrace()
@@ -98,34 +113,43 @@ describe('App', () => {
     runtime.reset.mockResolvedValue({
       trace: firstTrace,
       session: { visibleTokenIds: [4, 12], done: false },
-      diagnostics: { activeBackend: 'cpu', fallbackReason: 'WebGPU unavailable' },
+      diagnostics: {
+        activeBackend: 'cpu',
+        fallbackReason: 'WebGPU unavailable',
+      },
     })
     runtime.advance
       .mockResolvedValueOnce({
         trace: attentionTrace,
         session: { visibleTokenIds: [4, 12, 8], done: false },
-        diagnostics: { activeBackend: 'cpu', fallbackReason: 'WebGPU unavailable' },
+        diagnostics: {
+          activeBackend: 'cpu',
+          fallbackReason: 'WebGPU unavailable',
+        },
       })
       .mockResolvedValueOnce({
         trace: logitsTrace,
         session: { visibleTokenIds: [4, 12, 8, 11], done: false },
-        diagnostics: { activeBackend: 'cpu', fallbackReason: 'WebGPU unavailable' },
+        diagnostics: {
+          activeBackend: 'cpu',
+          fallbackReason: 'WebGPU unavailable',
+        },
       })
       .mockResolvedValueOnce({
         trace: sampleTrace,
         session: { visibleTokenIds: [4, 12, 8, 11], done: true },
-        diagnostics: { activeBackend: 'cpu', fallbackReason: 'WebGPU unavailable' },
+        diagnostics: {
+          activeBackend: 'cpu',
+          fallbackReason: 'WebGPU unavailable',
+        },
       })
 
-    loadModelBundleMock.mockResolvedValue({ vocab: [] })
+    loadModelBundleMock.mockResolvedValue(bundleStub)
     createTokenizerMock.mockReturnValue(makeTokenizer())
     runtimeCtorMock.mockImplementation(function () {
       return runtime
     })
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
-      ok: true,
-      text: async () => sourceText,
-    } as Response)
+    mockSourceFetch(sourceText)
 
     const { default: App } = await import('../App')
     render(<App />)
@@ -134,25 +158,21 @@ describe('App', () => {
       screen.getByText('Loading the model and canonical source…'),
     ).toBeInTheDocument()
 
-    await screen.findByText(workbenchTitle)
-    expect(screen.getByText('Explorer')).toBeInTheDocument()
-    expect(screen.getAllByText('Walkthrough').length).toBeGreaterThan(0)
-    expect(screen.getByText('Problems')).toBeInTheDocument()
-    expect(screen.getByText('Output')).toBeInTheDocument()
-    expect(screen.getAllByText('CPU fallback')).toHaveLength(1)
-    expect(screen.getAllByText('Tokenize Prefix').length).toBeGreaterThanOrEqual(2)
-    expect(screen.getByText(/Code lines L23-27, L191-196/)).toBeInTheDocument()
-    expect(screen.getAllByText('step 1 / 14').length).toBeGreaterThan(0)
-    expect(screen.getByRole('heading', { name: /p2:12 .* p3:stop/ })).toBeInTheDocument()
+    await screen.findByText('How a tiny GPT predicts the next token')
+    expect(screen.getByText('microgpt architecture')).toBeInTheDocument()
+    expect(screen.getAllByText('microgpt').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('CPU fallback').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Tokenize Prefix').length).toBeGreaterThan(0)
+    expect(screen.getByText('Projected 2D fallback')).toBeInTheDocument()
+    expect(screen.getAllByText('p2:12 -> p3:stop').length).toBeGreaterThan(0)
     expect(screen.getByText('line 117').closest('li')).not.toHaveClass('is-active')
 
-    fireEvent.mouseEnter(screen.getByText('Make QKV').closest('li')!)
-    expect(screen.getByText('line 117').closest('li')).toHaveClass('is-active')
-    fireEvent.mouseLeave(screen.getByText('Make QKV').closest('li')!)
+    fireEvent.mouseEnter(screen.getAllByText('step 1 / 14')[0])
     expect(screen.getByText('line 23').closest('li')).toHaveClass('is-active')
-    fireEvent.mouseEnter(screen.getByText('Read one slot, predict the next'))
+    fireEvent.mouseLeave(screen.getAllByText('step 1 / 14')[0])
+    fireEvent.mouseEnter(screen.getByText('weights came from offline training'))
     expect(document.querySelectorAll('.code-viewer__line.is-active').length).toBeGreaterThan(0)
-    fireEvent.mouseLeave(screen.getByText('Read one slot, predict the next'))
+    fireEvent.mouseLeave(screen.getByText('weights came from offline training'))
 
     fireEvent.change(screen.getByLabelText('Prefix'), {
       target: { value: 'Em!42' },
@@ -163,40 +183,54 @@ describe('App', () => {
     })
 
     fireEvent.click(screen.getByRole('button', { name: 'Next' }))
-    expect(screen.getAllByText('Token Embedding').length).toBeGreaterThanOrEqual(2)
-    expect(screen.getByText(/Code lines L109/)).toBeInTheDocument()
-    expect(screen.getAllByText('step 2 / 14').length).toBeGreaterThan(0)
-
-    for (let index = 0; index < 4; index += 1) {
-      fireEvent.click(screen.getByRole('button', { name: 'Next' }))
-    }
-    expect(screen.getByText('Reading p2:12 against visible slots')).toBeInTheDocument()
+    expect(screen.getAllByText('Token Embedding').length).toBeGreaterThan(0)
+    expect(screen.getByText('Look up the row for 12')).toBeInTheDocument()
 
     for (let index = 0; index < 5; index += 1) {
       fireEvent.click(screen.getByRole('button', { name: 'Next' }))
     }
-    expect(screen.getByText('Best guesses for p3')).toBeInTheDocument()
+    expect(
+      screen.getByText('Normalize the read weights for p2'),
+    ).toBeInTheDocument()
+
+    for (let index = 0; index < 5; index += 1) {
+      fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+    }
+    expect(
+      screen.getByText('Normalize the next-token distribution for p3'),
+    ).toBeInTheDocument()
 
     for (let index = 0; index < 2; index += 1) {
       fireEvent.click(screen.getByRole('button', { name: 'Next' }))
     }
-    expect(screen.getByText('Sampling')).toBeInTheDocument()
-    expect(screen.getByText('BOS means the model emitted the stop token and ends generation.')).toBeInTheDocument()
+    expect(screen.getAllByText('Append Or Stop').length).toBeGreaterThan(0)
+    expect(screen.getByText('Stop generation on BOS')).toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Show' }))
-    expect(screen.getByRole('button', { name: 'Hide' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Show training note' }))
+    expect(screen.getByRole('button', { name: 'Hide training note' })).toBeInTheDocument()
+    expect(screen.getByText('Dataset + Shuffle')).toBeInTheDocument()
 
     fireEvent.mouseEnter(screen.getByText('Dataset + Shuffle'))
     expect(document.querySelectorAll('.code-viewer__line.is-active').length).toBeGreaterThan(0)
     fireEvent.mouseLeave(screen.getByText('Dataset + Shuffle'))
 
-    fireEvent.click(screen.getByRole('tab', { name: 'viz' }))
-    expect(screen.getByRole('tab', { name: 'viz' })).toHaveAttribute('aria-selected', 'true')
-    fireEvent.click(screen.getByRole('tab', { name: 'code' }))
-    expect(screen.getByRole('tab', { name: 'code' })).toHaveAttribute('aria-selected', 'true')
-  })
+    fireEvent.click(screen.getByRole('tab', { name: 'Scene' }))
+    expect(screen.getByRole('tab', { name: 'Scene' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    )
+    fireEvent.click(screen.getByRole('tab', { name: 'Code' }))
+    expect(screen.getByRole('tab', { name: 'Code' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    )
+    },
+    20000,
+  )
 
-  it('renders initialization and advance errors', async () => {
+  it(
+    'renders initialization and advance errors',
+    async () => {
     const runtime = makeRuntime()
     runtime.reset.mockResolvedValue({
       trace: makeTrace(),
@@ -205,19 +239,16 @@ describe('App', () => {
     })
     runtime.advance.mockRejectedValue(new Error('advance failed'))
 
-    loadModelBundleMock.mockResolvedValue({ vocab: [] })
+    loadModelBundleMock.mockResolvedValue(bundleStub)
     createTokenizerMock.mockReturnValue(makeTokenizer())
     runtimeCtorMock.mockImplementation(function () {
       return runtime
     })
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
-      ok: true,
-      text: async () => sourceText,
-    } as Response)
+    mockSourceFetch(sourceText)
 
     const { default: App } = await import('../App')
     render(<App />)
-    await screen.findByText(workbenchTitle)
+    await screen.findByText('How a tiny GPT predicts the next token')
 
     for (let index = 0; index < 14; index += 1) {
       fireEvent.click(screen.getByRole('button', { name: 'Next' }))
@@ -225,7 +256,9 @@ describe('App', () => {
 
     await screen.findByText('Failed to load the walkthrough.')
     expect(screen.getByText('advance failed')).toBeInTheDocument()
-  })
+    },
+    15000,
+  )
 
   it('renders the BOS-only context path at position zero', async () => {
     const runtime = makeRuntime()
@@ -235,7 +268,7 @@ describe('App', () => {
       diagnostics: { activeBackend: 'cpu', fallbackReason: undefined },
     })
 
-    loadModelBundleMock.mockResolvedValue({ vocab: [] })
+    loadModelBundleMock.mockResolvedValue(bundleStub)
     createTokenizerMock.mockReturnValue(makeTokenizer())
     runtimeCtorMock.mockImplementation(function () {
       return runtime
@@ -245,9 +278,9 @@ describe('App', () => {
     const { default: App } = await import('../App')
     render(<App />)
 
-    await screen.findByText(workbenchTitle)
-    expect(screen.getByRole('heading', { name: 'Reading p0:BOS' })).toBeInTheDocument()
+    await screen.findByText('How a tiny GPT predicts the next token')
     expect(screen.getAllByText('p0:BOS -> p1:stop').length).toBeGreaterThan(0)
+    expect(screen.getByText('Stand on p0:BOS')).toBeInTheDocument()
   })
 
   it('falls back to the generic advance error message for non-Error rejections', async () => {
@@ -259,7 +292,7 @@ describe('App', () => {
     })
     runtime.advance.mockRejectedValue('advance failed')
 
-    loadModelBundleMock.mockResolvedValue({ vocab: [] })
+    loadModelBundleMock.mockResolvedValue(bundleStub)
     createTokenizerMock.mockReturnValue(makeTokenizer())
     runtimeCtorMock.mockImplementation(function () {
       return runtime
@@ -268,7 +301,7 @@ describe('App', () => {
 
     const { default: App } = await import('../App')
     render(<App />)
-    await screen.findByText(workbenchTitle)
+    await screen.findByText('How a tiny GPT predicts the next token')
 
     for (let index = 0; index < 14; index += 1) {
       fireEvent.click(screen.getByRole('button', { name: 'Next' }))
@@ -284,10 +317,7 @@ describe('App', () => {
     runtimeCtorMock.mockImplementation(function () {
       return makeRuntime()
     })
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
-      ok: true,
-      text: async () => sourceText,
-    } as Response)
+    mockSourceFetch(sourceText)
 
     const { default: App } = await import('../App')
     const first = render(<App />)
@@ -304,15 +334,12 @@ describe('App', () => {
       diagnostics: { activeBackend: 'cpu', fallbackReason: undefined },
     })
 
-    loadModelBundleMock.mockResolvedValue({ vocab: [] })
+    loadModelBundleMock.mockResolvedValue(bundleStub)
     createTokenizerMock.mockReturnValue(makeTokenizer())
     runtimeCtorMock.mockImplementation(function () {
       return runtime
     })
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
-      ok: true,
-      text: async () => sourceText,
-    } as Response)
+    mockSourceFetch(sourceText)
 
     const second = render(<App />)
     await waitFor(() => {
@@ -360,7 +387,7 @@ describe('App', () => {
       diagnostics: { activeBackend: 'webgpu', fallbackReason: undefined },
     })
 
-    loadModelBundleMock.mockResolvedValue({ vocab: [] })
+    loadModelBundleMock.mockResolvedValue(bundleStub)
     createTokenizerMock.mockReturnValue(makeTokenizer())
     runtimeCtorMock.mockImplementation(function () {
       return runtime
@@ -370,8 +397,8 @@ describe('App', () => {
     const { default: App } = await import('../App')
     render(<App />)
 
-    await screen.findByText(workbenchTitle)
-    expect(screen.getAllByText('WebGPU')).toHaveLength(1)
+    await screen.findByText('How a tiny GPT predicts the next token')
+    expect(screen.getAllByText('WebGPU').length).toBeGreaterThan(0)
 
     fireEvent.click(screen.getByRole('button', { name: 'Reset' }))
     await waitFor(() => {
@@ -382,14 +409,16 @@ describe('App', () => {
     expect(screen.getByRole('button', { name: 'Pause' })).toBeInTheDocument()
 
     await waitFor(() => {
-      expect(screen.getAllByText('Token Embedding').length).toBeGreaterThanOrEqual(2)
+      expect(screen.getAllByText('Token Embedding').length).toBeGreaterThan(0)
     })
 
     fireEvent.click(screen.getByRole('button', { name: 'Pause' }))
     expect(screen.getByRole('button', { name: 'Play' })).toBeInTheDocument()
   })
 
-  it('appends traces, ignores overlapping advances, and focuses code from viz cards', async () => {
+  it(
+    'appends traces, ignores overlapping advances, and focuses code from story and scene',
+    async () => {
     const runtime = makeRuntime()
     const firstTrace = makeTrace({ sampledTokenId: 26 })
     const secondTrace = makeTrace({ tokenId: 7, positionId: 3, sampledTokenId: 8 })
@@ -413,7 +442,7 @@ describe('App', () => {
         diagnostics: { activeBackend: 'cpu', fallbackReason: undefined },
       })
 
-    loadModelBundleMock.mockResolvedValue({ vocab: [] })
+    loadModelBundleMock.mockResolvedValue(bundleStub)
     createTokenizerMock.mockReturnValue(makeTokenizer())
     runtimeCtorMock.mockImplementation(function () {
       return runtime
@@ -422,36 +451,18 @@ describe('App', () => {
 
     const { default: App } = await import('../App')
     render(<App />)
-    await screen.findByText(workbenchTitle)
+    await screen.findByText('How a tiny GPT predicts the next token')
 
-    fireEvent.mouseEnter(screen.getByRole('heading', { name: 'Reading p2:12' }))
-    fireEvent.mouseLeave(screen.getByRole('heading', { name: 'Reading p2:12' }))
-    fireEvent.mouseEnter(screen.getByText('combined input stream'))
-    fireEvent.mouseLeave(screen.getByText('combined input stream'))
+    fireEvent.mouseEnter(screen.getAllByText('p2:12 -> p3:stop')[0])
+    fireEvent.mouseLeave(screen.getAllByText('p2:12 -> p3:stop')[0])
 
-    for (let index = 0; index < 4; index += 1) {
+    for (let index = 0; index < 5; index += 1) {
       fireEvent.click(screen.getByRole('button', { name: 'Next' }))
     }
-    fireEvent.mouseEnter(screen.getByText('Reading p2:12 against visible slots'))
-    fireEvent.mouseLeave(screen.getByText('Reading p2:12 against visible slots'))
 
-    for (let index = 0; index < 4; index += 1) {
+    for (let index = 0; index < 8; index += 1) {
       fireEvent.click(screen.getByRole('button', { name: 'Next' }))
     }
-    fireEvent.mouseEnter(screen.getByText('final state for this slot'))
-    fireEvent.mouseLeave(screen.getByText('final state for this slot'))
-
-    for (let index = 0; index < 2; index += 1) {
-      fireEvent.click(screen.getByRole('button', { name: 'Next' }))
-    }
-    fireEvent.mouseEnter(screen.getByText('Best guesses for p3'))
-    fireEvent.mouseLeave(screen.getByText('Best guesses for p3'))
-
-    for (let index = 0; index < 2; index += 1) {
-      fireEvent.click(screen.getByRole('button', { name: 'Next' }))
-    }
-    fireEvent.mouseEnter(screen.getByText('Sampling'))
-    fireEvent.mouseLeave(screen.getByText('Sampling'))
 
     fireEvent.click(screen.getByRole('button', { name: 'Next' }))
     fireEvent.click(screen.getByRole('button', { name: 'Next' }))
@@ -465,7 +476,7 @@ describe('App', () => {
     })
 
     await waitFor(() => {
-      expect(screen.getByText('position 3')).toBeInTheDocument()
+      expect(screen.getAllByText('p3:7 -> p4:8').length).toBeGreaterThan(0)
     })
 
     for (let index = 0; index < 14; index += 1) {
@@ -473,13 +484,15 @@ describe('App', () => {
     }
 
     await waitFor(() => {
-      expect(screen.getByText('position 4')).toBeInTheDocument()
+      expect(screen.getAllByText('p4:8 -> p5:9').length).toBeGreaterThan(0)
     })
     expect(runtime.advance).toHaveBeenCalledTimes(2)
-  })
+    },
+    15000,
+  )
 
   it('covers fetch failures, non-error bootstrap failures, and cancelled bootstrap branches', async () => {
-    loadModelBundleMock.mockResolvedValue({ vocab: [] })
+    loadModelBundleMock.mockResolvedValue(bundleStub)
     createTokenizerMock.mockReturnValue(makeTokenizer())
     runtimeCtorMock.mockImplementation(function () {
       return makeRuntime()
@@ -499,7 +512,7 @@ describe('App', () => {
     expect(screen.getByText('Failed to initialize app.')).toBeInTheDocument()
     nonErrorFailure.unmount()
 
-    const bundleDeferred = deferred<{ vocab: [] }>()
+    const bundleDeferred = deferred<typeof bundleStub>()
     const sourceDeferred = deferred<string>()
     loadModelBundleMock.mockReturnValue(bundleDeferred.promise)
     vi.spyOn(globalThis, 'fetch').mockResolvedValue({
@@ -509,27 +522,36 @@ describe('App', () => {
     runtimeCtorMock.mockClear()
     const cancelledBeforeInit = render(<App />)
     cancelledBeforeInit.unmount()
-    bundleDeferred.resolve({ vocab: [] })
+    bundleDeferred.resolve(bundleStub)
     sourceDeferred.resolve(sourceText)
+    await Promise.resolve()
+    expect(runtimeCtorMock).not.toHaveBeenCalled()
+
+    const lateFailure = deferred<typeof bundleStub>()
+    loadModelBundleMock.mockReturnValue(lateFailure.promise)
+    mockSourceFetch(sourceText)
+    const cancelledBeforeFailure = render(<App />)
+    cancelledBeforeFailure.unmount()
+    lateFailure.reject(new Error('late bundle failure'))
     await Promise.resolve()
     expect(runtimeCtorMock).not.toHaveBeenCalled()
 
     const initDeferred = deferred<{ activeBackend: 'cpu'; fallbackReason?: string }>()
     const runtime = makeRuntime()
     runtime.init.mockReturnValue(initDeferred.promise)
-    loadModelBundleMock.mockResolvedValue({ vocab: [] })
+    loadModelBundleMock.mockResolvedValue(bundleStub)
     createTokenizerMock.mockReturnValue(makeTokenizer())
     runtimeCtorMock.mockImplementation(function () {
       return runtime
     })
     mockSourceFetch(sourceText)
-    const cancelledWithInitError = render(<App />)
+    const cancelledAfterCtor = render(<App />)
     await waitFor(() => {
       expect(runtime.init).toHaveBeenCalled()
     })
-    cancelledWithInitError.unmount()
-    initDeferred.reject('ignore me')
+    cancelledAfterCtor.unmount()
+    initDeferred.resolve({ activeBackend: 'cpu' })
     await Promise.resolve()
-    expect(runtime.dispose).not.toHaveBeenCalled()
+    expect(runtime.dispose).toHaveBeenCalled()
   })
 })

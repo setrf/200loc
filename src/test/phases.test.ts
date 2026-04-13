@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { inferencePhases, trainingAppendix } from '../walkthrough/phases'
+import { inferencePhases, trainingAppendix, vizFocusRanges } from '../walkthrough/phases'
 import { makeTrace } from './helpers/fixtures'
 
 describe('phase line maps', () => {
@@ -18,21 +18,26 @@ describe('phase line maps', () => {
     }
   })
 
-  it('executes every phase selector and narration branch', () => {
+  it('gives every phase grouped viz metadata and explanation copy', () => {
     const baseTrace = makeTrace()
     const terminalTrace = makeTrace({ sampledTokenId: 26 })
+    const tokenLabel = (tokenId: number) => (tokenId === 26 ? 'BOS' : String(tokenId))
 
-    const narrationBodies = inferencePhases.map((phase, index) => {
+    const explanationBodies = inferencePhases.map((phase, index) => {
       const trace = index === inferencePhases.length - 1 ? terminalTrace : baseTrace
       expect(phase.select(trace)).toBeDefined()
-      return phase.narration(trace, (tokenId) =>
-        tokenId === 26 ? 'BOS' : String(tokenId),
-      )
+      expect(phase.viz.focusNodeId).toBeDefined()
+      expect(phase.viz.cameraPoseId).toBeDefined()
+      expect(phase.viz.overlayKind).toBeDefined()
+      expect(vizFocusRanges[phase.viz.focusNodeId].length).toBeGreaterThan(0)
+      expect(phase.explanationTitle(trace, tokenLabel).length).toBeGreaterThan(0)
+      expect(phase.explanationWhy(trace, tokenLabel).length).toBeGreaterThan(0)
+      return phase.explanationBody(trace, tokenLabel)
     })
 
-    expect(narrationBodies).toHaveLength(inferencePhases.length)
-    expect(narrationBodies[0].lead).toContain('position')
-    expect(narrationBodies.at(-1)?.lead).toContain('stops')
+    expect(explanationBodies).toHaveLength(inferencePhases.length)
+    expect(explanationBodies[0]).toContain('current slot')
+    expect(explanationBodies.at(-1)).toContain('Generation ends')
     expect(trainingAppendix.every((section) => section.description.length > 0)).toBe(true)
   })
 })

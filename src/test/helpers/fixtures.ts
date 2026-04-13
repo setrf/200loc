@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import type { ModelBundle, ModelBundleJson, TokenStepTrace } from '../../model'
+import type { ModelBundle, ModelBundleJson, ModelConfig, TokenStepTrace } from '../../model'
 
 export function loadBundle(): ModelBundle {
   const raw = JSON.parse(
@@ -22,6 +22,10 @@ export function loadTraceFixture() {
   return JSON.parse(
     readFileSync(resolve(process.cwd(), 'src/test/fixtures/expected-step-em.json'), 'utf8'),
   ) as TokenStepTrace & { prefix: string }
+}
+
+export function loadModelConfig(): ModelConfig {
+  return loadBundle().config
 }
 
 export function makeTrace(

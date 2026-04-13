@@ -10,7 +10,7 @@ export type WalkthroughStatus =
   | 'terminal'
   | 'error'
 
-export type MobileTab = 'story' | 'viz' | 'code'
+export type MobileTab = 'story' | 'scene' | 'code'
 
 export interface WalkthroughState {
   status: WalkthroughStatus

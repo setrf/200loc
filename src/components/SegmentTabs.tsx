@@ -5,7 +5,7 @@ interface SegmentTabsProps {
   onChange: (tab: MobileTab) => void
 }
 
-const tabs: MobileTab[] = ['story', 'viz', 'code']
+const tabs: MobileTab[] = ['code', 'story', 'scene']
 
 export function SegmentTabs({ activeTab, onChange }: SegmentTabsProps) {
   return (
@@ -19,7 +19,8 @@ export function SegmentTabs({ activeTab, onChange }: SegmentTabsProps) {
           key={tab}
           onClick={() => onChange(tab)}
         >
-          {tab}
+          {tab[0].toUpperCase()}
+          {tab.slice(1)}
         </button>
       ))}
     </div>
