@@ -13,6 +13,7 @@ import {
   BlkSpecial,
   type IBlkAccess,
   type IBlkDef,
+  type IBlkLabel,
 } from '../../vendor/llmVizOriginal/llm/GptModelLayout'
 import { DimStyle } from '../../vendor/llmVizOriginal/llm/walkthrough/WalkthroughTools'
 
@@ -437,6 +438,7 @@ export function buildMicroVizLayout(model: SceneModelData): MicroVizLayout {
     block.cube.idx = index
     return block.cube
   })
+  const labels: IBlkLabel[] = []
 
   const shape: MicroVizShape = {
     B: 1,
@@ -450,6 +452,7 @@ export function buildMicroVizLayout(model: SceneModelData): MicroVizLayout {
 
   return {
     cubes,
+    labels,
     blocks,
     edges,
     shape,

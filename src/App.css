@@ -436,6 +436,12 @@
   pointer-events: none;
 }
 
+.scene-panel__event-surface {
+  position: absolute;
+  inset: 0;
+  pointer-events: auto;
+}
+
 .scene-panel__interaction-hint {
   position: absolute;
   right: 14px;

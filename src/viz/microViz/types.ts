@@ -1,7 +1,10 @@
 import type { TokenStepTrace } from '../../model'
 import type { PhaseDefinition } from '../../walkthrough/phases'
 import type { ICamera, ICameraPos } from '../../vendor/llmVizOriginal/llm/Camera'
-import type { IBlkDef } from '../../vendor/llmVizOriginal/llm/GptModelLayout'
+import type {
+  IBlkDef,
+  IBlkLabel,
+} from '../../vendor/llmVizOriginal/llm/GptModelLayout'
 import type { IRenderState } from '../../vendor/llmVizOriginal/llm/render/modelRender'
 import type { IBufferTex } from '../../vendor/llmVizOriginal/utils/renderPhases'
 import type {
@@ -94,6 +97,7 @@ export interface MicroVizEdge {
 
 export interface MicroVizLayout {
   cubes: IBlkDef[]
+  labels: IBlkLabel[]
   blocks: Record<MicroVizBlockId, MicroVizBlock>
   edges: MicroVizEdge[]
   shape: MicroVizShape
