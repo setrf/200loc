@@ -671,8 +671,6 @@ export function applyMicroVizPhase(
       head.vectorLabel.visible = phaseState.phaseId === 'weighted-values' ? 1 : 0.6
     })
   }
-
-  ctx.camera.desiredCamera = ctx.layout.cameraPoses[phaseState.cameraPoseId]
 }
 
 export function drawMicroVizEdges(

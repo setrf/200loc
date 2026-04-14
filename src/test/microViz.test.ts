@@ -283,7 +283,7 @@ describe('micro viz bridge', () => {
     expect(layout.blocks['q-project'].cube.opacity).toBe(0.96)
     expect(layout.blocks['q-project'].cube.highlight).toBe(0.52)
     expect(layout.blocks.context.cube.opacity).toBeGreaterThan(0.6)
-    expect(ctx.camera.desiredCamera).toBe(layout.cameraPoses.attention)
+    expect(ctx.camera.desiredCamera).toBeUndefined()
 
     drawMicroVizEdges(
       ctx as unknown as Parameters<typeof drawMicroVizEdges>[0],

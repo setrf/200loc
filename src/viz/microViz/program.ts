@@ -169,6 +169,7 @@ export function setMicroVizProgramData(
   state: MicroVizProgramState,
   data: MicroVizProgramData,
 ) {
+  const previousPhaseState = state.microViz.phaseState
   state.microViz.data = data
   const phaseState = buildMicroVizPhaseState(
     data.phase,
@@ -184,6 +185,16 @@ export function setMicroVizProgramData(
     data.contextTokens,
   )
   applyMicroVizPhase(state.microViz.renderContext, phaseState)
+
+  const phaseChanged =
+    !previousPhaseState ||
+    previousPhaseState.phaseId !== phaseState.phaseId ||
+    previousPhaseState.cameraPoseId !== phaseState.cameraPoseId
+
+  if (phaseChanged) {
+    state.camera.desiredCamera =
+      state.layout.cameraPoses[phaseState.cameraPoseId]
+  }
 }
 
 function manageMicroVizMovement(

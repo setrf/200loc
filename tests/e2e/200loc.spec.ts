@@ -196,9 +196,11 @@ test.describe('desktop walkthrough', () => {
     await expectSceneToChange(scene, async () => {
       await page.mouse.move(box.x + box.width * 0.5, box.y + box.height * 0.55)
       await page.mouse.down()
+      await page.waitForTimeout(180)
       await page.mouse.move(box.x + box.width * 0.62, box.y + box.height * 0.62, {
         steps: 8,
       })
+      await page.waitForTimeout(180)
       await page.mouse.up()
       await page.waitForTimeout(500)
     })
