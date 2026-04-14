@@ -16,6 +16,94 @@ import { lineHeight } from "./TextLayout";
 import type { IColorMix } from "../Annotations";
 import { clamp } from "@llmviz/utils/data";
 
+export interface IModelCardLayoutMetrics {
+    tl: Vec3;
+    br: Vec3;
+    titleFontScale: number;
+    paramLabelScale: number;
+    paramValueScale: number;
+    titleY: number;
+    paramY: number;
+}
+
+function fitTextScale(textWidth: number, preferredScale: number, maxWidth: number, minScale: number) {
+    if (textWidth <= 0 || maxWidth <= 0) {
+        return preferredScale;
+    }
+    return clamp(preferredScale * (maxWidth / textWidth), minScale, preferredScale);
+}
+
+export function computeModelCardLayout(
+    titleWidthAtUnitScale: number,
+    paramLabelWidthAtUnitScale: number,
+    paramValueWidthAtUnitScale: number,
+) : IModelCardLayoutMetrics {
+    const innerPaddingX = 8;
+    const titleTopPadding = 4;
+    const contentGap = 4;
+    const bottomPadding = 5;
+
+    const preferredTitleScale = 13;
+    const preferredParamLabelScale = 4;
+    const preferredParamValueScale = 8;
+
+    const minTitleScale = 9;
+    const minParamLabelScale = 3.2;
+    const minParamValueScale = 6.4;
+
+    const minInnerWidth = 74;
+    const maxInnerWidth = 102;
+
+    const preferredTitleWidth = titleWidthAtUnitScale * preferredTitleScale;
+    const preferredParamWidth =
+        paramLabelWidthAtUnitScale * preferredParamLabelScale +
+        paramValueWidthAtUnitScale * preferredParamValueScale;
+
+    const innerWidth = clamp(
+        Math.max(preferredTitleWidth, preferredParamWidth) + innerPaddingX * 2,
+        minInnerWidth,
+        maxInnerWidth,
+    );
+    const contentWidth = innerWidth - innerPaddingX * 2;
+
+    const titleFontScale = fitTextScale(
+        titleWidthAtUnitScale * preferredTitleScale,
+        preferredTitleScale,
+        contentWidth,
+        minTitleScale,
+    );
+    const paramLabelScale = fitTextScale(
+        paramLabelWidthAtUnitScale * preferredParamLabelScale,
+        preferredParamLabelScale,
+        contentWidth,
+        minParamLabelScale,
+    );
+    const paramValueScale = fitTextScale(
+        paramValueWidthAtUnitScale * preferredParamValueScale,
+        preferredParamValueScale,
+        contentWidth,
+        minParamValueScale,
+    );
+
+    const titleHeight = titleFontScale * 1.3;
+    const paramHeight = Math.max(paramLabelScale, paramValueScale);
+    const cardHeight = titleTopPadding + titleHeight + contentGap + paramHeight + bottomPadding;
+    const halfWidth = innerWidth / 2;
+
+    const tl = new Vec3(-halfWidth, -97, 0);
+    const br = new Vec3(halfWidth, tl.y + cardHeight, 0);
+
+    return {
+        tl,
+        br,
+        titleFontScale,
+        paramLabelScale,
+        paramValueScale,
+        titleY: tl.y + titleTopPadding,
+        paramY: tl.y + titleTopPadding + titleHeight + contentGap,
+    };
+}
+
 export function drawModelCard(state: IProgramState, layout: IGptModelLayout, title: string, offset: Vec3) {
     let { render } = state;
     let { camPos } = cameraToMatrixView(state.camera);
@@ -23,7 +111,7 @@ export function drawModelCard(state: IProgramState, layout: IGptModelLayout, tit
 
     let scale = clamp(dist / 500.0, 1.0, 800.0);
 
-    let pinY = -60;
+    let pinY = -118;
     let mtx = Mat4f.fromScaleTranslation(new Vec3(scale, scale, scale), new Vec3(0, pinY, 0).add(offset))
         .mul(Mat4f.fromTranslation(new Vec3(0, -pinY, 0)));
 
@@ -35,43 +123,33 @@ export function drawModelCard(state: IProgramState, layout: IGptModelLayout, tit
 
     let lineOpts: ILineOpts = { color: borderColor, mtx, thick, n };
 
-    let tl = new Vec3(-45, -97, 0);
-    let br = new Vec3( 45, -70, 0);
+    let nParamsText = `n_params = `;
+    let weightCountText = numberToCommaSep(layout.weightCount);
+    let cardLayout = computeModelCardLayout(
+        measureTextWidth(render.modelFontBuf, title, 1),
+        measureTextWidth(render.modelFontBuf, nParamsText, 1),
+        measureTextWidth(render.modelFontBuf, weightCountText, 1),
+    );
+    let { tl, br } = cardLayout;
     drawLineRect(render, tl, br, lineOpts);
 
     addQuad(render.triRender, new Vec3(tl.x, tl.y, -0.1), new Vec3(br.x, br.y, -0.1), backgroundColor, mtx);
 
-    // let w = measureTextWidth(state.modelFontBuf, title, .0);
-    let { B, C, T, A, nBlocks, nHeads, vocabSize } = layout.shape;
-
     let midX = (tl.x + br.x) / 2;
-    let paramLeft = br.x - 50;
-    let paramOff = tl.y + 2;
-
-    let paramLineHeight = 1.3;
-    let paramFontScale = 4;
-    let numWidth = paramFontScale * 0.6;
-    let allNums = [B, C, T, A, nBlocks, nHeads];
-    let maxLen = Math.max(...allNums.map(n => n.toString().length));
-    let paramHeight = 2 + paramLineHeight * paramFontScale * 3 + 1;
-
-    let titleFontScale = 13;
+    let titleFontScale = cardLayout.titleFontScale;
     let titleW = measureTextWidth(render.modelFontBuf, title, titleFontScale);
-    let titleHeight = titleFontScale * paramLineHeight;
-    writeTextToBuffer(render.modelFontBuf, title, titleColor, midX - titleW / 2, tl.y + 2, titleFontScale, mtx);
+    writeTextToBuffer(render.modelFontBuf, title, titleColor, midX - titleW / 2, cardLayout.titleY, titleFontScale, mtx);
 
     // layout.weightCount = 150000000000;
 
-    let nParamsText = `n_params = `;
-    let weightCountText = numberToCommaSep(layout.weightCount);
-
-    let weightSize = 8;
+    let paramFontScale = cardLayout.paramLabelScale;
+    let weightSize = cardLayout.paramValueScale;
     let weightTitleW = measureTextWidth(render.modelFontBuf, nParamsText, paramFontScale);
     let weightCountW = measureTextWidth(render.modelFontBuf, weightCountText, weightSize);
     // let infoText = "goal: sort 6 letters from { A, B, C } into ascending order";
     // writeTextToBuffer(render.modelFontBuf, infoText, titleColor, tl.x + 2, tl.y + paramHeight + 2, 4, mtx);
 
-    paramOff = tl.y + titleHeight + 4;
+    let paramOff = cardLayout.paramY;
     let weightX = midX - (weightCountW + weightTitleW) / 2;
 
     writeTextToBuffer(render.modelFontBuf, nParamsText, titleColor, weightX, paramOff - paramFontScale / 2, paramFontScale, mtx);
