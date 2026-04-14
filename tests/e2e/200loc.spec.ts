@@ -231,6 +231,65 @@ test.describe('desktop walkthrough', () => {
     expect(issues).toEqual([])
   })
 
+  test('keeps the interactive scene host mounted while stepping through phases', async ({
+    page,
+  }) => {
+    const issues = collectBrowserIssues(page)
+    await expect(page.locator('.scene-panel__event-surface')).toBeVisible()
+
+    await page.evaluate(() => {
+      const viewport = document.querySelector('.scene-panel__viewport')
+      if (!viewport) {
+        throw new Error('Scene viewport not found')
+      }
+      const counts = { added: 0, removed: 0 }
+      const observer = new MutationObserver((mutations) => {
+        for (const mutation of mutations) {
+          mutation.addedNodes.forEach((node) => {
+            if (
+              node instanceof HTMLElement &&
+              node.classList.contains('scene-panel__event-surface')
+            ) {
+              counts.added += 1
+            }
+          })
+          mutation.removedNodes.forEach((node) => {
+            if (
+              node instanceof HTMLElement &&
+              node.classList.contains('scene-panel__event-surface')
+            ) {
+              counts.removed += 1
+            }
+          })
+        }
+      })
+      observer.observe(viewport, { childList: true, subtree: true })
+      ;(window as Window & {
+        __sceneHostObserver?: MutationObserver
+        __sceneHostCounts?: typeof counts
+      }).__sceneHostObserver = observer
+      ;(window as Window & {
+        __sceneHostCounts?: typeof counts
+      }).__sceneHostCounts = counts
+    })
+
+    for (let index = 0; index < 6; index += 1) {
+      await advanceOnePhase(page)
+    }
+
+    const hostCounts = await page.evaluate(() => {
+      const win = window as Window & {
+        __sceneHostObserver?: MutationObserver
+        __sceneHostCounts?: { added: number; removed: number }
+      }
+      win.__sceneHostObserver?.disconnect()
+      return win.__sceneHostCounts ?? { added: -1, removed: -1 }
+    })
+
+    expect(hostCounts).toEqual({ added: 0, removed: 0 })
+    expect(issues).toEqual([])
+  })
+
   test('shows in-scene hover readouts for access-backed matrices', async ({
     page,
   }) => {

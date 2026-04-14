@@ -164,6 +164,7 @@ export function ArchitectureScene({
 }: ArchitectureSceneProps) {
   const viewportRef = useRef<HTMLDivElement>(null)
   const layerViewRef = useRef<MicroLayerViewHandle | null>(null)
+  const currentPhaseIdRef = useRef(phase.id)
   const [renderMode, setRenderMode] = useState<'loading' | 'webgl' | 'fallback'>(
     'loading',
   )
@@ -195,19 +196,24 @@ export function ArchitectureScene({
     [abstractLayout, viewportSize, vizFrame.cameraPoseId],
   )
 
+  useEffect(() => {
+    currentPhaseIdRef.current = phase.id
+  }, [phase.id])
+
   const setHoverFocusState = useCallback(
     (focusId: FocusRangeKey | null) => {
       setHoverFocusId((current) => {
-        if (current.phaseId === phase.id && current.focusId === focusId) {
+        const phaseId = currentPhaseIdRef.current
+        if (current.phaseId === phaseId && current.focusId === focusId) {
           return current
         }
         return {
-          phaseId: phase.id,
+          phaseId,
           focusId,
         }
       })
     },
-    [phase.id],
+    [],
   )
 
   const handleLayerHoverChange = useCallback(
