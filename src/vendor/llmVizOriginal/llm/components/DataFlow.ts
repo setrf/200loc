@@ -66,11 +66,20 @@ export function drawDataFlow(state: IProgramState, blk: IBlkDef, destIdx: Vec3, 
     } else if (blk.deps.special === BlKDepSpecial.LayerNorm) {
         bb = drawLayerNorm(dataFlowArgs);
 
+    } else if (blk.deps.special === BlKDepSpecial.RmsNorm) {
+        bb = drawRmsNorm(dataFlowArgs);
+
     } else if (blk.deps.special === BlKDepSpecial.LayerNormMu) {
         bb = drawLayerNormMuAgg(dataFlowArgs);
 
+    } else if (blk.deps.special === BlKDepSpecial.RmsNormAggMeanSquare) {
+        bb = drawRmsNormMeanSquareAgg(dataFlowArgs);
+
     } else if (blk.deps.special === BlKDepSpecial.LayerNormSigma) {
         bb = drawLayerNormSigmaAgg(dataFlowArgs);
+
+    } else if (blk.deps.special === BlKDepSpecial.RmsNormAggRms) {
+        bb = drawRmsNormRmsAgg(dataFlowArgs);
 
     } else if (blk.deps.special === BlKDepSpecial.SoftmaxAggMax) {
         bb = drawSoftmaxAggMax(dataFlowArgs);
@@ -417,6 +426,22 @@ function drawLayerNormMuAgg(args: IDataFlowArgs) {
     return drawMaths(args, center, textBlock);
 }
 
+function drawRmsNormMeanSquareAgg(args: IDataFlowArgs) {
+    let { center, mtx } = args;
+    let fontOpts: IFontOpts = { color: opColor, mtx, size: 16 };
+
+    let textBlock = mkTextBlock({
+        opts: fontOpts,
+        subs: [
+            { text: 'E[' },
+            { cellX: 1, cellY: 3, color: workingSrcColor },
+            { text: '²]' },
+        ],
+    });
+
+    return drawMaths(args, center, textBlock);
+}
+
 function drawLayerNormSigmaAgg(args: IDataFlowArgs) {
     let { center, mtx } = args;
     let fontOpts: IFontOpts = { color: opColor, mtx, size: 16 };
@@ -431,6 +456,27 @@ function drawLayerNormSigmaAgg(args: IDataFlowArgs) {
                     { cellX: 1, cellY: 3, color: workingSrcColor },
                     { text: ']', color: workingSrcColor },
                     { text: ' + ε' },
+                ]},
+            ],
+        }],
+    });
+
+    return drawMaths(args, center, textBlock);
+}
+
+function drawRmsNormRmsAgg(args: IDataFlowArgs) {
+    let { center, mtx } = args;
+    let fontOpts: IFontOpts = { color: opColor, mtx, size: 16 };
+
+    let textBlock = mkTextBlock({
+        opts: fontOpts,
+        subs: [{
+            type: TextBlockType.Sqrt,
+            subs: [
+                { type: TextBlockType.Line, subs: [
+                    { text: 'E[' },
+                    { cellX: 1, cellY: 3, color: workingSrcColor },
+                    { text: '²] + ε' },
                 ]},
             ],
         }],
@@ -483,6 +529,41 @@ function drawLayerNorm(args: IDataFlowArgs) {
             { text: ' + ' },
             { text: 'β', color: weightSrcColor },
         ],
+    });
+
+    return drawMaths(args, center, blk);
+}
+
+function drawRmsNorm(args: IDataFlowArgs) {
+    let { center, mtx } = args;
+    let fontOpts: IFontOpts = { color: opColor, mtx, size: 16 };
+
+    let blk = mkTextBlock({
+        opts: fontOpts,
+        subs: [{
+            type: TextBlockType.Divide,
+            subs: [
+                {
+                    subs: [
+                        { cellX: 1, cellY: 1, color: workingSrcColor },
+                    ],
+                },
+                {
+                    type: TextBlockType.Line,
+                    rectOpts: { color: Colors.Aggregates.mul(0.8), mtx, thick: 1.0, dash: 6 },
+                    subs: [{
+                        type: TextBlockType.Sqrt,
+                        subs: [
+                            { type: TextBlockType.Line, subs: [
+                                { text: 'E[' },
+                                { cellX: 1, cellY: 3, color: workingSrcColor },
+                                { text: '²] + ε' },
+                            ]},
+                        ],
+                    }],
+                },
+            ],
+        }],
     });
 
     return drawMaths(args, center, blk);

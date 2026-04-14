@@ -2,9 +2,11 @@ import type { TokenStepTrace } from '../../model'
 import type { PhaseDefinition } from '../../walkthrough/phases'
 import type { ICamera, ICameraPos } from '../../vendor/llmVizOriginal/llm/Camera'
 import type {
+  BlKDepSpecial,
   IBlkDef,
   IBlkLabel,
 } from '../../vendor/llmVizOriginal/llm/GptModelLayout'
+import type { DimStyle } from '../../vendor/llmVizOriginal/llm/walkthrough/WalkthroughTools'
 import type { IRenderState } from '../../vendor/llmVizOriginal/llm/render/modelRender'
 import type { IBufferTex } from '../../vendor/llmVizOriginal/utils/renderPhases'
 import type {
@@ -165,7 +167,8 @@ export interface MicroVizCardModel {
 export interface MicroVizLayout {
   cubes: IBlkDef[]
   labels: IBlkLabel[]
-  blocks: Record<MicroVizBlockId, MicroVizBlock>
+  blocks: MicroVizTransformerBlock[]
+  blockMap: Record<MicroVizBlockId, MicroVizBlock>
   cubeFocusIds: Record<number, VizNodeId | VizEdgeId | null>
   edges: MicroVizEdge[]
   shape: MicroVizShape
@@ -178,13 +181,16 @@ export interface MicroVizLayout {
   tokEmbedObj: IBlkDef
   posEmbedObj: IBlkDef
   residual0: IBlkDef
+  ln_f: MicroVizNormGroup | null
   embedLabel: IBlkLabel
   transformerBlocks: MicroVizTransformerBlock[]
+  outputLabel: IBlkLabel
   lmHeadWeight: IBlkDef
   logits: IBlkDef
   logitsAgg1: IBlkDef
   logitsAgg2: IBlkDef
   logitsSoftmax: IBlkDef
+  sampleBlock: IBlkDef
   logitsTransposed: boolean
   model: MicroVizCardModel
 }
@@ -205,11 +211,18 @@ export interface MicroVizTextureBinding {
 export interface MicroVizPhaseState {
   phaseId: PhaseDefinition['id']
   cameraPoseId: CameraPoseId
+  cameraTarget: ICameraPos
   focusBlockIds: MicroVizBlockId[]
   emphasisBlockIds: MicroVizBlockId[]
   emphasisEdgeIds: MicroVizEdgeId[]
-  dimmedBlockIds: MicroVizBlockId[]
+  hoverBlockIndices: number[]
+  dimHover: DimStyle | null
+  lines: string[]
+  topOutputOpacity?: number
+  opacityByBlockId: Partial<Record<MicroVizBlockId, number>>
+  highlightByBlockId: Partial<Record<MicroVizBlockId, number>>
   blockBindings: Partial<Record<MicroVizBlockId, MicroVizTextureBinding>>
+  specials: Partial<Record<MicroVizBlockId, BlKDepSpecial>>
 }
 
 export interface MicroVizTextureSet {

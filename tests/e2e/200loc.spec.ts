@@ -180,29 +180,37 @@ test.describe('desktop walkthrough', () => {
   }) => {
     const issues = collectBrowserIssues(page)
     const scene = page.locator('.scene-panel')
+    const eventSurface = page.locator('.scene-panel__event-surface')
     await scene.scrollIntoViewIfNeeded()
     await expect(page.locator('.scene-panel canvas')).toBeVisible()
+    await expect(eventSurface).toBeVisible()
 
     await expectSceneToChange(scene, async () => {
       await page.keyboard.press('ArrowRight')
       await page.waitForTimeout(500)
     })
 
-    const box = await scene.boundingBox()
+    const box = await eventSurface.boundingBox()
     if (!box) {
-      throw new Error('Scene bounding box was not available')
+      throw new Error('Scene event surface bounding box was not available')
     }
+
+    const hoverLinesBefore = await activeLineNumbers(page)
+    await page.mouse.move(box.x + box.width * 0.48, box.y + box.height * 0.65)
+    await page.waitForTimeout(300)
+    const hoverLinesAfter = await activeLineNumbers(page)
+    expect(hoverLinesAfter).not.toEqual(hoverLinesBefore)
 
     await expectSceneToChange(scene, async () => {
       await page.mouse.move(box.x + box.width * 0.5, box.y + box.height * 0.55)
       await page.mouse.down()
       await page.waitForTimeout(180)
-      await page.mouse.move(box.x + box.width * 0.62, box.y + box.height * 0.62, {
-        steps: 8,
+      await page.mouse.move(box.x + box.width * 0.8, box.y + box.height * 0.8, {
+        steps: 20,
       })
-      await page.waitForTimeout(180)
+      await page.waitForTimeout(300)
       await page.mouse.up()
-      await page.waitForTimeout(500)
+      await page.waitForTimeout(700)
     })
 
     const scrollBefore = await page.evaluate(() => window.scrollY)

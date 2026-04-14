@@ -85,6 +85,9 @@ export enum BlKDepSpecial {
     SoftmaxAggMax,
     SoftmaxAggExp,
     Attention,
+    RmsNorm,
+    RmsNormAggMeanSquare,
+    RmsNormAggRms,
 }
 
 let depIdxVars = '0xybi';
@@ -933,4 +936,3 @@ export function genGptModelLayout(shape: IModelShape, gptGpuModel: IGptModelLink
         },
     };
 }
-

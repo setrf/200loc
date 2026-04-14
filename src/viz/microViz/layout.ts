@@ -13,9 +13,12 @@ import type {
 import { Mat4f } from '../../vendor/llmVizOriginal/utils/matrix'
 import { Vec3 } from '../../vendor/llmVizOriginal/utils/vector'
 import {
+  BlKDepSpecial,
   BlkSpecial,
   type IBlkAccess,
+  type IBlkCellDep,
   type IBlkDef,
+  type IBlkDeps,
   type IBlkLabel,
 } from '../../vendor/llmVizOriginal/llm/GptModelLayout'
 import { DimStyle } from '../../vendor/llmVizOriginal/llm/walkthrough/WalkthroughTools'
@@ -28,13 +31,53 @@ function makeAccessMatrix(x: number[], y: number[]) {
   return Mat4f.fromColMajor([...x4, ...y4, 0, 0, 0, 0, 0, 0, 0, 0])
 }
 
-function createAccess(): IBlkAccess {
+function createAccess(
+  x: number[] = [1, 0, 0],
+  y: number[] = [0, 1, 0],
+  scale = 1,
+): IBlkAccess {
   return {
     src: null as never,
     channel: 'r',
-    scale: 1,
-    mat: makeAccessMatrix([1, 0, 0, 0], [0, 1, 0, 0]),
+    scale,
+    mat: makeAccessMatrix(x, y),
     disable: true,
+  }
+}
+
+interface DepArgs {
+  dot?: [[IBlkDef, string], [IBlkDef, string]]
+  dotLen?: number
+  add?: [IBlkDef, string][]
+  lowerTri?: boolean
+  special?: BlKDepSpecial
+}
+
+function parseDepIdxStr(str: string) {
+  const depIdxVars = '0xybi'
+  const mtx = Mat4f.zeros()
+  for (let destI = 0; destI < str.length; destI += 1) {
+    const srcIdx = depIdxVars.indexOf(str[destI]!)
+    if (srcIdx > 0) {
+      mtx.s(destI, srcIdx - 1, 1)
+    }
+  }
+  return mtx
+}
+
+function makeBlkDep(src: IBlkDef, depStr: string): IBlkCellDep {
+  return { src, srcIdxMtx: parseDepIdxStr(depStr) }
+}
+
+function makeDeps(value: DepArgs): IBlkDeps {
+  return {
+    dot: value.dot?.map(([src, depStr]) => makeBlkDep(src, depStr)) as
+      | [IBlkCellDep, IBlkCellDep]
+      | undefined,
+    dotLen: value.dotLen,
+    add: value.add?.map(([src, depStr]) => makeBlkDep(src, depStr)),
+    lowerTri: value.lowerTri,
+    special: value.special ?? BlKDepSpecial.None,
   }
 }
 
@@ -122,7 +165,7 @@ export function buildMicroVizLayout(model: SceneModelData): MicroVizLayout {
           ? args.zF - dz
           : (args.zM ?? 0) - dz / 2
 
-    return {
+    const cube: IBlkDef = {
       idx: -1,
       t: args.t,
       x,
@@ -140,12 +183,14 @@ export function buildMicroVizLayout(model: SceneModelData): MicroVizLayout {
         args.dimY ?? (args.t === 'w' ? DimStyle.Weights : DimStyle.Intermediates),
       name: args.name,
       access: createAccess(),
+      deps: undefined,
       opacity: args.hidden ? 0 : 0.82,
       highlight: 0.24,
       small: args.small ?? false,
       special: args.special ?? BlkSpecial.None,
       localMtx: Mat4f.identity,
-    } satisfies IBlkDef
+    }
+    return cube
   }
 
   const leftX = -(shape.T * cell) / 2 - margin
@@ -163,6 +208,7 @@ export function buildMicroVizLayout(model: SceneModelData): MicroVizLayout {
     dimY: DimStyle.None,
     name: 'tokens',
   })
+  idxObj.access = createAccess([1, 0, 0], [0, 0, 0], 1 / Math.max(1, shape.vocabSize - 1))
   registerCube(idxObj, 'context')
 
   y += cell + margin
@@ -178,6 +224,7 @@ export function buildMicroVizLayout(model: SceneModelData): MicroVizLayout {
     dimX: DimStyle.C,
     dimY: DimStyle.n_vocab,
   })
+  tokEmbedObj.access = createAccess([1, 0, 0], [0, 1, 0], 10)
   const posEmbedObj = mk({
     t: 'w',
     xL: rightX,
@@ -189,6 +236,7 @@ export function buildMicroVizLayout(model: SceneModelData): MicroVizLayout {
     dimX: DimStyle.C,
     dimY: DimStyle.T,
   })
+  posEmbedObj.access = createAccess([1, 0, 0], [0, 1, 0], 10)
   const residual0 = mk({
     t: 'i',
     xM: 0,
@@ -200,6 +248,11 @@ export function buildMicroVizLayout(model: SceneModelData): MicroVizLayout {
     dimX: DimStyle.T,
     dimY: DimStyle.C,
     name: 'input embed',
+  })
+  residual0.access = createAccess([1, 0, 0], [0, 1, 0], 1)
+  residual0.deps = makeDeps({
+    add: [[tokEmbedObj, 'iy'], [posEmbedObj, 'xy'], [idxObj, 'x0']],
+    special: BlKDepSpecial.InputEmbed,
   })
   registerCube(tokEmbedObj, 'token-embedding')
   registerCube(posEmbedObj, 'position-embedding')
@@ -227,6 +280,11 @@ export function buildMicroVizLayout(model: SceneModelData): MicroVizLayout {
       name: `${title} mean`,
       small: true,
     })
+    lnAgg1.access = createAccess([1, 0, 0], [0, 0, 0], 1)
+    lnAgg1.deps = makeDeps({
+      add: [[source, 'xi']],
+      special: BlKDepSpecial.RmsNormAggMeanSquare,
+    })
     const lnAgg2 = mk({
       t: 'a',
       xR: aggLeft,
@@ -240,6 +298,11 @@ export function buildMicroVizLayout(model: SceneModelData): MicroVizLayout {
       name: `${title} rms`,
       small: true,
     })
+    lnAgg2.access = createAccess([1, 0, 0], [0, 0, 0], 1)
+    lnAgg2.deps = makeDeps({
+      add: [[source, 'xi'], [lnAgg1, 'x0']],
+      special: BlKDepSpecial.RmsNormAggRms,
+    })
     const hiddenLeft = aggLeft - shape.T * cell - margin
     const lnSigma = mk({
       t: 'w',
@@ -252,6 +315,7 @@ export function buildMicroVizLayout(model: SceneModelData): MicroVizLayout {
       hidden: true,
       small: true,
     })
+    lnSigma.access = createAccess([0, 0, 0], [0, 1, 0], 1)
     const lnMu = mk({
       t: 'w',
       xR: hiddenLeft - cell - margin,
@@ -263,6 +327,7 @@ export function buildMicroVizLayout(model: SceneModelData): MicroVizLayout {
       hidden: true,
       small: true,
     })
+    lnMu.access = createAccess([0, 0, 0], [0, 1, 0], 1)
     const lnResid = mk({
       t: 'i',
       xM: 0,
@@ -274,6 +339,11 @@ export function buildMicroVizLayout(model: SceneModelData): MicroVizLayout {
       dimX: DimStyle.T,
       dimY: DimStyle.C,
       name: title,
+    })
+    lnResid.access = createAccess([1, 0, 0], [0, 1, 0], 1)
+    lnResid.deps = makeDeps({
+      add: [[source, 'xy'], [lnAgg1, 'x0'], [lnAgg2, 'x0']],
+      special: BlKDepSpecial.RmsNorm,
     })
     registerCube(lnAgg1, focusId)
     registerCube(lnAgg2, focusId)
@@ -313,6 +383,7 @@ export function buildMicroVizLayout(model: SceneModelData): MicroVizLayout {
       dimX: DimStyle.C,
       dimY: DimStyle.A,
     })
+    qWeightBlock.access = createAccess([1, 0, 0], [0, 1, 0], shape.C * 0.25)
     const kWeightBlock = mk({
       t: 'w',
       xR: weightLeft,
@@ -324,6 +395,7 @@ export function buildMicroVizLayout(model: SceneModelData): MicroVizLayout {
       dimX: DimStyle.C,
       dimY: DimStyle.A,
     })
+    kWeightBlock.access = createAccess([1, 0, 0], [0, 1, 0], shape.C * 0.25)
     const vWeightBlock = mk({
       t: 'w',
       xR: weightLeft,
@@ -335,6 +407,7 @@ export function buildMicroVizLayout(model: SceneModelData): MicroVizLayout {
       dimX: DimStyle.C,
       dimY: DimStyle.A,
     })
+    vWeightBlock.access = createAccess([1, 0, 0], [0, 1, 0], shape.C * 0.25)
     const qBiasBlock = mk({
       t: 'w',
       xR: weightLeft - shape.C * cell - margin,
@@ -346,6 +419,7 @@ export function buildMicroVizLayout(model: SceneModelData): MicroVizLayout {
       hidden: true,
       small: true,
     })
+    qBiasBlock.access = createAccess([0, 0, 0], [0, 1, 0], 1)
     const kBiasBlock = mk({
       t: 'w',
       xR: weightLeft - shape.C * cell - margin,
@@ -357,6 +431,7 @@ export function buildMicroVizLayout(model: SceneModelData): MicroVizLayout {
       hidden: true,
       small: true,
     })
+    kBiasBlock.access = createAccess([0, 0, 0], [0, 1, 0], 1)
     const vBiasBlock = mk({
       t: 'w',
       xR: weightLeft - shape.C * cell - margin,
@@ -368,6 +443,7 @@ export function buildMicroVizLayout(model: SceneModelData): MicroVizLayout {
       hidden: true,
       small: true,
     })
+    vBiasBlock.access = createAccess([0, 0, 0], [0, 1, 0], 1)
     const qBlock = mk({
       t: 'i',
       xR: vectorLeft,
@@ -379,6 +455,13 @@ export function buildMicroVizLayout(model: SceneModelData): MicroVizLayout {
       dimX: DimStyle.T,
       dimY: DimStyle.A,
       name: 'Q vectors',
+    })
+    qBlock.access = createAccess([1, 0, 0], [0, 1, 0], 1)
+    qBlock.deps = makeDeps({
+      dot: [[qWeightBlock, 'iy'], [ln1.lnResid, 'xi']],
+      add: [[qBiasBlock, '0y']],
+      dotLen: shape.C,
+      special: BlKDepSpecial.None,
     })
     const kBlock = mk({
       t: 'i',
@@ -392,6 +475,13 @@ export function buildMicroVizLayout(model: SceneModelData): MicroVizLayout {
       dimY: DimStyle.A,
       name: 'K vectors',
     })
+    kBlock.access = createAccess([1, 0, 0], [0, 1, 0], 1)
+    kBlock.deps = makeDeps({
+      dot: [[kWeightBlock, 'iy'], [ln1.lnResid, 'xi']],
+      add: [[kBiasBlock, '0y']],
+      dotLen: shape.C,
+      special: BlKDepSpecial.None,
+    })
     const vBlock = mk({
       t: 'i',
       xR: vectorLeft,
@@ -403,6 +493,13 @@ export function buildMicroVizLayout(model: SceneModelData): MicroVizLayout {
       dimX: DimStyle.T,
       dimY: DimStyle.A,
       name: 'V vectors',
+    })
+    vBlock.access = createAccess([1, 0, 0], [0, 1, 0], 1)
+    vBlock.deps = makeDeps({
+      dot: [[vWeightBlock, 'iy'], [ln1.lnResid, 'xi']],
+      add: [[vBiasBlock, '0y']],
+      dotLen: shape.C,
+      special: BlKDepSpecial.None,
     })
 
     const attnMtx = mk({
@@ -418,6 +515,13 @@ export function buildMicroVizLayout(model: SceneModelData): MicroVizLayout {
       name: 'attention scores',
       special: BlkSpecial.Attention,
     })
+    attnMtx.access = createAccess([1, 0, 0], [0, 1, 0], 1)
+    attnMtx.deps = makeDeps({
+      dot: [[qBlock, 'yi'], [kBlock, 'xi']],
+      lowerTri: true,
+      dotLen: shape.A,
+      special: BlKDepSpecial.Attention,
+    })
     const attnMtxAgg1 = mk({
       t: 'a',
       xR: attnSoftmaxLeft,
@@ -430,6 +534,11 @@ export function buildMicroVizLayout(model: SceneModelData): MicroVizLayout {
       dimY: DimStyle.T,
       name: '',
       small: true,
+    })
+    attnMtxAgg1.access = createAccess([0, 0, 0], [0, 1, 0], 1)
+    attnMtxAgg1.deps = makeDeps({
+      add: [[attnMtx, 'iy']],
+      special: BlKDepSpecial.SoftmaxAggExp,
     })
     const attnMtxAgg2 = mk({
       t: 'a',
@@ -444,6 +553,11 @@ export function buildMicroVizLayout(model: SceneModelData): MicroVizLayout {
       name: '',
       small: true,
     })
+    attnMtxAgg2.access = createAccess([0, 0, 0], [0, 1, 0], 1)
+    attnMtxAgg2.deps = makeDeps({
+      add: [[attnMtx, 'iy']],
+      special: BlKDepSpecial.SoftmaxAggMax,
+    })
     const attnMtxSm = mk({
       t: 'i',
       xR: attnSoftmaxLeft - (shape.T + 2) * cell - margin,
@@ -457,6 +571,12 @@ export function buildMicroVizLayout(model: SceneModelData): MicroVizLayout {
       name: 'attention',
       special: BlkSpecial.Attention,
     })
+    attnMtxSm.access = createAccess([1, 0, 0], [0, 1, 0], 1)
+    attnMtxSm.deps = makeDeps({
+      add: [[attnMtx, 'xy'], [attnMtxAgg1, 'x0'], [attnMtxAgg2, 'x0']],
+      lowerTri: true,
+      special: BlKDepSpecial.Softmax,
+    })
     const vOutBlock = mk({
       t: 'i',
       xR: vectorLeft,
@@ -468,6 +588,12 @@ export function buildMicroVizLayout(model: SceneModelData): MicroVizLayout {
       dimX: DimStyle.T,
       dimY: DimStyle.A,
       name: 'head output',
+    })
+    vOutBlock.access = createAccess([1, 0, 0], [0, 1, 0], 1)
+    vOutBlock.deps = makeDeps({
+      dot: [[vBlock, 'iy'], [attnMtxSm, 'ix']],
+      dotLen: shape.A,
+      special: BlKDepSpecial.None,
     })
 
     const focusId = (`attention-head-${headIndex + 1}` as VizNodeId) satisfies VizNodeId
@@ -560,6 +686,7 @@ export function buildMicroVizLayout(model: SceneModelData): MicroVizLayout {
     dimY: DimStyle.C,
     name: 'attention out',
   })
+  attnOut.access = createAccess([1, 0, 0], [0, 1, 0], 1)
   const projWeight = mk({
     t: 'w',
     xR: projLeft,
@@ -571,6 +698,7 @@ export function buildMicroVizLayout(model: SceneModelData): MicroVizLayout {
     dimX: DimStyle.C,
     dimY: DimStyle.C,
   })
+  projWeight.access = createAccess([1, 0, 0], [0, 1, 0], shape.C * 0.5)
   const projBias = mk({
     t: 'w',
     xR: projLeft - shape.C * cell - margin,
@@ -582,6 +710,7 @@ export function buildMicroVizLayout(model: SceneModelData): MicroVizLayout {
     hidden: true,
     small: true,
   })
+  projBias.access = createAccess([0, 0, 0], [0, 1, 0], 1)
   const attnResidual = mk({
     t: 'i',
     xM: 0,
@@ -593,6 +722,17 @@ export function buildMicroVizLayout(model: SceneModelData): MicroVizLayout {
     dimX: DimStyle.T,
     dimY: DimStyle.C,
     name: 'attention residual',
+  })
+  attnResidual.access = createAccess([1, 0, 0], [0, 1, 0], 1)
+  attnOut.deps = makeDeps({
+    dot: [[projWeight, 'iy'], [heads[0]!.vOutBlock, 'xi']],
+    add: [[projBias, '0y'], ...heads.map((head) => [head.vOutBlock, 'xi'] as [IBlkDef, string])],
+    dotLen: shape.C,
+    special: BlKDepSpecial.None,
+  })
+  attnResidual.deps = makeDeps({
+    add: [[attnOut, 'xy'], [residual0, 'xy']],
+    special: BlKDepSpecial.None,
   })
   ;[projWeight, projBias, attnOut, attnResidual].forEach((cube) =>
     registerCube(cube, cube === attnResidual ? 'residual-add-1' : 'attention-mix'),
@@ -613,6 +753,7 @@ export function buildMicroVizLayout(model: SceneModelData): MicroVizLayout {
     dimX: DimStyle.C,
     dimY: DimStyle.C4,
   })
+  mlpFcWeight.access = createAccess([1, 0, 0], [0, 1, 0], shape.C * 0.5)
   const mlpFcBias = mk({
     t: 'w',
     xR: projLeft - shape.C * cell - margin,
@@ -624,6 +765,7 @@ export function buildMicroVizLayout(model: SceneModelData): MicroVizLayout {
     hidden: true,
     small: true,
   })
+  mlpFcBias.access = createAccess([1, 0, 0], [0, 0, 0], shape.C * 0.5)
   const mlpFc = mk({
     t: 'i',
     xM: 0,
@@ -635,6 +777,13 @@ export function buildMicroVizLayout(model: SceneModelData): MicroVizLayout {
     dimX: DimStyle.C4,
     dimY: DimStyle.T,
     name: 'fc1 output',
+  })
+  mlpFc.access = createAccess([1, 0, 0], [0, 1, 0], 1)
+  mlpFc.deps = makeDeps({
+    dot: [[mlpFcWeight, 'xi'], [ln2.lnResid, 'yi']],
+    add: [[mlpFcBias, 'x0']],
+    dotLen: shape.C,
+    special: BlKDepSpecial.None,
   })
   registerCube(mlpFcWeight, 'mlp')
   registerCube(mlpFcBias, 'mlp')
@@ -654,6 +803,11 @@ export function buildMicroVizLayout(model: SceneModelData): MicroVizLayout {
     dimY: DimStyle.T,
     name: 'relu',
   })
+  mlpAct.access = createAccess([1, 0, 0], [0, 1, 0], 1)
+  mlpAct.deps = makeDeps({
+    add: [[mlpFc, 'xy']],
+    special: BlKDepSpecial.Gelu,
+  })
   registerCube(mlpAct, 'mlp')
 
   y += shape.T * cell + margin
@@ -669,6 +823,7 @@ export function buildMicroVizLayout(model: SceneModelData): MicroVizLayout {
     dimX: DimStyle.C4,
     dimY: DimStyle.C,
   })
+  mlpProjWeight.access = createAccess([1, 0, 0], [0, 1, 0], shape.C * 0.5)
   const mlpProjBias = mk({
     t: 'w',
     xR: projLeft - shape.C * 4 * cell - margin,
@@ -680,6 +835,7 @@ export function buildMicroVizLayout(model: SceneModelData): MicroVizLayout {
     hidden: true,
     small: true,
   })
+  mlpProjBias.access = createAccess([0, 0, 0], [0, 1, 0], shape.C * 0.5)
   const mlpResult = mk({
     t: 'i',
     xM: 0,
@@ -692,6 +848,13 @@ export function buildMicroVizLayout(model: SceneModelData): MicroVizLayout {
     dimY: DimStyle.C,
     name: 'mlp result',
   })
+  mlpResult.access = createAccess([1, 0, 0], [0, 1, 0], 1)
+  mlpResult.deps = makeDeps({
+    dot: [[mlpProjWeight, 'iy'], [mlpAct, 'ix']],
+    add: [[mlpProjBias, '0y']],
+    dotLen: shape.C,
+    special: BlKDepSpecial.None,
+  })
   const mlpResidual = mk({
     t: 'i',
     xM: 0,
@@ -703,6 +866,11 @@ export function buildMicroVizLayout(model: SceneModelData): MicroVizLayout {
     dimX: DimStyle.T,
     dimY: DimStyle.C,
     name: 'mlp residual',
+  })
+  mlpResidual.access = createAccess([1, 0, 0], [0, 1, 0], 1)
+  mlpResidual.deps = makeDeps({
+    add: [[mlpResult, 'xy'], [attnResidual, 'xy']],
+    special: BlKDepSpecial.None,
   })
   ;[mlpProjWeight, mlpProjBias, mlpResult, mlpResidual].forEach((cube) =>
     registerCube(cube, cube === mlpResult || cube === mlpResidual ? 'mlp' : 'mlp'),
@@ -755,6 +923,7 @@ export function buildMicroVizLayout(model: SceneModelData): MicroVizLayout {
     dimX: DimStyle.C,
     dimY: DimStyle.n_vocab,
   })
+  lmHeadWeight.access = createAccess([1, 0, 0], [0, 1, 0], 5)
   const logits = mk({
     t: 'i',
     xM: 0,
@@ -766,6 +935,12 @@ export function buildMicroVizLayout(model: SceneModelData): MicroVizLayout {
     dimX: DimStyle.T,
     dimY: DimStyle.n_vocab,
     name: 'logits',
+  })
+  logits.access = createAccess([1, 0, 0], [0, 1, 0], 1)
+  logits.deps = makeDeps({
+    dot: [[lmHeadWeight, 'iy'], [mlpResidual, 'xi']],
+    dotLen: shape.C,
+    special: BlKDepSpecial.None,
   })
   registerCube(lmHeadWeight, 'logits')
   registerCube(logits, 'logits')
@@ -785,6 +960,11 @@ export function buildMicroVizLayout(model: SceneModelData): MicroVizLayout {
     name: 'softmax max',
     small: true,
   })
+  logitsAgg2.access = createAccess([1, 0, 0], [0, 0, 0], 1)
+  logitsAgg2.deps = makeDeps({
+    add: [[logits, 'xi']],
+    special: BlKDepSpecial.SoftmaxAggMax,
+  })
   const logitsAgg1 = mk({
     t: 'a',
     xM: 0,
@@ -797,6 +977,11 @@ export function buildMicroVizLayout(model: SceneModelData): MicroVizLayout {
     dimY: DimStyle.None,
     name: 'softmax exp',
     small: true,
+  })
+  logitsAgg1.access = createAccess([1, 0, 0], [0, 0, 0], 1)
+  logitsAgg1.deps = makeDeps({
+    add: [[logits, 'xi'], [logitsAgg2, 'x0']],
+    special: BlKDepSpecial.SoftmaxAggExp,
   })
   registerCube(logitsAgg2, 'probabilities')
   registerCube(logitsAgg1, 'probabilities')
@@ -815,6 +1000,11 @@ export function buildMicroVizLayout(model: SceneModelData): MicroVizLayout {
     dimY: DimStyle.n_vocab,
     name: 'probabilities',
   })
+  logitsSoftmax.access = createAccess([1, 0, 0], [0, 1, 0], 1)
+  logitsSoftmax.deps = makeDeps({
+    add: [[logits, 'xy'], [logitsAgg1, 'x0'], [logitsAgg2, 'x0']],
+    special: BlKDepSpecial.Softmax,
+  })
   registerCube(logitsSoftmax, 'probabilities')
 
   y += shape.vocabSize * cell + margin
@@ -831,7 +1021,16 @@ export function buildMicroVizLayout(model: SceneModelData): MicroVizLayout {
     dimY: DimStyle.None,
     name: 'sample / stop',
   })
+  sampleBlock.access = createAccess([1, 0, 0], [0, 0, 0], 1)
   registerCube(sampleBlock, 'sample')
+  const outputLabel = mkLabel(0.9, [
+    lmHeadWeight,
+    logits,
+    logitsAgg1,
+    logitsAgg2,
+    logitsSoftmax,
+    sampleBlock,
+  ])
 
   const transformerBlock: MicroVizTransformerBlock = {
     ln1,
@@ -863,7 +1062,7 @@ export function buildMicroVizLayout(model: SceneModelData): MicroVizLayout {
     mlpResidual,
   }
 
-  const blocks = {
+  const blockMap = {
     context: makeBlock('context', idxObj, 'context'),
     'token-embedding': makeBlock('token-embedding', tokEmbedObj, 'token-embedding'),
     'position-embedding': makeBlock(
@@ -1119,8 +1318,9 @@ export function buildMicroVizLayout(model: SceneModelData): MicroVizLayout {
 
   return {
     cubes,
-    labels: [embedLabel, ...transformerBlock.labels],
-    blocks,
+    labels: [embedLabel, ...transformerBlock.labels, outputLabel],
+    blocks: [transformerBlock],
+    blockMap,
     cubeFocusIds,
     edges,
     shape,
@@ -1133,13 +1333,16 @@ export function buildMicroVizLayout(model: SceneModelData): MicroVizLayout {
     tokEmbedObj,
     posEmbedObj,
     residual0,
+    ln_f: null,
     embedLabel,
     transformerBlocks: [transformerBlock],
+    outputLabel,
     lmHeadWeight,
     logits,
     logitsAgg1,
     logitsAgg2,
     logitsSoftmax,
+    sampleBlock,
     logitsTransposed: false,
     model: {
       inputTokens: { localBuffer: new Float32Array(shape.T) },

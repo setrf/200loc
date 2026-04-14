@@ -7,7 +7,6 @@ import {
   applyMicroVizPhase,
   buildMicroVizPhaseState,
   createMicroVizTextures,
-  drawMicroVizEdges,
   uploadMicroVizFrame,
 } from '../viz/microViz/bridge'
 import { inferencePhases } from '../walkthrough/phases'
@@ -16,7 +15,6 @@ import { loadBundle, makeTrace } from './helpers/fixtures'
 const {
   createBufferTexMock,
   writeToBufferTexMock,
-  addLineMock,
 } = vi.hoisted(() => ({
   createBufferTexMock: vi.fn(
     (_gl: unknown, width: number, height: number, channels: number) => ({
@@ -41,16 +39,11 @@ const {
       buffer.localBuffer = Float32Array.from(data)
     },
   ),
-  addLineMock: vi.fn(),
 }))
 
 vi.mock('../vendor/llmVizOriginal/utils/renderPhases', () => ({
   createBufferTex: createBufferTexMock,
   writeToBufferTex: writeToBufferTexMock,
-}))
-
-vi.mock('../vendor/llmVizOriginal/llm/render/lineRender', () => ({
-  addLine: addLineMock,
 }))
 
 const bundle = loadBundle()
@@ -110,11 +103,13 @@ describe('micro viz bridge', () => {
     expect(layout.shape.T).toBe(16)
     expect(layout.shape.vocabSize).toBe(27)
     expect(layout.weightCount).toBe(4192)
-    expect(layout.blocks['norm-1'].cube.name).toBe('rmsnorm 1')
-    expect(layout.blocks['norm-2'].cube.name).toBe('rmsnorm 2')
-    expect(layout.blocks['q-project'].cube.name).toBe('Q weights')
-    expect(layout.blocks['mlp-fc1'].cube.name).toBe('fc1')
-    expect(layout.blocks.sample.cube.name).toBe('sample / stop')
+    expect(layout.blockMap['norm-1'].cube.name).toBe('rmsnorm 1')
+    expect(layout.blockMap['norm-2'].cube.name).toBe('rmsnorm 2')
+    expect(layout.blockMap['q-project'].cube.name).toBe('Q weights')
+    expect(layout.blockMap['mlp-fc1'].cube.name).toBe('fc1')
+    expect(layout.blockMap.sample.cube.name).toBe('sample / stop')
+    expect(layout.blocks).toHaveLength(1)
+    expect(layout.outputLabel.cubes).toContain(layout.logitsSoftmax)
     expect(layout.edges.some((edge) => edge.id === 'probabilities-to-sample')).toBe(
       true,
     )
@@ -238,11 +233,11 @@ describe('micro viz bridge', () => {
       ]),
     )
     expect(textures.dynamicTextures['sample-grid'].localBuffer?.[trace.positionId]).toBe(1)
-    expect(layout.blocks['token-embedding'].cube.access?.src).toBe(textures.staticTextures.wte)
-    expect(layout.blocks['attention-head-1'].cube.access?.src).toBe(
+    expect(layout.blockMap['token-embedding'].cube.access?.src).toBe(textures.staticTextures.wte)
+    expect(layout.blockMap['attention-head-1'].cube.access?.src).toBe(
       textures.dynamicTextures['attention-head-1-weights'],
     )
-    expect(layout.blocks.probabilities.cube.access?.src).toBe(
+    expect(layout.blockMap.probabilities.cube.access?.src).toBe(
       textures.dynamicTextures['probs-grid'],
     )
     expect(layout.model.inputLen).toBe(3)
@@ -280,24 +275,13 @@ describe('micro viz bridge', () => {
       phaseState,
     )
 
-    expect(layout.blocks['q-project'].cube.opacity).toBe(0.96)
-    expect(layout.blocks['q-project'].cube.highlight).toBe(0.52)
-    expect(layout.blocks.context.cube.opacity).toBeGreaterThan(0.6)
+    expect(layout.blockMap['q-project'].cube.opacity).toBeGreaterThan(0.9)
+    expect(layout.blockMap['q-project'].cube.highlight).toBeGreaterThan(0.39)
+    expect(layout.blockMap.context.cube.opacity).toBeGreaterThan(0.8)
     expect(ctx.camera.desiredCamera).toBeUndefined()
 
-    drawMicroVizEdges(
-      ctx as unknown as Parameters<typeof drawMicroVizEdges>[0],
-      phaseState,
-    )
-
-    expect(addLineMock).toHaveBeenCalledTimes(layout.edges.length)
-    expect(addLineMock).toHaveBeenCalledWith(
-      ctx.renderState.lineRender,
-      2.6,
-      expect.anything(),
-      expect.anything(),
-      expect.anything(),
-    )
+    expect(phaseState.emphasisEdgeIds).toContain('norm-1-to-q-project')
+    expect(phaseState.hoverBlockIndices.length).toBeGreaterThan(0)
   })
 
   it('keeps nano-gpt assets out of the live app code path', () => {

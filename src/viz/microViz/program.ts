@@ -2,6 +2,7 @@ import type { TokenStepTrace } from '../../model'
 import type { PhaseDefinition } from '../../walkthrough/phases'
 import type { VizFrame } from '../llmViz/types'
 import type { ICamera } from '../../vendor/llmVizOriginal/llm/Camera'
+import type { IBlkDef } from '../../vendor/llmVizOriginal/llm/GptModelLayout'
 import {
   genModelViewMatrices,
   updateCamera,
@@ -29,9 +30,10 @@ import { Subscriptions } from '../../vendor/llmVizOriginal/utils/hooks'
 import { Vec3, Vec4 } from '../../vendor/llmVizOriginal/utils/vector'
 import type { IMovementInfo } from '../../vendor/llmVizOriginal/llm/components/MovementControls'
 import { MovementAction } from '../../vendor/llmVizOriginal/llm/components/MovementControls'
-import { createMicroVizTextures, drawMicroVizEdges } from './bridge'
+import { createMicroVizTextures } from './bridge'
 import { applyMicroVizPhase, buildMicroVizPhaseState, uploadMicroVizFrame } from './bridge'
 import { buildMicroVizLayout } from './layout'
+import { drawMicroVizArrows } from './arrows'
 import type {
   MicroVizPhaseState,
   MicroVizRenderContext,
@@ -63,7 +65,7 @@ export interface MicroVizProgramState {
   }
   movement: IMovementInfo
   walkthrough: {
-    dimHighlightBlocks: null
+    dimHighlightBlocks: IBlkDef[] | null
   }
   htmlSubs: Subscriptions
   layout: MicroVizRenderContext['layout']
@@ -185,6 +187,14 @@ export function setMicroVizProgramData(
     data.contextTokens,
   )
   applyMicroVizPhase(state.microViz.renderContext, phaseState)
+  state.layout.cameraPoses[phaseState.cameraPoseId] = phaseState.cameraTarget
+  state.display.blkIdxHover = phaseState.hoverBlockIndices
+  state.display.dimHover = phaseState.dimHover
+  state.display.topOutputOpacity = phaseState.topOutputOpacity
+  state.display.lines = [...phaseState.lines]
+  state.walkthrough.dimHighlightBlocks = state.layout.cubes.filter((cube) =>
+    phaseState.hoverBlockIndices.includes(cube.idx),
+  )
 
   const phaseChanged =
     !previousPhaseState ||
@@ -192,8 +202,7 @@ export function setMicroVizProgramData(
     previousPhaseState.cameraPoseId !== phaseState.cameraPoseId
 
   if (phaseChanged) {
-    state.camera.desiredCamera =
-      state.layout.cameraPoses[phaseState.cameraPoseId]
+    state.camera.desiredCamera = phaseState.cameraTarget
   }
 }
 
@@ -256,41 +265,33 @@ export function runMicroVizProgram(
   view: IRenderView,
   state: MicroVizProgramState,
 ) {
-  const { renderContext, phaseState } = state.microViz
+  const { phaseState } = state.microViz
   if (!phaseState) {
     return
   }
 
   resetRenderBuffers(state.render)
-  state.display.lines = []
+  state.display.lines = [...phaseState.lines]
   state.display.hoverTarget = null
   state.display.blkIdxHover = null
   state.display.dimHover = null
 
   manageMicroVizMovement(state, phaseState)
+  state.display.blkIdxHover = phaseState.hoverBlockIndices
+  state.display.dimHover = phaseState.dimHover
+  state.display.topOutputOpacity = phaseState.topOutputOpacity
+  state.walkthrough.dimHighlightBlocks = state.layout.cubes.filter((cube) =>
+    phaseState.hoverBlockIndices.includes(cube.idx),
+  )
   updateCamera(state as never, view)
   genModelViewMatrices(state as never, state.layout as never)
 
-  drawMicroVizEdges(renderContext, phaseState)
-  drawModelCard(
-    state as never,
-    {
-      ...state.layout,
-      blocks: state.layout.transformerBlocks,
-    } as never,
-    'microgpt',
-    new Vec3(),
-  )
+  drawMicroVizArrows(state.render, state.layout, phaseState)
+  drawModelCard(state as never, state.layout as never, 'microgpt', new Vec3())
   drawBlockInfo(state as never)
   runMouseHitTesting(state as never)
   state.render.sharedRender.activePhase = RenderPhase.Opaque
-  drawBlockLabels(
-    state.render as never,
-    {
-      ...state.layout,
-      blocks: state.layout.transformerBlocks,
-    } as never,
-  )
+  drawBlockLabels(state.render as never, state.layout as never)
 
   state.render.sharedRender.activePhase = RenderPhase.Overlay2D
   const opts: IFontOpts = {

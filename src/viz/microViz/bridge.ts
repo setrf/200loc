@@ -16,9 +16,8 @@ import {
   createBufferTex,
   writeToBufferTex,
 } from '../../vendor/llmVizOriginal/utils/renderPhases'
-import { Vec3, Vec4 } from '../../vendor/llmVizOriginal/utils/vector'
-import { addLine } from '../../vendor/llmVizOriginal/llm/render/lineRender'
-import { RenderPhase } from '../../vendor/llmVizOriginal/llm/render/sharedRender'
+import { Vec3 } from '../../vendor/llmVizOriginal/utils/vector'
+import { DimStyle } from '../../vendor/llmVizOriginal/llm/walkthrough/WalkthroughTools'
 
 const headBlockIds: MicroVizBlockId[] = [
   'attention-head-1',
@@ -242,6 +241,81 @@ function makeBinding(kind: MicroVizTextureBinding['kind'], key: string) {
   return { kind, key } satisfies MicroVizTextureBinding
 }
 
+function buildPhaseCameraTarget(
+  phase: PhaseDefinition,
+  layout: MicroVizLayout,
+  focusBlockIds: MicroVizBlockId[],
+  emphasisBlockIds: MicroVizBlockId[],
+) {
+  const focusIds = new Set(
+    focusBlockIds.map((blockId) => layout.blockMap[blockId].codeFocusId),
+  )
+  const emphasisIds = new Set(
+    emphasisBlockIds.map((blockId) => layout.blockMap[blockId].codeFocusId),
+  )
+  const cubes = layout.cubes.filter((cube) => {
+    const focusId = layout.cubeFocusIds[cube.idx]
+    return focusId != null && focusIds.has(focusId)
+  })
+  const sourceCubes =
+    cubes.length > 0
+      ? cubes
+      : layout.cubes.filter((cube) => {
+          const focusId = layout.cubeFocusIds[cube.idx]
+          return focusId != null && emphasisIds.has(focusId)
+        })
+  const cameraCubes = sourceCubes.length > 0 ? sourceCubes : layout.cubes
+  const bounds = cameraCubes.reduce(
+    (acc, cube) => {
+      acc.minX = Math.min(acc.minX, cube.x)
+      acc.maxX = Math.max(acc.maxX, cube.x + cube.dx)
+      acc.minY = Math.min(acc.minY, cube.y)
+      acc.maxY = Math.max(acc.maxY, cube.y + cube.dy)
+      acc.minZ = Math.min(acc.minZ, cube.z)
+      acc.maxZ = Math.max(acc.maxZ, cube.z + cube.dz)
+      return acc
+    },
+    {
+      minX: Number.POSITIVE_INFINITY,
+      maxX: Number.NEGATIVE_INFINITY,
+      minY: Number.POSITIVE_INFINITY,
+      maxY: Number.NEGATIVE_INFINITY,
+      minZ: Number.POSITIVE_INFINITY,
+      maxZ: Number.NEGATIVE_INFINITY,
+    },
+  )
+  const centerX = (bounds.minX + bounds.maxX) * 0.5
+  const centerY = bounds.minY + (bounds.maxY - bounds.minY) * 0.35
+  const centerZ = (bounds.minZ + bounds.maxZ) * 0.5
+  const spanX = Math.max(1, bounds.maxX - bounds.minX)
+  const spanY = Math.max(1, bounds.maxY - bounds.minY)
+  const baseAngles = {
+    overview: { x: 288, y: 17, z: 9.6 },
+    input: { x: 288, y: 17, z: 6.9 },
+    attention: { x: 287, y: 18, z: 5.6 },
+    residual: { x: 288, y: 17, z: 6.1 },
+    readout: { x: 287, y: 17, z: 5.6 },
+    sample: { x: 287, y: 16, z: 5.2 },
+  } as const
+  const base = baseAngles[phase.viz.cameraPoseId]
+  const zoomAdjust = Math.min(1.2, Math.max(-1.1, (Math.max(spanX, spanY) - 150) / 180))
+  const yBias =
+    phase.viz.cameraPoseId === 'input'
+      ? -48
+      : phase.viz.cameraPoseId === 'attention'
+        ? -52
+        : phase.viz.cameraPoseId === 'readout'
+          ? -24
+          : phase.viz.cameraPoseId === 'sample'
+            ? -12
+            : 0
+
+  return {
+    center: new Vec3(centerX - 6, centerY + yBias, centerZ),
+    angle: new Vec3(base.x, base.y, Math.max(4.8, base.z + zoomAdjust)),
+  }
+}
+
 export function buildMicroVizPhaseState(
   phase: PhaseDefinition,
   frame: VizFrame,
@@ -253,6 +327,41 @@ export function buildMicroVizPhaseState(
   )
   const emphasisEdgeIds = unique(
     frame.emphasisEdgeIds.flatMap((edgeId) => mapEdgeToMicro(edgeId)),
+  )
+
+  const lineTitle = phase.title
+  const lineSubtitle = frame.currentSlotLabel
+  const lineTransition = frame.transitionLabel
+  const opacityByBlockId: MicroVizPhaseState['opacityByBlockId'] = {}
+  const highlightByBlockId: MicroVizPhaseState['highlightByBlockId'] = {}
+  const hoverBlockIndices = unique(
+    [...focusBlockIds, ...emphasisBlockIds].map((blockId) => layout.blockMap[blockId].cube.idx),
+  )
+
+  for (const blockId of Object.keys(layout.blockMap) as MicroVizBlockId[]) {
+    const isFocused = focusBlockIds.includes(blockId)
+    const isEmphasized = emphasisBlockIds.includes(blockId)
+    opacityByBlockId[blockId] = isFocused ? 1 : isEmphasized ? 0.96 : 0.86
+    highlightByBlockId[blockId] = isFocused ? 0.9 : isEmphasized ? 0.45 : 0.08
+  }
+
+  const dimHover =
+    phase.id === 'tokenize' ||
+    phase.id === 'embed-add-norm' ||
+    phase.id === 'attn-out'
+      ? DimStyle.T
+      : phase.id === 'token-embedding' ||
+          phase.id === 'position-embedding' ||
+          phase.id === 'qkv' ||
+          phase.id === 'mlp' ||
+          phase.id === 'logits'
+        ? DimStyle.C
+        : null
+  const cameraTarget = buildPhaseCameraTarget(
+    phase,
+    layout,
+    focusBlockIds,
+    emphasisBlockIds,
   )
 
   const blockBindings: Partial<Record<MicroVizBlockId, MicroVizTextureBinding>> = {
@@ -290,11 +399,21 @@ export function buildMicroVizPhaseState(
   return {
     phaseId: phase.id,
     cameraPoseId: frame.cameraPoseId,
+    cameraTarget,
     focusBlockIds,
     emphasisBlockIds: unique([...focusBlockIds, ...emphasisBlockIds]),
     emphasisEdgeIds,
-    dimmedBlockIds: [],
+    hoverBlockIndices,
+    dimHover,
+    lines: [lineTitle, lineSubtitle, lineTransition],
+    topOutputOpacity:
+      phase.id === 'logits' || phase.id === 'probabilities' || phase.id === 'sample'
+        ? 1
+        : 0.9,
+    opacityByBlockId,
+    highlightByBlockId,
     blockBindings,
+    specials: {},
   }
 }
 
@@ -604,8 +723,8 @@ export function uploadMicroVizFrame(
   bindCubeTexture(ctx, ctx.layout.logitsAgg2, 'dynamic', 'sample-grid')
   bindCubeTexture(ctx, ctx.layout.logitsSoftmax, 'dynamic', 'probs-grid')
 
-  for (const [blockId, block] of Object.entries(ctx.layout.blocks) as Array<
-    [MicroVizBlockId, MicroVizLayout['blocks'][MicroVizBlockId]]
+  for (const [blockId, block] of Object.entries(ctx.layout.blockMap) as Array<
+    [MicroVizBlockId, MicroVizLayout['blockMap'][MicroVizBlockId]]
   >) {
     const binding = phaseState.blockBindings[blockId]
     if (!binding) {
@@ -620,29 +739,38 @@ export function applyMicroVizPhase(
   phaseState: MicroVizPhaseState,
 ) {
   const focusIds = new Set(
-    phaseState.focusBlockIds.map((blockId) => ctx.layout.blocks[blockId].codeFocusId),
+    phaseState.focusBlockIds.map((blockId) => ctx.layout.blockMap[blockId].codeFocusId),
   )
   const emphasisIds = new Set(
-    phaseState.emphasisBlockIds.map((blockId) => ctx.layout.blocks[blockId].codeFocusId),
+    phaseState.emphasisBlockIds.map((blockId) => ctx.layout.blockMap[blockId].codeFocusId),
   )
 
   for (const cube of ctx.layout.cubes) {
     const focusId = ctx.layout.cubeFocusIds[cube.idx]
+    const namedBlock = (Object.values(ctx.layout.blockMap).find((entry) => entry.cube.idx === cube.idx))
+    const blockId = namedBlock?.id
+    const baseOpacity = blockId ? phaseState.opacityByBlockId[blockId] : cube.name ? 0.84 : 0
+    const baseHighlight = blockId ? phaseState.highlightByBlockId[blockId] : cube.name ? 0.08 : 0
     if (focusId != null && focusIds.has(focusId)) {
       cube.opacity = 1
       cube.highlight = 1
       continue
     }
     if (focusId != null && emphasisIds.has(focusId)) {
-      cube.opacity = 0.96
-      cube.highlight = 0.52
+      cube.opacity = Math.max(baseOpacity ?? 0, 0.94)
+      cube.highlight = Math.max(baseHighlight ?? 0, 0.4)
       continue
     }
-    cube.opacity = cube.name ? 0.82 : 0
-    cube.highlight = cube.name ? 0.12 : 0
+    cube.opacity = baseOpacity ?? (cube.name ? 0.82 : 0)
+    cube.highlight = baseHighlight ?? (cube.name ? 0.12 : 0)
   }
 
-  ctx.layout.embedLabel.visible = phaseState.phaseId.startsWith('token') || phaseState.phaseId.startsWith('position') || phaseState.phaseId === 'tokenize' ? 1 : 0.82
+  ctx.layout.embedLabel.visible =
+    phaseState.phaseId.startsWith('token') ||
+    phaseState.phaseId.startsWith('position') ||
+    phaseState.phaseId === 'tokenize'
+      ? 1
+      : 0.88
   for (const transformerBlock of ctx.layout.transformerBlocks) {
     transformerBlock.transformerLabel.visible = 0.92
     transformerBlock.selfAttendLabel.visible =
@@ -671,30 +799,10 @@ export function applyMicroVizPhase(
       head.vectorLabel.visible = phaseState.phaseId === 'weighted-values' ? 1 : 0.6
     })
   }
-}
-
-export function drawMicroVizEdges(
-  ctx: MicroVizRenderContext,
-  phaseState: MicroVizPhaseState,
-) {
-  ctx.renderState.sharedRender.activePhase = RenderPhase.Overlay
-  const emphasized = new Set(phaseState.emphasisEdgeIds)
-
-  for (const edge of ctx.layout.edges) {
-    const from = ctx.layout.blocks[edge.from].cube
-    const to = ctx.layout.blocks[edge.to].cube
-    const active = emphasized.has(edge.id)
-    const start = new Vec3(from.x + from.dx / 2, from.y + from.dy, from.z + from.dz / 2)
-    const end = new Vec3(to.x + to.dx / 2, to.y, to.z + to.dz / 2)
-
-    addLine(
-      ctx.renderState.lineRender,
-      active ? 2.6 : 1.4,
-      active
-        ? new Vec4(0.12, 0.7, 0.22, 0.88)
-        : new Vec4(0.48, 0.76, 0.52, 0.38),
-      start,
-      end,
-    )
-  }
+  ctx.layout.outputLabel.visible =
+    phaseState.phaseId === 'logits' ||
+    phaseState.phaseId === 'probabilities' ||
+    phaseState.phaseId === 'sample'
+      ? 1
+      : 0.84
 }
