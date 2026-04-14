@@ -115,6 +115,7 @@ export function createBufferTex(gl: WebGL2RenderingContext, width: number, heigh
         height,
         texture,
         channels,
+        localBuffer: new Float32Array(width * height * channels),
     };
 }
 
@@ -122,6 +123,10 @@ export function writeToBufferTex(gl: WebGL2RenderingContext, buffer: IBufferTex,
     if (data.length !== buffer.width * buffer.height * buffer.channels) {
         throw new Error('Data length does not match buffer size');
     }
+    if (!buffer.localBuffer || buffer.localBuffer.length !== data.length) {
+        buffer.localBuffer = new Float32Array(data.length);
+    }
+    buffer.localBuffer.set(data);
     gl.bindTexture(gl.TEXTURE_2D, buffer.texture);
     let [format] = channelsToFormat(gl, buffer.channels);
     gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, buffer.width, buffer.height, format, gl.FLOAT, data);

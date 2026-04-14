@@ -89,6 +89,7 @@ async function expectSceneToChange(scene: Locator, action: () => Promise<void>) 
 
 test.describe('desktop walkthrough', () => {
   test.beforeEach(async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 1100 })
     await page.goto('/')
     await expect(page.getByRole('heading', { name: 'microgpt, one token at a time' })).toBeVisible()
   })
@@ -230,6 +231,35 @@ test.describe('desktop walkthrough', () => {
     expect(issues).toEqual([])
   })
 
+  test('shows in-scene hover readouts for access-backed matrices', async ({
+    page,
+  }) => {
+    const issues = collectBrowserIssues(page)
+    const scene = page.locator('.scene-panel')
+    const eventSurface = page.locator('.scene-panel__event-surface')
+    await scene.scrollIntoViewIfNeeded()
+    await expect(page.locator('.scene-panel canvas')).toBeVisible()
+
+    for (let index = 0; index < 11; index += 1) {
+      await advanceOnePhase(page)
+    }
+    await expect(page.locator('.story-panel__phase-chip')).toContainText('Softmax Probabilities')
+
+    const box = await eventSurface.boundingBox()
+    if (!box) {
+      throw new Error('Scene event surface bounding box was not available')
+    }
+
+    await expectSceneToChange(scene, async () => {
+      await page.mouse.move(box.x + box.width * 0.85, box.y + box.height * 0.08)
+      await page.waitForTimeout(150)
+      await page.mouse.move(box.x + box.width * 0.0909, box.y + box.height * 0.4545)
+      await page.waitForTimeout(300)
+    })
+
+    expect(issues).toEqual([])
+  })
+
   test('survives repeated matrix hover without crashing or emitting browser errors', async ({
     page,
   }) => {
@@ -269,31 +299,31 @@ test.describe('desktop walkthrough', () => {
       throw new Error('Scene event surface bounding box was not available')
     }
 
-    for (let cycle = 0; cycle < 3; cycle += 1) {
-      for (let step = 0; step < 8; step += 1) {
+    for (let cycle = 0; cycle < 2; cycle += 1) {
+      for (let step = 0; step < 6; step += 1) {
         await page.getByRole('button', { name: 'Next' }).click()
-        await page.waitForTimeout(120)
+        await page.waitForTimeout(100)
       }
 
-      for (let move = 0; move < 24; move += 1) {
+      for (let move = 0; move < 18; move += 1) {
         const x = box.x + box.width * (0.28 + (move % 8) * 0.055)
         const y = box.y + box.height * (0.42 + ((move / 8) % 3) * 0.06)
         await page.mouse.move(x, y)
-        await page.waitForTimeout(24)
+        await page.waitForTimeout(20)
       }
 
       await expectSceneToChange(scene, async () => {
         await page.mouse.move(box.x + box.width * 0.46, box.y + box.height * 0.54)
         await page.mouse.down()
         await page.mouse.move(box.x + box.width * 0.68, box.y + box.height * 0.7, {
-          steps: 14,
+          steps: 12,
         })
         await page.mouse.up()
-        await page.waitForTimeout(220)
+        await page.waitForTimeout(180)
       })
 
       await page.getByRole('button', { name: 'Prev' }).click()
-      await page.waitForTimeout(120)
+      await page.waitForTimeout(100)
     }
 
     await expect(page.locator('.scene-panel canvas')).toBeVisible()

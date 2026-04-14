@@ -27,9 +27,6 @@ interface IDataFlowArgs {
 }
 
 export function drawDataFlow(state: IProgramState, blk: IBlkDef, destIdx: Vec3, pinIdx?: Vec3) {
-    if (!blk.deps) {
-        return;
-    }
     let prevPhase = state.render.sharedRender.activePhase;
     state.render.sharedRender.activePhase = RenderPhase.Overlay2D;
 
@@ -53,6 +50,14 @@ export function drawDataFlow(state: IProgramState, blk: IBlkDef, destIdx: Vec3, 
         blk,
         destIdx,
         mtx: resMtx,
+    }
+
+    if (!blk.deps) {
+        if (blk.access?.src.localBuffer) {
+            drawAccessValue(dataFlowArgs);
+        }
+        state.render.sharedRender.activePhase = prevPhase;
+        return;
     }
 
     let bb = new BoundingBox3d();
@@ -212,6 +217,23 @@ export function getBlockValueAtIdx(blk: IBlkDef, blkIdx: Vec3) {
     let idx = bufferPos.y * bufferTex.width * bufferTex.channels + bufferPos.x * bufferTex.channels + channelIdx;
 
     return localBuffer[idx];
+}
+
+function drawAccessValue(args: IDataFlowArgs) {
+    let { blk, center, mtx } = args;
+    let fontOpts: IFontOpts = { color: opColor, mtx, size: 16 };
+    let title = blk.name?.trim() || 'value';
+
+    let textBlock = mkTextBlock({
+        opts: fontOpts,
+        type: TextBlockType.Line,
+        subs: [
+            { text: title, color: nameColor },
+        ],
+    });
+
+    let bb = drawMaths(args, center, textBlock);
+    drawCellIndexAndValue(args, bb);
 }
 
 export function drawOLIndexLookup(args: IDataFlowArgs, offset: Vec3) {

@@ -218,9 +218,27 @@ describe('micro viz bridge', () => {
     )
 
     expect(textures.dynamicTextures.context.localBuffer?.slice(0, 4)).toEqual(
-      Float32Array.from([1, 4 / 26, 12 / 26, 0]),
+      Float32Array.from([1, 4 / 26, 12 / 26, 1]),
     )
     expect(textures.dynamicTextures['residual-grid'].localBuffer?.length).toBe(256)
+    const tokenEmbedding = Array.from(bundle.weights.wte.data.slice(4 * 16, 5 * 16))
+    const positionEmbedding = Array.from(bundle.weights.wpe.data.slice(1 * 16, 2 * 16))
+    const positionOneResidual = tokenEmbedding.map(
+      (value, index) => value + positionEmbedding[index]!,
+    )
+    const norm1MeanSquare = positionOneResidual.reduce(
+      (sum, value) => sum + value * value,
+      0,
+    ) / positionOneResidual.length
+    const norm1Rms = Math.sqrt(norm1MeanSquare + 1e-5)
+    expect(textures.dynamicTextures['norm1-agg-ms'].localBuffer?.[1]).toBeCloseTo(
+      norm1MeanSquare,
+      6,
+    )
+    expect(textures.dynamicTextures['norm1-agg-rms'].localBuffer?.[1]).toBeCloseTo(
+      norm1Rms,
+      6,
+    )
     const weightRowStart = trace.positionId * bundle.config.blockSize
     expect(
       textures.dynamicTextures['attention-head-1-weights'].localBuffer?.slice(
@@ -242,6 +260,37 @@ describe('micro viz bridge', () => {
     )
     expect(layout.blockMap.probabilities.cube.access?.src).toBe(
       textures.dynamicTextures['probs-grid'],
+    )
+    expect(layout.transformerBlocks[0]?.ln1.lnAgg1.access?.src).toBe(
+      textures.dynamicTextures['norm1-agg-ms'],
+    )
+    expect(layout.transformerBlocks[0]?.ln1.lnAgg2.access?.src).toBe(
+      textures.dynamicTextures['norm1-agg-rms'],
+    )
+    expect(layout.transformerBlocks[0]?.ln2.lnAgg1.access?.src).toBe(
+      textures.dynamicTextures['norm2-agg-ms'],
+    )
+    expect(layout.transformerBlocks[0]?.ln2.lnAgg2.access?.src).toBe(
+      textures.dynamicTextures['norm2-agg-rms'],
+    )
+    expect(layout.logitsAgg1.access?.src).toBe(textures.dynamicTextures['softmax-exp'])
+    expect(layout.logitsAgg2.access?.src).toBe(textures.dynamicTextures['softmax-max'])
+    expect(layout.transformerBlocks[0]?.ln1.lnAgg1.access?.src).not.toBe(
+      textures.dynamicTextures.context,
+    )
+    expect(layout.transformerBlocks[0]?.ln2.lnAgg1.access?.src).not.toBe(
+      textures.dynamicTextures['sample-grid'],
+    )
+    expect(layout.logitsAgg1.access?.src).not.toBe(textures.dynamicTextures['sample-grid'])
+    const maxLogit = Math.max(...trace.logits)
+    const expSum = trace.logits.reduce((sum, value) => sum + Math.exp(value - maxLogit), 0)
+    expect(textures.dynamicTextures['softmax-max'].localBuffer?.[trace.positionId]).toBeCloseTo(
+      maxLogit,
+      6,
+    )
+    expect(textures.dynamicTextures['softmax-exp'].localBuffer?.[trace.positionId]).toBeCloseTo(
+      expSum,
+      6,
     )
     expect(layout.model.inputLen).toBe(3)
   })

@@ -69,6 +69,22 @@ function setRow(buffer: Float32Array, width: number, values: readonly number[], 
   buffer.set(values.slice(0, width), row * width)
 }
 
+function meanSquare(values: ArrayLike<number>) {
+  if (values.length === 0) {
+    return 0
+  }
+  let total = 0
+  for (let index = 0; index < values.length; index += 1) {
+    const value = values[index] ?? 0
+    total += value * value
+  }
+  return total / values.length
+}
+
+function rmsValue(values: ArrayLike<number>) {
+  return Math.sqrt(meanSquare(values) + 1e-5)
+}
+
 function getRow(matrix: MatrixData, rowIndex: number) {
   const start = rowIndex * matrix.cols
   return matrix.data.slice(start, start + matrix.cols)
@@ -130,14 +146,20 @@ function createDynamicTextures(
       context: createBufferTex(gl, T, 1, 1),
       'residual-grid': createBufferTex(gl, T, C, 1),
       'norm1-grid': createBufferTex(gl, T, C, 1),
+      'norm1-agg-ms': createBufferTex(gl, T, 1, 1),
+      'norm1-agg-rms': createBufferTex(gl, T, 1, 1),
       'attn-out-grid': createBufferTex(gl, T, C, 1),
       'attn-residual-grid': createBufferTex(gl, T, C, 1),
       'norm2-grid': createBufferTex(gl, T, C, 1),
+      'norm2-agg-ms': createBufferTex(gl, T, 1, 1),
+      'norm2-agg-rms': createBufferTex(gl, T, 1, 1),
       'mlp-fc-grid': createBufferTex(gl, C * 4, T, 1),
       'mlp-act-grid': createBufferTex(gl, C * 4, T, 1),
       'mlp-result-grid': createBufferTex(gl, T, C, 1),
       'mlp-residual-grid': createBufferTex(gl, T, C, 1),
       'logits-grid': createBufferTex(gl, T, V, 1),
+      'softmax-max': createBufferTex(gl, T, 1, 1),
+      'softmax-exp': createBufferTex(gl, T, 1, 1),
       'probs-grid': createBufferTex(gl, T, V, 1),
       'sample-grid': createBufferTex(gl, T, 1, 1),
       ...Object.fromEntries(
@@ -285,7 +307,6 @@ function buildPhaseCameraTarget(
   phase: PhaseDefinition,
   layout: MicroVizLayout,
   focusBlockIds: MicroVizBlockId[],
-  emphasisBlockIds: MicroVizBlockId[],
 ) {
   const anchorBlockIds = cameraAnchorBlockIdsForPose(phase.viz.cameraPoseId)
   const anchorCubes = anchorBlockIds?.flatMap((blockId) => {
@@ -402,7 +423,6 @@ export function buildMicroVizPhaseState(
     phase,
     layout,
     focusBlockIds,
-    emphasisBlockIds,
   )
 
   const blockBindings: Partial<Record<MicroVizBlockId, MicroVizTextureBinding>> = {
@@ -523,20 +543,26 @@ function buildContextAndNormGrids(
   const tokenBuffer = makeZeroGrid(T, 1)
   const residualGrid = makeZeroGrid(T, C)
   const normGrid = makeZeroGrid(T, C)
+  const normMeanSquare = makeZeroGrid(T, 1)
+  const normRms = makeZeroGrid(T, 1)
 
-  contextTokens.slice(0, T).forEach((token, position) => {
-    const tokenId = tokenToId(token, model)
+  for (let position = 0; position < T; position += 1) {
+    const token = contextTokens[position]
+    const tokenId = token ? tokenToId(token, model) : model.config.bosToken
     tokenBuffer[position] = tokenId / Math.max(1, model.config.vocabSize - 1)
     const tokenEmbedding = getRow(model.weights.wte, tokenId)
     const positionEmbedding = getRow(model.weights.wpe, position)
     const residual = Array.from(tokenEmbedding, (value, index) => (
       value + (positionEmbedding[index] ?? 0)
     ))
-    setColumn(residualGrid, T, residual, position)
-    setColumn(normGrid, T, rmsnorm(residual), position)
-  })
+    const activeResidual = token ? residual : new Array(C).fill(0)
+    normMeanSquare[position] = meanSquare(activeResidual)
+    normRms[position] = rmsValue(activeResidual)
+    setColumn(residualGrid, T, activeResidual, position)
+    setColumn(normGrid, T, rmsnorm(activeResidual), position)
+  }
 
-  return { tokenBuffer, residualGrid, normGrid }
+  return { tokenBuffer, residualGrid, normGrid, normMeanSquare, normRms }
 }
 
 function buildHeadTextures(
@@ -596,6 +622,18 @@ function buildCurrentPositionGrid(
   return grid
 }
 
+function buildAggregateLine(
+  width: number,
+  index: number,
+  value: number,
+) {
+  const grid = makeZeroGrid(width, 1)
+  if (index >= 0 && index < width) {
+    grid[index] = value
+  }
+  return grid
+}
+
 export function uploadMicroVizFrame(
   ctx: MicroVizRenderContext,
   model: MicroVizStaticModel,
@@ -611,13 +649,19 @@ export function uploadMicroVizFrame(
 
   buildCardModel(ctx.layout, model, trace, contextTokens)
 
-  const { tokenBuffer, residualGrid, normGrid } = buildContextAndNormGrids(
+  const { tokenBuffer, residualGrid, normGrid, normMeanSquare, normRms } = buildContextAndNormGrids(
     model,
     contextTokens,
   )
   writeDynamicTexture(gl, ctx.textures, 'context', tokenBuffer, T, 1, { sequential: true })
   writeDynamicTexture(gl, ctx.textures, 'residual-grid', residualGrid, T, C)
   writeDynamicTexture(gl, ctx.textures, 'norm1-grid', normGrid, T, C)
+  writeDynamicTexture(gl, ctx.textures, 'norm1-agg-ms', normMeanSquare, T, 1)
+  writeDynamicTexture(gl, ctx.textures, 'norm1-agg-rms', normRms, T, 1, {
+    sequential: true,
+  })
+  const attnResidualNormMeanSquare = meanSquare(trace.xAfterAttnResidual)
+  const attnResidualNormRms = rmsValue(trace.xAfterAttnResidual)
   writeDynamicTexture(
     gl,
     ctx.textures,
@@ -641,6 +685,23 @@ export function uploadMicroVizFrame(
     buildCurrentPositionGrid(T, C, currentPosition, rmsnorm(trace.xAfterAttnResidual)),
     T,
     C,
+  )
+  writeDynamicTexture(
+    gl,
+    ctx.textures,
+    'norm2-agg-ms',
+    buildAggregateLine(T, currentPosition, attnResidualNormMeanSquare),
+    T,
+    1,
+  )
+  writeDynamicTexture(
+    gl,
+    ctx.textures,
+    'norm2-agg-rms',
+    buildAggregateLine(T, currentPosition, attnResidualNormRms),
+    T,
+    1,
+    { sequential: true },
   )
   writeDynamicTexture(
     gl,
@@ -689,6 +750,28 @@ export function uploadMicroVizFrame(
     T,
     V,
   )
+  const maxLogit = Math.max(...trace.logits)
+  const expSum = trace.logits.reduce(
+    (sum, value) => sum + Math.exp(value - maxLogit),
+    0,
+  )
+  writeDynamicTexture(
+    gl,
+    ctx.textures,
+    'softmax-max',
+    buildAggregateLine(T, currentPosition, maxLogit),
+    T,
+    1,
+  )
+  writeDynamicTexture(
+    gl,
+    ctx.textures,
+    'softmax-exp',
+    buildAggregateLine(T, currentPosition, expSum),
+    T,
+    1,
+    { sequential: true },
+  )
   writeDynamicTexture(
     gl,
     ctx.textures,
@@ -727,14 +810,14 @@ export function uploadMicroVizFrame(
   bindCubeTexture(ctx, ctx.layout.residual0, 'dynamic', 'residual-grid')
 
   const block = ctx.layout.transformerBlocks[0]
-  bindCubeTexture(ctx, block.ln1.lnAgg1, 'dynamic', 'context')
-  bindCubeTexture(ctx, block.ln1.lnAgg2, 'dynamic', 'context')
+  bindCubeTexture(ctx, block.ln1.lnAgg1, 'dynamic', 'norm1-agg-ms')
+  bindCubeTexture(ctx, block.ln1.lnAgg2, 'dynamic', 'norm1-agg-rms')
   bindCubeTexture(ctx, block.ln1.lnResid, 'dynamic', 'norm1-grid')
   bindCubeTexture(ctx, block.projWeight, 'static', 'layer0.attn_wo')
   bindCubeTexture(ctx, block.attnOut, 'dynamic', 'attn-out-grid')
   bindCubeTexture(ctx, block.attnResidual, 'dynamic', 'attn-residual-grid')
-  bindCubeTexture(ctx, block.ln2.lnAgg1, 'dynamic', 'sample-grid')
-  bindCubeTexture(ctx, block.ln2.lnAgg2, 'dynamic', 'sample-grid')
+  bindCubeTexture(ctx, block.ln2.lnAgg1, 'dynamic', 'norm2-agg-ms')
+  bindCubeTexture(ctx, block.ln2.lnAgg2, 'dynamic', 'norm2-agg-rms')
   bindCubeTexture(ctx, block.ln2.lnResid, 'dynamic', 'norm2-grid')
   bindCubeTexture(ctx, block.mlpFcWeight, 'static', 'layer0.mlp_fc1')
   bindCubeTexture(ctx, block.mlpFc, 'dynamic', 'mlp-fc-grid')
@@ -760,8 +843,8 @@ export function uploadMicroVizFrame(
 
   bindCubeTexture(ctx, ctx.layout.lmHeadWeight, 'static', 'lm_head')
   bindCubeTexture(ctx, ctx.layout.logits, 'dynamic', 'logits-grid')
-  bindCubeTexture(ctx, ctx.layout.logitsAgg1, 'dynamic', 'sample-grid')
-  bindCubeTexture(ctx, ctx.layout.logitsAgg2, 'dynamic', 'sample-grid')
+  bindCubeTexture(ctx, ctx.layout.logitsAgg1, 'dynamic', 'softmax-exp')
+  bindCubeTexture(ctx, ctx.layout.logitsAgg2, 'dynamic', 'softmax-max')
   bindCubeTexture(ctx, ctx.layout.logitsSoftmax, 'dynamic', 'probs-grid')
 
   for (const [blockId, block] of Object.entries(ctx.layout.blockMap) as Array<
