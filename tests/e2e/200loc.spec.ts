@@ -229,6 +229,31 @@ test.describe('desktop walkthrough', () => {
 
     expect(issues).toEqual([])
   })
+
+  test('survives repeated matrix hover without crashing or emitting browser errors', async ({
+    page,
+  }) => {
+    const issues = collectBrowserIssues(page)
+    const eventSurface = page.locator('.scene-panel__event-surface')
+    await eventSurface.scrollIntoViewIfNeeded()
+    await expect(page.locator('.scene-panel canvas')).toBeVisible()
+
+    const box = await eventSurface.boundingBox()
+    if (!box) {
+      throw new Error('Scene event surface bounding box was not available')
+    }
+
+    for (let step = 0; step < 40; step += 1) {
+      const x = box.x + box.width * (0.34 + (step % 6) * 0.05)
+      const y = box.y + box.height * (0.48 + ((step / 6) % 4) * 0.04)
+      await page.mouse.move(x, y)
+      await page.waitForTimeout(40)
+    }
+
+    await page.waitForTimeout(400)
+    await expect(page.locator('.scene-panel canvas')).toBeVisible()
+    expect(issues).toEqual([])
+  })
 })
 
 test.describe('mobile walkthrough', () => {

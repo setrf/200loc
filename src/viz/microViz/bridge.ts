@@ -847,3 +847,12 @@ export function applyMicroVizPhase(
       ? 1
       : 0.84
 }
+
+export function resetMicroVizHoverState(ctx: MicroVizRenderContext) {
+  for (const cube of ctx.layout.cubes) {
+    cube.subs = undefined
+    cube.rangeOffsetsX = undefined
+    cube.rangeOffsetsY = undefined
+    cube.rangeOffsetsZ = undefined
+  }
+}

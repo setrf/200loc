@@ -31,7 +31,12 @@ import { Vec3, Vec4 } from '../../vendor/llmVizOriginal/utils/vector'
 import type { IMovementInfo } from '../../vendor/llmVizOriginal/llm/components/MovementControls'
 import { MovementAction } from '../../vendor/llmVizOriginal/llm/components/MovementControls'
 import { createMicroVizTextures } from './bridge'
-import { applyMicroVizPhase, buildMicroVizPhaseState, uploadMicroVizFrame } from './bridge'
+import {
+  applyMicroVizPhase,
+  buildMicroVizPhaseState,
+  resetMicroVizHoverState,
+  uploadMicroVizFrame,
+} from './bridge'
 import { buildMicroVizLayout } from './layout'
 import { drawMicroVizArrows } from './arrows'
 import type {
@@ -278,6 +283,8 @@ export function runMicroVizProgram(
   }
 
   resetRenderBuffers(state.render)
+  resetMicroVizHoverState(state.microViz.renderContext)
+  applyMicroVizPhase(state.microViz.renderContext, phaseState)
   state.display.lines = [...phaseState.lines]
   state.display.hoverTarget = null
   state.display.blkIdxHover = null
