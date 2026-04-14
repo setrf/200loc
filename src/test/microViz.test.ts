@@ -9,6 +9,9 @@ import {
   createMicroVizTextures,
   uploadMicroVizFrame,
 } from '../viz/microViz/bridge'
+import {
+  shouldUpdateDesiredCamera,
+} from '../viz/microViz/program'
 import { inferencePhases } from '../walkthrough/phases'
 import { loadBundle, makeTrace } from './helpers/fixtures'
 
@@ -282,6 +285,31 @@ describe('micro viz bridge', () => {
 
     expect(phaseState.emphasisEdgeIds).toContain('norm-1-to-q-project')
     expect(phaseState.hoverBlockIndices.length).toBeGreaterThan(0)
+  })
+
+  it('does not re-seed camera transitions when stepping within the same camera pose group', () => {
+    const trace = makeTrace()
+    const contextTokens = ['BOS', 'e', 'm']
+    const layout = buildMicroVizLayout(bundle)
+    const qkvState = buildMicroVizPhaseState(
+      inferencePhases[4],
+      buildVizFrame(trace, inferencePhases[4], bundle, contextTokens, tokenLabel),
+      layout,
+    )
+    const scoreState = buildMicroVizPhaseState(
+      inferencePhases[5],
+      buildVizFrame(trace, inferencePhases[5], bundle, contextTokens, tokenLabel),
+      layout,
+    )
+    const sampleState = buildMicroVizPhaseState(
+      inferencePhases[13],
+      buildVizFrame(trace, inferencePhases[13], bundle, contextTokens, tokenLabel),
+      layout,
+    )
+
+    expect(qkvState.cameraPoseId).toBe(scoreState.cameraPoseId)
+    expect(shouldUpdateDesiredCamera(qkvState, scoreState)).toBe(false)
+    expect(shouldUpdateDesiredCamera(scoreState, sampleState)).toBe(true)
   })
 
   it('keeps nano-gpt assets out of the live app code path', () => {

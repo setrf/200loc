@@ -85,6 +85,16 @@ export interface MicroVizProgramState {
   }
 }
 
+export function shouldUpdateDesiredCamera(
+  previousPhaseState: MicroVizPhaseState | null,
+  nextPhaseState: MicroVizPhaseState,
+) {
+  return (
+    !previousPhaseState ||
+    previousPhaseState.cameraPoseId !== nextPhaseState.cameraPoseId
+  )
+}
+
 export function createCamera(initialCenter: Vec3, initialAngle: Vec3): ICamera {
   return {
     angle: new Vec3(initialAngle.x, initialAngle.y, initialAngle.z),
@@ -196,12 +206,9 @@ export function setMicroVizProgramData(
     phaseState.hoverBlockIndices.includes(cube.idx),
   )
 
-  const phaseChanged =
-    !previousPhaseState ||
-    previousPhaseState.phaseId !== phaseState.phaseId ||
-    previousPhaseState.cameraPoseId !== phaseState.cameraPoseId
+  const poseChanged = shouldUpdateDesiredCamera(previousPhaseState, phaseState)
 
-  if (phaseChanged) {
+  if (poseChanged) {
     state.camera.desiredCamera = phaseState.cameraTarget
   }
 }
