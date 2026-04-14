@@ -31,7 +31,11 @@ export interface WalkthroughState {
 export type WalkthroughAction =
   | { type: 'loading' }
   | { type: 'error'; error: string }
-  | { type: 'setPrefixInput'; prefixInput: string }
+  | {
+      type: 'setPrefixInput'
+      prefixInput: string
+      normalization?: PrefixNormalization
+    }
   | {
       type: 'reset'
       prefixInput: string
@@ -79,6 +83,22 @@ export function walkthroughReducer(
   state: WalkthroughState,
   action: WalkthroughAction,
 ): WalkthroughState {
+  const rangesEqual = (
+    left: LineRange[] | null,
+    right: LineRange[] | null,
+  ) => {
+    if (left === right) {
+      return true
+    }
+    if (!left || !right || left.length !== right.length) {
+      return false
+    }
+    return left.every(
+      (range, index) =>
+        range.start === right[index]?.start && range.end === right[index]?.end,
+    )
+  }
+
   switch (action.type) {
     case 'loading':
       return {
@@ -96,6 +116,7 @@ export function walkthroughReducer(
       return {
         ...state,
         prefixInput: action.prefixInput,
+        normalization: action.normalization ?? state.normalization,
       }
     case 'reset':
       return {
@@ -160,6 +181,9 @@ export function walkthroughReducer(
         status: action.playing ? 'playing' : 'paused',
       }
     case 'setHoverRanges':
+      if (rangesEqual(state.hoverRanges, action.ranges)) {
+        return state
+      }
       return {
         ...state,
         hoverRanges: action.ranges,

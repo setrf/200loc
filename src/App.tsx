@@ -1,4 +1,4 @@
-import { useEffect, useReducer, useRef, useState } from 'react'
+import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
 import {
   createTokenizer,
   loadModelBundle,
@@ -9,7 +9,11 @@ import { CodeViewer } from './components/CodeViewer'
 import { Controls } from './components/Controls'
 import { SegmentTabs } from './components/SegmentTabs'
 import { useAutoplay } from './hooks/useAutoplay'
-import { inferencePhases, trainingAppendix } from './walkthrough/phases'
+import {
+  inferencePhases,
+  trainingAppendix,
+  type LineRange,
+} from './walkthrough/phases'
 import {
   initialWalkthroughState,
   walkthroughReducer,
@@ -58,6 +62,27 @@ export default function App() {
       terminal: result.session.done,
     })
   }
+
+  const handleFocusRanges = useCallback((ranges: LineRange[] | null) => {
+    dispatch({ type: 'setHoverRanges', ranges })
+  }, [])
+
+  const handlePrefixChange = useCallback((value: string) => {
+    const normalization = tokenizerRef.current
+      ? tokenizerRef.current.normalizePrefix(value)
+      : {
+          normalized: value.toLowerCase().replace(/[^a-z]/g, '').slice(0, 15),
+          removedUnsupported: /[^a-z]/.test(value.toLowerCase()),
+          truncated:
+            value.toLowerCase().replace(/[^a-z]/g, '').length > 15,
+        }
+
+    dispatch({
+      type: 'setPrefixInput',
+      prefixInput: normalization.normalized,
+      normalization,
+    })
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -288,9 +313,7 @@ export default function App() {
               playing={state.status === 'playing'}
               canPrev={canPrev}
               canNext={canNext}
-              onPrefixChange={(value) =>
-                dispatch({ type: 'setPrefixInput', prefixInput: value })
-              }
+              onPrefixChange={handlePrefixChange}
               onReset={() => {
                 dispatch({ type: 'setPlaying', playing: false })
                 void hydrate(state.prefixInput)
@@ -311,9 +334,7 @@ export default function App() {
                 }
               }}
               onToggleAppendix={() => dispatch({ type: 'toggleAppendix' })}
-              onFocusRanges={(ranges) =>
-                dispatch({ type: 'setHoverRanges', ranges })
-              }
+              onFocusRanges={handleFocusRanges}
             />
           </div>
 
@@ -328,9 +349,7 @@ export default function App() {
               contextTokens={contextTokens}
               tokenLabel={tokenLabel}
               sceneModelData={sceneModelData}
-              onFocusRanges={(ranges) =>
-                dispatch({ type: 'setHoverRanges', ranges })
-              }
+              onFocusRanges={handleFocusRanges}
             />
           </div>
         </section>

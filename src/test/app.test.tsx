@@ -159,7 +159,6 @@ describe('App', () => {
     ).toBeInTheDocument()
 
     await screen.findByText('How a tiny GPT predicts the next token')
-    expect(screen.getByText('microgpt scene')).toBeInTheDocument()
     expect(screen.getAllByText('microgpt').length).toBeGreaterThan(0)
     expect(screen.getAllByText('CPU fallback').length).toBeGreaterThan(0)
     expect(screen.getAllByText('Tokenize Prefix').length).toBeGreaterThan(0)

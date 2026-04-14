@@ -1,13 +1,19 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 
 export function useAutoplay(active: boolean, step: () => void, delayMs = 1100) {
+  const stepRef = useRef(step)
+
+  useEffect(() => {
+    stepRef.current = step
+  }, [step])
+
   useEffect(() => {
     if (!active) {
       return
     }
 
     const timer = window.setInterval(() => {
-      step()
+      stepRef.current()
     }, delayMs)
 
     return () => {
