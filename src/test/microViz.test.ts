@@ -309,6 +309,10 @@ describe('micro viz bridge', () => {
 
     expect(qkvState.cameraPoseId).toBe(scoreState.cameraPoseId)
     expect(shouldUpdateDesiredCamera(qkvState, scoreState)).toBe(false)
+    expect(qkvState.cameraTarget.center.x).toBeCloseTo(scoreState.cameraTarget.center.x, 5)
+    expect(qkvState.cameraTarget.center.y).toBeCloseTo(scoreState.cameraTarget.center.y, 5)
+    expect(qkvState.cameraTarget.center.z).toBeCloseTo(scoreState.cameraTarget.center.z, 5)
+    expect(qkvState.cameraTarget.angle.z).toBeCloseTo(scoreState.cameraTarget.angle.z, 5)
     expect(shouldUpdateDesiredCamera(scoreState, sampleState)).toBe(true)
   })
 

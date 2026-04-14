@@ -241,28 +241,69 @@ function makeBinding(kind: MicroVizTextureBinding['kind'], key: string) {
   return { kind, key } satisfies MicroVizTextureBinding
 }
 
+function cameraAnchorBlockIdsForPose(cameraPoseId: PhaseDefinition['viz']['cameraPoseId']) {
+  switch (cameraPoseId) {
+    case 'input':
+      return [
+        'context',
+        'token-embedding',
+        'position-embedding',
+        'residual-stream',
+        'norm-1',
+      ] satisfies MicroVizBlockId[]
+    case 'attention':
+      return [
+        'q-project',
+        'k-project',
+        'v-project',
+        'attention-head-1',
+        'attention-head-2',
+        'attention-head-3',
+        'attention-head-4',
+        'attention-out',
+      ] satisfies MicroVizBlockId[]
+    case 'residual':
+      return ['attention-out', 'residual-add-1', 'norm-2'] satisfies MicroVizBlockId[]
+    case 'readout':
+      return [
+        'norm-2',
+        'mlp-fc1',
+        'mlp-relu',
+        'mlp-fc2',
+        'logits',
+        'probabilities',
+      ] satisfies MicroVizBlockId[]
+    case 'sample':
+      return ['logits', 'probabilities', 'sample'] satisfies MicroVizBlockId[]
+    case 'overview':
+    default:
+      return null
+  }
+}
+
 function buildPhaseCameraTarget(
   phase: PhaseDefinition,
   layout: MicroVizLayout,
   focusBlockIds: MicroVizBlockId[],
   emphasisBlockIds: MicroVizBlockId[],
 ) {
-  const focusIds = new Set(
-    focusBlockIds.map((blockId) => layout.blockMap[blockId].codeFocusId),
-  )
-  const emphasisIds = new Set(
-    emphasisBlockIds.map((blockId) => layout.blockMap[blockId].codeFocusId),
-  )
-  const cubes = layout.cubes.filter((cube) => {
-    const focusId = layout.cubeFocusIds[cube.idx]
-    return focusId != null && focusIds.has(focusId)
+  const anchorBlockIds = cameraAnchorBlockIdsForPose(phase.viz.cameraPoseId)
+  const anchorCubes = anchorBlockIds?.flatMap((blockId) => {
+    const block = layout.blockMap[blockId]
+    return block ? [block.cube] : []
   })
   const sourceCubes =
-    cubes.length > 0
-      ? cubes
+    anchorCubes && anchorCubes.length > 0
+      ? anchorCubes
       : layout.cubes.filter((cube) => {
           const focusId = layout.cubeFocusIds[cube.idx]
-          return focusId != null && emphasisIds.has(focusId)
+          if (focusId == null) {
+            return false
+          }
+
+          return focusBlockIds.some(
+            (blockId) => layout.blockMap[blockId].codeFocusId === focusId,
+          )
         })
   const cameraCubes = sourceCubes.length > 0 ? sourceCubes : layout.cubes
   const bounds = cameraCubes.reduce(
