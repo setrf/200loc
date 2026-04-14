@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -25,30 +26,10 @@ import type {
   VectorStripOverlay,
   VizOverlay,
 } from '../viz/llmViz/types'
-import { buildMicroVizPhaseState, createMicroVizTextures, drawMicroVizEdges, uploadMicroVizFrame, applyMicroVizPhase } from '../viz/microViz/bridge'
-import { buildMicroVizLayout } from '../viz/microViz/layout'
-import type {
-  MicroVizPhaseState,
-  MicroVizRenderContext,
-} from '../viz/microViz/types'
-import type { ICamera } from '../vendor/llmVizOriginal/llm/Camera'
 import {
-  genModelViewMatrices,
-  updateCamera,
-} from '../vendor/llmVizOriginal/llm/Camera'
-import { drawBlockInfo } from '../vendor/llmVizOriginal/llm/components/BlockInfo'
-import { CanvasEventSurface } from '../vendor/llmVizOriginal/llm/CanvasEventSurface'
-import { runMouseHitTesting } from '../vendor/llmVizOriginal/llm/Interaction'
-import { fetchFontAtlasData } from '../vendor/llmVizOriginal/llm/render/fontRender'
-import {
-  initRender,
-  renderModel,
-  resetRenderBuffers,
-} from '../vendor/llmVizOriginal/llm/render/modelRender'
-import { ProgramStateContext } from '../vendor/llmVizOriginal/llm/Sidebar'
-import { Mat4f } from '../vendor/llmVizOriginal/utils/matrix'
-import { Subscriptions } from '../vendor/llmVizOriginal/utils/hooks'
-import { Vec3 } from '../vendor/llmVizOriginal/utils/vector'
+  MicroLayerView,
+  type MicroLayerViewHandle,
+} from '../viz/microViz/LayerView'
 
 interface ArchitectureSceneProps {
   trace: TokenStepTrace
@@ -94,271 +75,7 @@ function useViewportSize<T extends HTMLElement>(ref: RefObject<T | null>) {
   return size
 }
 
-function createCamera(initialCenter: Vec3, initialAngle: Vec3): ICamera {
-  return {
-    angle: new Vec3(initialAngle.x, initialAngle.y, initialAngle.z),
-    center: new Vec3(initialCenter.x, initialCenter.y, initialCenter.z),
-    transition: {},
-    modelMtx: new Mat4f(),
-    viewMtx: new Mat4f(),
-    lookAtMtx: new Mat4f(),
-    camPos: new Vec3(),
-    camPosModel: new Vec3(),
-  }
-}
-
 type FocusRangeKey = keyof typeof vizFocusRanges
-
-interface MicroVizProgramState {
-  render: MicroVizRenderContext['renderState']
-  camera: ICamera
-  mouse: {
-    mousePos: Vec3
-  }
-  display: {
-    tokenColors: null
-    tokenIdxColors: null
-    tokenOutputColors: null
-    lines: string[]
-    hoverTarget: unknown
-    blkIdxHover: number[] | null
-    dimHover: unknown
-    topOutputOpacity?: number
-  }
-  walkthrough: {
-    dimHighlightBlocks: null
-  }
-  htmlSubs: Subscriptions
-  layout: MicroVizRenderContext['layout']
-  shape: MicroVizRenderContext['layout']['shape']
-  pageLayout: {
-    height: number
-    width: number
-    isDesktop: boolean
-    isPhone: boolean
-  }
-  markDirty: () => void
-}
-
-class MicroVizCanvasController {
-  private renderContext: MicroVizRenderContext
-  private programState: MicroVizProgramState
-  private phaseState: MicroVizPhaseState | null = null
-  private stopped = false
-  private canvasSizeDirty = true
-  private rafHandle = 0
-  private prevTime = performance.now()
-  private lastCameraPoseId: PhaseDefinition['viz']['cameraPoseId'] | null = null
-  private hoverFocusId: FocusRangeKey | null = null
-  private hoverListener: ((focusId: FocusRangeKey | null) => void) | null = null
-  private blockFocusByIndex: Map<number, FocusRangeKey | null>
-
-  constructor(
-    private canvasEl: HTMLCanvasElement,
-    sceneModelData: SceneModelData,
-    fontAtlasData: Awaited<ReturnType<typeof fetchFontAtlasData>>,
-  ) {
-    const renderState = initRender(canvasEl, fontAtlasData)
-    if (!renderState) {
-      throw new Error('WebGL2 unavailable')
-    }
-
-    const layout = buildMicroVizLayout(sceneModelData)
-    const textures = createMicroVizTextures(renderState.gl, sceneModelData)
-    const overview = layout.cameraPoses.overview
-    const camera = createCamera(overview.center, overview.angle)
-    const htmlSubs = new Subscriptions()
-
-    this.renderContext = {
-      renderState,
-      layout,
-      textures,
-      camera,
-    }
-    this.blockFocusByIndex = new Map(
-      Object.values(layout.blocks).map(({ cube, codeFocusId }) => [
-        cube.idx,
-        codeFocusId && codeFocusId in vizFocusRanges
-          ? (codeFocusId as FocusRangeKey)
-          : null,
-      ]),
-    )
-    this.programState = {
-      render: renderState,
-      camera,
-      mouse: {
-        mousePos: new Vec3(),
-      },
-      display: {
-        tokenColors: null,
-        tokenIdxColors: null,
-        tokenOutputColors: null,
-        lines: [],
-        hoverTarget: null,
-        blkIdxHover: null,
-        dimHover: null,
-      },
-      walkthrough: {
-        dimHighlightBlocks: null,
-      },
-      htmlSubs,
-      layout,
-      shape: layout.shape,
-      pageLayout: {
-        height: 0,
-        width: 0,
-        isDesktop: true,
-        isPhone: false,
-      },
-      markDirty: this.markDirty,
-    }
-  }
-
-  destroy() {
-    this.stopped = true
-    if (this.rafHandle) {
-      cancelAnimationFrame(this.rafHandle)
-      this.rafHandle = 0
-    }
-    this.hoverListener = null
-  }
-
-  resize() {
-    this.canvasSizeDirty = true
-    this.markDirty()
-  }
-
-  requestRender() {
-    this.markDirty()
-  }
-
-  getProgramState() {
-    return this.programState
-  }
-
-  setHoverListener(listener: ((focusId: FocusRangeKey | null) => void) | null) {
-    this.hoverListener = listener
-  }
-
-  resetToCameraPose(cameraPoseId: PhaseDefinition['viz']['cameraPoseId']) {
-    this.renderContext.camera.desiredCamera =
-      this.renderContext.layout.cameraPoses[cameraPoseId]
-    this.lastCameraPoseId = cameraPoseId
-    this.markDirty()
-  }
-
-  setFrame(
-    sceneModelData: SceneModelData,
-    phase: PhaseDefinition,
-    trace: TokenStepTrace,
-    contextTokens: string[],
-    vizFrame: ReturnType<typeof buildVizFrame>,
-  ) {
-    const phaseState = buildMicroVizPhaseState(phase, vizFrame, this.renderContext.layout)
-    this.phaseState = phaseState
-    uploadMicroVizFrame(
-      this.renderContext,
-      sceneModelData,
-      phaseState,
-      trace,
-      contextTokens.length,
-    )
-    applyMicroVizPhase(this.renderContext, phaseState)
-    if (this.lastCameraPoseId !== phaseState.cameraPoseId) {
-      this.renderContext.camera.desiredCamera =
-        this.renderContext.layout.cameraPoses[phaseState.cameraPoseId]
-      this.lastCameraPoseId = phaseState.cameraPoseId
-    }
-    this.markDirty()
-  }
-
-  private markDirty = () => {
-    if (this.stopped) {
-      return
-    }
-    if (!this.rafHandle) {
-      this.prevTime = performance.now()
-      this.rafHandle = requestAnimationFrame(this.loop)
-    }
-  }
-
-  private loop = (time: number) => {
-    this.rafHandle = 0
-    if (this.stopped || !this.phaseState) {
-      return
-    }
-    let dt = time - this.prevTime
-    this.prevTime = time
-    if (dt < 8) {
-      dt = 16
-    }
-    this.render(time, dt)
-
-    if (this.renderContext.camera.desiredCameraTransition) {
-      this.markDirty()
-    }
-  }
-
-  private render(time: number, dt: number) {
-    const { renderState, camera, layout } = this.renderContext
-    const state = this.programState
-
-    if (this.canvasSizeDirty) {
-      const bounds = this.canvasEl.getBoundingClientRect()
-      const scale = window.devicePixelRatio || 1
-      this.canvasEl.width = Math.max(1, Math.round(bounds.width * scale))
-      this.canvasEl.height = Math.max(1, Math.round(bounds.height * scale))
-      renderState.size = new Vec3(bounds.width, bounds.height)
-      state.pageLayout = {
-        height: bounds.height,
-        width: bounds.width,
-        isDesktop: bounds.width >= 1024,
-        isPhone: bounds.width < 720,
-      }
-      this.canvasSizeDirty = false
-    }
-
-    const view = {
-      time,
-      dt,
-      markDirty: this.markDirty,
-    }
-
-    resetRenderBuffers(renderState)
-    applyMicroVizPhase(this.renderContext, this.phaseState!)
-    updateCamera(state as never, view)
-    genModelViewMatrices(state as never, layout as never)
-    drawMicroVizEdges(this.renderContext, this.phaseState!)
-    state.display.lines = []
-    state.display.hoverTarget = null
-    state.display.blkIdxHover = null
-    state.display.dimHover = null
-    drawBlockInfo(state as never)
-    runMouseHitTesting(state as never)
-    renderModel({
-      render: renderState,
-      layout: layout as never,
-      camera,
-      examples: [],
-    } as never)
-    state.htmlSubs.notify()
-    this.publishHoverFocus()
-  }
-
-  private publishHoverFocus() {
-    const hoverTarget = this.programState.display.hoverTarget as
-      | { mainCube: { idx: number } }
-      | null
-    const nextHoverFocusId = hoverTarget
-      ? this.blockFocusByIndex.get(hoverTarget.mainCube.idx) ?? null
-      : null
-    if (nextHoverFocusId === this.hoverFocusId) {
-      return
-    }
-    this.hoverFocusId = nextHoverFocusId
-    this.hoverListener?.(nextHoverFocusId)
-  }
-}
 
 function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value))
@@ -720,10 +437,7 @@ export function ArchitectureScene({
   onFocusRanges,
 }: ArchitectureSceneProps) {
   const viewportRef = useRef<HTMLDivElement>(null)
-  const canvasRef = useRef<HTMLCanvasElement>(null)
-  const controllerRef = useRef<MicroVizCanvasController | null>(null)
-  const phaseIdRef = useRef(phase.id)
-  const [programState, setProgramState] = useState<MicroVizProgramState | null>(null)
+  const layerViewRef = useRef<MicroLayerViewHandle | null>(null)
   const [renderMode, setRenderMode] = useState<'loading' | 'webgl' | 'fallback'>(
     'loading',
   )
@@ -740,12 +454,17 @@ export function ArchitectureScene({
   )
   const viewportSize = useViewportSize(viewportRef)
 
-  useEffect(() => {
-    phaseIdRef.current = phase.id
-  }, [phase.id])
-
   const activeHoverFocusId =
     hoverFocusId.phaseId === phase.id ? hoverFocusId.focusId : null
+  const handleLayerHoverChange = useCallback(
+    (focusId: FocusRangeKey | null) => {
+      setHoverFocusId({
+        phaseId: phase.id,
+        focusId,
+      })
+    },
+    [phase.id],
+  )
 
   const vizFrame = useMemo(
     () =>
@@ -768,90 +487,6 @@ export function ArchitectureScene({
       ),
     [abstractLayout, phaseCameraPose, viewportSize],
   )
-
-  useEffect(() => {
-    const canvasNode = canvasRef.current
-    const viewportNode = viewportRef.current
-    if (!canvasNode) {
-      return
-    }
-    const activeCanvas: HTMLCanvasElement = canvasNode
-
-    let cancelled = false
-    let resizeObserver: ResizeObserver | null = null
-    let preventWheel: ((event: WheelEvent) => void) | null = null
-    let supportsWebgl = false
-    try {
-      supportsWebgl = !!activeCanvas.getContext('webgl2')
-    } catch {
-      supportsWebgl = false
-    }
-
-    if (!supportsWebgl) {
-      queueMicrotask(() => {
-        if (!cancelled) {
-          setRenderMode('fallback')
-        }
-      })
-      return
-    }
-
-    async function bootstrap() {
-      try {
-        const fontAtlasData = await fetchFontAtlasData()
-        if (cancelled) {
-          return
-        }
-        const controller = new MicroVizCanvasController(
-          activeCanvas,
-          sceneModelData,
-          fontAtlasData,
-        )
-        controllerRef.current = controller
-        setProgramState(controller.getProgramState())
-        controller.setHoverListener((focusId) => {
-          setHoverFocusId({
-            phaseId: phaseIdRef.current,
-            focusId,
-          })
-        })
-        const ResizeObserverCtor = globalThis.ResizeObserver
-        if (ResizeObserverCtor) {
-          resizeObserver = new ResizeObserverCtor(() => controller.resize())
-          resizeObserver.observe(activeCanvas)
-        }
-        if (viewportNode) {
-          preventWheel = (event) => event.preventDefault()
-          viewportNode.addEventListener('wheel', preventWheel, { passive: false })
-        }
-        setRenderMode('webgl')
-      } catch {
-        setRenderMode('fallback')
-      }
-    }
-
-    void bootstrap()
-
-    return () => {
-      cancelled = true
-      resizeObserver?.disconnect()
-      if (preventWheel && viewportNode) {
-        viewportNode.removeEventListener('wheel', preventWheel)
-      }
-      setProgramState(null)
-      controllerRef.current?.setHoverListener(null)
-      controllerRef.current?.destroy()
-      controllerRef.current = null
-    }
-  }, [sceneModelData])
-
-  useEffect(() => {
-    const controller = controllerRef.current
-    if (!controller) {
-      return
-    }
-    controller.setFrame(sceneModelData, phase, trace, contextTokens, vizFrame)
-  }, [phase, trace, contextTokens, sceneModelData, vizFrame])
 
   useEffect(() => {
     if (!viewportRef.current?.matches(':hover')) {
@@ -890,7 +525,7 @@ export function ArchitectureScene({
     if (target.closest('.scene-focus-window')) {
       return
     }
-    controllerRef.current?.resetToCameraPose(phase.viz.cameraPoseId)
+    layerViewRef.current?.resetToCameraPose(phase.viz.cameraPoseId)
   }
 
   const sampledToken = tokenLabel(trace.sampledTokenId)
@@ -956,10 +591,15 @@ export function ArchitectureScene({
         {renderMode === 'fallback' ? (
           renderFallbackScene(projectedScene, vizFrame.overlay, phase, onFocusRanges)
         ) : (
-          <canvas
-            className="scene-panel__canvas"
-            data-testid={renderMode === 'loading' ? 'scene-loading' : undefined}
-            ref={canvasRef}
+          <MicroLayerView
+            ref={layerViewRef}
+            phase={phase}
+            trace={trace}
+            contextTokens={contextTokens}
+            vizFrame={vizFrame}
+            sceneModelData={sceneModelData}
+            onHoverFocusChange={handleLayerHoverChange}
+            onRenderModeChange={setRenderMode}
           />
         )}
 
@@ -970,13 +610,6 @@ export function ArchitectureScene({
           <div className="scene-panel__interaction-hint">
             drag to pan · wheel to zoom · double click to reset
           </div>
-          {renderMode === 'webgl' && programState ? (
-            <ProgramStateContext.Provider value={programState as never}>
-              <div className="scene-panel__event-surface">
-                <CanvasEventSurface />
-              </div>
-            </ProgramStateContext.Provider>
-          ) : null}
 
           <div className="scene-focus-window" style={focusWindowStyle}>
             <div className="scene-focus-window__header">

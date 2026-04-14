@@ -306,7 +306,7 @@ describe('micro viz bridge', () => {
       resolve(process.cwd(), 'src/components/ArchitectureScene.tsx'),
       'utf8',
     )
-    expect(sceneSource.includes('LayerView')).toBe(false)
+    expect(sceneSource.includes("../vendor/llmVizOriginal/llm/LayerView")).toBe(false)
     expect(sceneSource.includes("from '../vendor/llmVizOriginal/llm/walkthrough/Walkthrough'")).toBe(
       false,
     )

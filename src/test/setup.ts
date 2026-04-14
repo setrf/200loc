@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom/vitest'
-import { vi } from 'vitest'
+import { beforeEach, vi } from 'vitest'
 
 class ResizeObserverMock {
   observe() {}
@@ -7,7 +7,27 @@ class ResizeObserverMock {
   unobserve() {}
 }
 
+const matchMediaMock = (query: string) => ({
+  matches: false,
+  media: query,
+  onchange: null,
+  addListener() {},
+  removeListener() {},
+  addEventListener() {},
+  removeEventListener() {},
+  dispatchEvent() {
+    return false
+  },
+})
+
 vi.stubGlobal('ResizeObserver', ResizeObserverMock)
+vi.stubGlobal('matchMedia', matchMediaMock)
+beforeEach(() => {
+  Object.defineProperty(window, 'matchMedia', {
+    writable: true,
+    value: matchMediaMock,
+  })
+})
 
 Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
   configurable: true,
