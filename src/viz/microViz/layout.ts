@@ -1068,31 +1068,52 @@ export function buildMicroVizLayout(model: SceneModelData): MicroVizLayout {
   ] satisfies MicroVizEdge[]
 
   const height = sampleBlock.y + sampleBlock.dy + margin * 6
-  const overviewY = height * 0.62
+  const bounds = cubes.reduce(
+    (acc, cube) => {
+      acc.minX = Math.min(acc.minX, cube.x)
+      acc.maxX = Math.max(acc.maxX, cube.x + cube.dx)
+      acc.minY = Math.min(acc.minY, cube.y)
+      acc.maxY = Math.max(acc.maxY, cube.y + cube.dy)
+      acc.minZ = Math.min(acc.minZ, cube.z)
+      acc.maxZ = Math.max(acc.maxZ, cube.z + cube.dz)
+      return acc
+    },
+    {
+      minX: Number.POSITIVE_INFINITY,
+      maxX: Number.NEGATIVE_INFINITY,
+      minY: Number.POSITIVE_INFINITY,
+      maxY: Number.NEGATIVE_INFINITY,
+      minZ: Number.POSITIVE_INFINITY,
+      maxZ: Number.NEGATIVE_INFINITY,
+    },
+  )
+  const centerX = (bounds.minX + bounds.maxX) * 0.5
+  const centerY = (bounds.minY + bounds.maxY) * 0.5
+  const centerZ = (bounds.minZ + bounds.maxZ) * 0.5
   const cameraPoses = {
     overview: {
-      center: new Vec3(-26, overviewY, -20),
-      angle: new Vec3(288, 17, 24),
+      center: new Vec3(centerX - 6, centerY + 18, centerZ),
+      angle: new Vec3(288, 17, 11.2),
     },
     input: {
-      center: new Vec3(-24, overviewY * 0.96, -16),
-      angle: new Vec3(288, 17, 22.5),
+      center: new Vec3(centerX, centerY, centerZ),
+      angle: new Vec3(288, 17, 10.5),
     },
     attention: {
-      center: new Vec3(-42, overviewY, -6),
-      angle: new Vec3(287, 18, 23.5),
+      center: new Vec3(centerX + 28, centerY + 32, centerZ + 6),
+      angle: new Vec3(287, 18, 10.8),
     },
     residual: {
-      center: new Vec3(-18, overviewY * 1.04, -14),
-      angle: new Vec3(288, 17, 22.8),
+      center: new Vec3(centerX + 16, centerY + 84, centerZ),
+      angle: new Vec3(288, 17, 10.6),
     },
     readout: {
-      center: new Vec3(-12, overviewY * 1.08, -12),
-      angle: new Vec3(287, 17, 22.2),
+      center: new Vec3(centerX + 22, centerY + 116, centerZ + 2),
+      angle: new Vec3(287, 17, 10.2),
     },
     sample: {
-      center: new Vec3(-8, overviewY * 1.12, -10),
-      angle: new Vec3(287, 16, 21.8),
+      center: new Vec3(centerX + 28, centerY + 148, centerZ + 4),
+      angle: new Vec3(287, 16, 9.9),
     },
   }
 
