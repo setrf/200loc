@@ -1,10 +1,10 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import type { IProgramState } from "./Program";
 import { useProgramState } from "./Sidebar";
 import { clamp } from "@llmviz/utils/data";
-import { useGlobalDrag, useTouchEvents } from "@llmviz/utils/pointer";
+import { getWheelDelta, useGlobalDrag, useTouchEvents } from "@llmviz/utils/pointer";
 import { Vec3 } from "@llmviz/utils/vector";
-import { cancelCameraMotion } from "./Camera";
+import { cancelCameraMotion, clampManualZoom } from "./Camera";
 import s from './LayerView.module.scss';
 
 export const CanvasEventSurface: React.FC<{
@@ -14,6 +14,11 @@ export const CanvasEventSurface: React.FC<{
     let progState = useProgramState();
 
     let updateRenderState = useCallback((fn: (ps: IProgramState) => void) => {
+        fn(progState);
+        progState.markDirty();
+    }, [progState]);
+
+    let updateCameraState = useCallback((fn: (ps: IProgramState) => void) => {
         cancelCameraMotion(progState.camera);
         fn(progState);
         progState.markDirty();
@@ -26,7 +31,7 @@ export const CanvasEventSurface: React.FC<{
         let sideMul = Math.sin(camAngle.x * Math.PI / 180) > 0 ? 1 : -1;
         target.x = target.x + sideMul * dx * 0.1 * camAngle.z;
 
-        updateRenderState(ps => {
+        updateCameraState(ps => {
             ps.camera.center = target;
         });
     }
@@ -36,15 +41,15 @@ export const CanvasEventSurface: React.FC<{
         let degPerPixel = 0.5;
         camAngle.x = camAngle.x - dx * degPerPixel;
         camAngle.y = clamp(camAngle.y + dy * degPerPixel, -87, 87);
-        updateRenderState(ps => {
+        updateCameraState(ps => {
             ps.camera.angle = camAngle;
         });
     }
 
     function zoom(initial: { camAngle: Vec3, camTarget: Vec3 }, dy: number) {
         let camAngle = initial.camAngle.clone();
-        camAngle.z = clamp(camAngle.z / dy, 0.1, 100000);
-        updateRenderState(ps => {
+        camAngle.z = clampManualZoom(progState.camera, camAngle.z / dy);
+        updateCameraState(ps => {
             ps.camera.angle = camAngle;
         });
     }
@@ -83,9 +88,14 @@ export const CanvasEventSurface: React.FC<{
             let dy = evMidY - dsMidY;
             let dsDist = Math.sqrt((dsTouch0.clientX - dsTouch1.clientX) ** 2 + (dsTouch0.clientY - dsTouch1.clientY) ** 2);
             let evDist = Math.sqrt((evTouch0.clientX - evTouch1.clientX) ** 2 + (evTouch0.clientY - evTouch1.clientY) ** 2);
-            rotate(ds.data, dx, dy);
-            // pan(ds.data, dx, dy);
-            zoom(ds.data, evDist / dsDist);
+            let camAngle = ds.data.camAngle.clone();
+            let degPerPixel = 0.5;
+            camAngle.x = camAngle.x - dx * degPerPixel;
+            camAngle.y = clamp(camAngle.y + dy * degPerPixel, -87, 87);
+            camAngle.z = clamp(camAngle.z / (evDist / dsDist), 0.1, 100000);
+            updateCameraState(ps => {
+                ps.camera.angle = camAngle;
+            });
             ev.preventDefault();
     });
 
@@ -105,16 +115,36 @@ export const CanvasEventSurface: React.FC<{
         }
     }
 
-    function handleWheel(ev: React.WheelEvent) {
+    function handleMouseLeave() {
         if (progState) {
-            let camAngle = progState.camera.angle;
-            let zoom = clamp(camAngle.z * Math.pow(1.0013, ev.deltaY), 0.01, 100000);
-            updateRenderState(rs => {
-                rs.camera.angle = new Vec3(camAngle.x, camAngle.y, zoom);
+            updateRenderState(ps => {
+                ps.mouse.mousePos = new Vec3(-1_000_000, -1_000_000, 0);
+                ps.display.hoverTarget = null;
             });
         }
-        ev.stopPropagation();
     }
+
+    useEffect(() => {
+        if (!eventSurfaceEl || !progState) {
+            return;
+        }
+
+        function handleWheel(ev: WheelEvent) {
+            let camAngle = progState.camera.angle;
+            let wheelDelta = getWheelDelta(ev as any);
+            let zoom = clampManualZoom(progState.camera, camAngle.z * Math.pow(1.08, wheelDelta));
+            updateCameraState(rs => {
+                rs.camera.angle = new Vec3(camAngle.x, camAngle.y, zoom);
+            });
+            ev.preventDefault();
+            ev.stopPropagation();
+        }
+
+        eventSurfaceEl.addEventListener('wheel', handleWheel, { passive: false });
+        return () => {
+            eventSurfaceEl.removeEventListener('wheel', handleWheel);
+        };
+    }, [eventSurfaceEl, progState, updateCameraState]);
 
     if (!progState.render) {
         return null;
@@ -125,7 +155,7 @@ export const CanvasEventSurface: React.FC<{
         className={s.canvasEventSurface}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
-        onWheel={handleWheel}
+        onMouseLeave={handleMouseLeave}
         onContextMenu={ev => ev.preventDefault()}
         style={{ cursor: dragStart ? 'grabbing' : progState.display.hoverTarget ? 'crosshair' : 'grab' }}
     >

@@ -13,6 +13,7 @@ export interface ICamera {
     modelMtx: Mat4f;
     center: Vec3;
     angle: Vec3; // x = degrees about z axis, y = degrees above the x-y plane; z = zoom
+    zoomReference?: number;
 
     centerDesired?: Vec3;
     // separated into rotation & zoom since they behave differently, and we want to control them separately
@@ -186,6 +187,13 @@ export function cancelCameraMotion(camera: ICamera) {
     camera.transition.centerInit = undefined;
     camera.transition.angleInit = undefined;
     camera.transition.angleZInit = undefined;
+}
+
+export function clampManualZoom(camera: ICamera, nextZoom: number) {
+    const referenceZoom = camera.zoomReference ?? camera.angle.z;
+    const minZoom = Math.max(1.8, referenceZoom * 0.55);
+    const maxZoom = Math.max(minZoom * 1.5, referenceZoom * 3.5);
+    return clamp(nextZoom, minZoom, maxZoom);
 }
 
 

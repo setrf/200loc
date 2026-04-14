@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   cancelCameraMotion,
+  clampManualZoom,
   updateCamera,
   type ICamera,
 } from '../vendor/llmVizOriginal/llm/Camera'
@@ -96,5 +97,15 @@ describe('camera transition scheduling', () => {
     expect(camera.transition.centerT).toBeUndefined()
     expect(camera.transition.angleT).toBeUndefined()
     expect(camera.transition.angleZT).toBeUndefined()
+  })
+
+  it('clamps manual zoom against the current guided shot', () => {
+    const camera = makeCamera({
+      zoomReference: 10,
+    })
+
+    expect(clampManualZoom(camera, 0.5)).toBeCloseTo(5.5)
+    expect(clampManualZoom(camera, 80)).toBeCloseTo(35)
+    expect(clampManualZoom(camera, 12)).toBeCloseTo(12)
   })
 })

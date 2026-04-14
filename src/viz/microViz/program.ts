@@ -5,6 +5,7 @@ import type { ICamera } from '../../vendor/llmVizOriginal/llm/Camera'
 import type { IBlkDef } from '../../vendor/llmVizOriginal/llm/GptModelLayout'
 import {
   cancelCameraMotion,
+  clampManualZoom,
   genModelViewMatrices,
   updateCamera,
 } from '../../vendor/llmVizOriginal/llm/Camera'
@@ -95,9 +96,21 @@ export function shouldUpdateDesiredCamera(
   previousPhaseState: MicroVizPhaseState | null,
   nextPhaseState: MicroVizPhaseState,
 ) {
+  if (!previousPhaseState) {
+    return true
+  }
+
+  const samePoseBucket =
+    previousPhaseState.cameraPoseId === nextPhaseState.cameraPoseId
+  const centerDelta =
+    previousPhaseState.cameraTarget.center.dist(nextPhaseState.cameraTarget.center)
+  const angleDelta =
+    previousPhaseState.cameraTarget.angle.dist(nextPhaseState.cameraTarget.angle)
+
   return (
-    !previousPhaseState ||
-    previousPhaseState.cameraPoseId !== nextPhaseState.cameraPoseId
+    !samePoseBucket ||
+    centerDelta > 1 ||
+    angleDelta > 0.08
   )
 }
 
@@ -105,6 +118,7 @@ export function createCamera(initialCenter: Vec3, initialAngle: Vec3): ICamera {
   return {
     angle: new Vec3(initialAngle.x, initialAngle.y, initialAngle.z),
     center: new Vec3(initialCenter.x, initialCenter.y, initialCenter.z),
+    zoomReference: initialAngle.z,
     transition: {},
     modelMtx: new Mat4f(),
     viewMtx: new Mat4f(),
@@ -137,6 +151,11 @@ export function initMicroVizProgramState(
     layout,
     textures,
     camera,
+    currentSceneOffset: Vec3.zero,
+    targetSceneOffset: Vec3.zero,
+    currentCardOffset: Vec3.zero,
+    targetCardOffset: Vec3.zero,
+    offsetTransition: null,
   }
 
   return {
@@ -195,15 +214,37 @@ export function setMicroVizProgramData(
     state.microViz.renderContext.layout,
   )
   state.microViz.phaseState = phaseState
+  state.camera.zoomReference = phaseState.cameraTarget.angle.z
+  const renderContext = state.microViz.renderContext
+  const sceneOffsetChanged =
+    renderContext.targetSceneOffset.dist(phaseState.sceneOffset) > 0.1 ||
+    renderContext.targetCardOffset.dist(phaseState.cardOffset) > 0.1
+
+  if (!previousPhaseState) {
+    renderContext.currentSceneOffset = phaseState.sceneOffset.clone()
+    renderContext.targetSceneOffset = phaseState.sceneOffset.clone()
+    renderContext.currentCardOffset = phaseState.cardOffset.clone()
+    renderContext.targetCardOffset = phaseState.cardOffset.clone()
+    renderContext.offsetTransition = null
+  } else if (sceneOffsetChanged) {
+    renderContext.offsetTransition = {
+      t: 0,
+      initialSceneOffset: renderContext.currentSceneOffset.clone(),
+      initialCardOffset: renderContext.currentCardOffset.clone(),
+    }
+    renderContext.targetSceneOffset = phaseState.sceneOffset.clone()
+    renderContext.targetCardOffset = phaseState.cardOffset.clone()
+    state.markDirty()
+  }
+
   uploadMicroVizFrame(
-    state.microViz.renderContext,
+    renderContext,
     state.microViz.sceneModelData,
     phaseState,
     data.trace,
     data.contextTokens,
   )
-  applyMicroVizPhase(state.microViz.renderContext, phaseState)
-  state.layout.cameraPoses[phaseState.cameraPoseId] = phaseState.cameraTarget
+  applyMicroVizPhase(renderContext, phaseState)
   state.display.blkIdxHover = phaseState.hoverBlockIndices
   state.display.dimHover = phaseState.dimHover
   state.display.topOutputOpacity = phaseState.topOutputOpacity
@@ -216,6 +257,35 @@ export function setMicroVizProgramData(
 
   if (poseChanged) {
     state.camera.desiredCamera = phaseState.cameraTarget
+  }
+}
+
+function updateSceneOffsetTransition(
+  state: MicroVizProgramState,
+  view: IRenderView,
+) {
+  const ctx = state.microViz.renderContext
+  const transition = ctx.offsetTransition
+  if (!transition) {
+    return
+  }
+
+  transition.t = Math.min(1, transition.t + view.dt / 1000 * 1.5)
+  ctx.currentSceneOffset = transition.initialSceneOffset.lerp(
+    ctx.targetSceneOffset,
+    transition.t,
+  )
+  ctx.currentCardOffset = transition.initialCardOffset.lerp(
+    ctx.targetCardOffset,
+    transition.t,
+  )
+
+  if (transition.t >= 1) {
+    ctx.currentSceneOffset = ctx.targetSceneOffset.clone()
+    ctx.currentCardOffset = ctx.targetCardOffset.clone()
+    ctx.offsetTransition = null
+  } else {
+    view.markDirty()
   }
 }
 
@@ -250,17 +320,17 @@ function manageMicroVizMovement(
     nextCenter.z += verticalStep
   }
   if (action === MovementAction.In) {
-    nextAngle.z = Math.max(0.1, nextAngle.z * 0.88)
+    nextAngle.z = clampManualZoom(camera, nextAngle.z * 0.94)
   }
   if (action === MovementAction.Out) {
-    nextAngle.z = Math.min(100000, nextAngle.z * 1.12)
+    nextAngle.z = clampManualZoom(camera, nextAngle.z * 1.08)
   }
 
   const targetPose =
     action === MovementAction.Expand
       ? state.layout.cameraPoses.overview
       : action === MovementAction.Focus
-        ? state.layout.cameraPoses[phaseState.cameraPoseId]
+        ? phaseState.cameraTarget
         : null
 
   if (targetPose) {
@@ -287,6 +357,7 @@ export function runMicroVizProgram(
 
   resetRenderBuffers(state.render)
   resetMicroVizHoverState(state.microViz.renderContext)
+  updateSceneOffsetTransition(state, view)
   applyMicroVizPhase(state.microViz.renderContext, phaseState)
   state.display.lines = [...phaseState.lines]
   state.display.hoverTarget = null
@@ -304,7 +375,14 @@ export function runMicroVizProgram(
   genModelViewMatrices(state as never, state.layout as never)
 
   drawMicroVizArrows(state.render, state.layout, phaseState)
-  drawModelCard(state as never, state.layout as never, 'microgpt', new Vec3())
+  if (phaseState.cameraPoseId === 'overview') {
+    drawModelCard(
+      state as never,
+      state.layout as never,
+      'microgpt',
+      state.microViz.renderContext.currentCardOffset,
+    )
+  }
   drawBlockInfo(state as never)
   runMouseHitTesting(state as never)
   state.render.sharedRender.activePhase = RenderPhase.Opaque
