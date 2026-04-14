@@ -1,6 +1,6 @@
 import { createTokenizer } from './tokenizer'
 import { ReferenceCpuEngine } from './cpuEngine'
-import { WebGpuEngine } from './webgpuEngine'
+import { WebGpuEngine, WebGpuInitError } from './webgpuEngine'
 import { maxAbsDiff } from './math'
 import type {
   BackendName,
@@ -45,9 +45,12 @@ export class MicrogptRuntime {
         this.backend = 'webgpu'
       }
     } catch (error) {
-      console.warn('WebGPU init failed, falling back to CPU.', error)
       this.backend = 'cpu'
-      this.fallbackReason = 'WebGPU failed to initialize.'
+      this.fallbackReason = this.describeInitFallback(error)
+
+      if (!this.isExpectedInitFallback(error)) {
+        console.warn('WebGPU init failed, falling back to CPU.', error)
+      }
     }
 
     return this.diagnostics
@@ -122,6 +125,30 @@ export class MicrogptRuntime {
     return {
       logitsDiff: maxAbsDiff(cpuTrace.logits, gpuTrace.logits),
       probsDiff: maxAbsDiff(cpuTrace.probs, gpuTrace.probs),
+    }
+  }
+
+  private isExpectedInitFallback(error: unknown) {
+    return (
+      error instanceof WebGpuInitError &&
+      (error.code === 'unavailable' || error.code === 'adapter-unavailable')
+    )
+  }
+
+  private describeInitFallback(error: unknown) {
+    if (!(error instanceof WebGpuInitError)) {
+      return 'WebGPU failed to initialize.'
+    }
+
+    switch (error.code) {
+      case 'unavailable':
+        return 'WebGPU is unavailable in this browser.'
+      case 'adapter-unavailable':
+        return 'WebGPU is supported here, but no GPU adapter is available on this device.'
+      case 'device-unavailable':
+        return 'WebGPU found an adapter but failed to create a device.'
+      default:
+        return 'WebGPU failed to initialize.'
     }
   }
 }

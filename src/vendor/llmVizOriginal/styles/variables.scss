@@ -1,4 +1,6 @@
 
+@use 'sass:color';
+
 // media query
 $phone-width:  'screen and (max-width: 800px)';
 
@@ -7,6 +9,6 @@ $color-highlight: #0c61e2;
 
 $color-text-light: #696969;
 
-$color-highlight-dark: darken($color-highlight, 10%);
+$color-highlight-dark: color.adjust($color-highlight, $lightness: -10%);
 
 $color-red: #c20101;

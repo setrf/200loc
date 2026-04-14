@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { MicrogptRuntime } from '../model'
+import { WebGpuInitError } from '../model/webgpuEngine'
 import type { SessionState } from '../model'
 import { loadBundle, makeTrace } from './helpers/fixtures'
 
@@ -123,6 +124,35 @@ describe('MicrogptRuntime', () => {
       fallbackReason: 'WebGPU failed to initialize.',
     })
     expect(consoleWarn).toHaveBeenCalled()
+
+    const adapterlessRuntime = new MicrogptRuntime(loadBundle()) as any
+    adapterlessRuntime.cpu = {
+      init: vi.fn(),
+      runPrefix: vi.fn(),
+      step: vi.fn(),
+      dispose: vi.fn(),
+    }
+    adapterlessRuntime.gpu = {
+      supported: true,
+      init: vi
+        .fn()
+        .mockRejectedValue(
+          new WebGpuInitError(
+            'adapter-unavailable',
+            'No WebGPU adapter is available on this device',
+          ),
+        ),
+      runPrefix: vi.fn(),
+      step: vi.fn(),
+      dispose: vi.fn(),
+    }
+    const adapterlessDiagnostics = await adapterlessRuntime.init()
+    expect(adapterlessDiagnostics).toEqual({
+      activeBackend: 'cpu',
+      fallbackReason:
+        'WebGPU is supported here, but no GPU adapter is available on this device.',
+    })
+    expect(consoleWarn).toHaveBeenCalledTimes(1)
     consoleWarn.mockRestore()
   })
 

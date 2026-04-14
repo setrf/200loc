@@ -127,7 +127,7 @@ describe('WebGpuEngine', () => {
     const missingAdapter = new WebGpuEngine()
     expect(missingAdapter.supported).toBe(true)
     await expect(missingAdapter.init(loadBundle())).rejects.toThrow(
-      'Failed to acquire a WebGPU adapter',
+      'No WebGPU adapter is available on this device',
     )
   })
 

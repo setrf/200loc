@@ -9,6 +9,20 @@ import type {
 
 const WORKGROUP_SIZE = 64
 
+export class WebGpuInitError extends Error {
+  code: 'unavailable' | 'adapter-unavailable' | 'device-unavailable'
+
+  constructor(
+    code: 'unavailable' | 'adapter-unavailable' | 'device-unavailable',
+    message: string,
+    options?: ErrorOptions,
+  ) {
+    super(message, options)
+    this.name = 'WebGpuInitError'
+    this.code = code
+  }
+}
+
 interface GpuBufferSet {
   tokenIndex: GPUBuffer
   positionIndex: GPUBuffer
@@ -59,15 +73,26 @@ export class WebGpuEngine implements InferenceEngine {
     this.bundle = bundle
 
     if (!this.supported) {
-      throw new Error('WebGPU is unavailable')
+      throw new WebGpuInitError('unavailable', 'WebGPU is unavailable')
     }
 
     const adapter = await navigator.gpu.requestAdapter()
     if (!adapter) {
-      throw new Error('Failed to acquire a WebGPU adapter')
+      throw new WebGpuInitError(
+        'adapter-unavailable',
+        'No WebGPU adapter is available on this device',
+      )
     }
 
-    this.device = await adapter.requestDevice()
+    try {
+      this.device = await adapter.requestDevice()
+    } catch (error) {
+      throw new WebGpuInitError(
+        'device-unavailable',
+        'Failed to create a WebGPU device',
+        { cause: error },
+      )
+    }
     this.createResources(bundle)
   }
 

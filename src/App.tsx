@@ -34,10 +34,21 @@ export default function App() {
   const tokenizerRef = useRef<ReturnType<typeof createTokenizer> | null>(null)
   const advancingRef = useRef(false)
   const [reducedMotion, setReducedMotion] = useState(false)
+  const [mobileViewport, setMobileViewport] = useState(false)
 
   useEffect(() => {
     const media = window.matchMedia('(prefers-reduced-motion: reduce)')
     const update = () => setReducedMotion(media.matches)
+    update()
+    media.addEventListener('change', update)
+    return () => {
+      media.removeEventListener('change', update)
+    }
+  }, [])
+
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 1023px)')
+    const update = () => setMobileViewport(media.matches)
     update()
     media.addEventListener('change', update)
     return () => {
@@ -252,6 +263,7 @@ export default function App() {
     state.activeTraceIndex < state.traces.length - 1 ||
     state.status !== 'terminal'
   const transitionLabel = `p${trace.positionId}:${currentTokenLabel} -> p${trace.positionId + 1}:${nextTokenLabel}`
+  const showScene = !mobileViewport || state.mobileTab === 'scene'
 
   return (
     <div className="app-shell">
@@ -343,14 +355,16 @@ export default function App() {
               state.mobileTab === 'scene' ? 'is-active' : ''
             }`}
           >
-            <ArchitectureScene
-              trace={trace}
-              phase={phase}
-              contextTokens={contextTokens}
-              tokenLabel={tokenLabel}
-              sceneModelData={sceneModelData}
-              onFocusRanges={handleFocusRanges}
-            />
+            {showScene ? (
+              <ArchitectureScene
+                trace={trace}
+                phase={phase}
+                contextTokens={contextTokens}
+                tokenLabel={tokenLabel}
+                sceneModelData={sceneModelData}
+                onFocusRanges={handleFocusRanges}
+              />
+            ) : null}
           </div>
         </section>
       </main>

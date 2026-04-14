@@ -1,4 +1,4 @@
-@import '@llmviz/styles/variables.scss';
+@use '@llmviz/styles/variables.scss' as *;
 
 .title {
     margin: 8px 0;

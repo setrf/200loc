@@ -9,8 +9,17 @@ const iPhone13 = {
 }
 
 type BrowserIssue = {
-  kind: 'console' | 'pageerror'
+  kind: 'console-error' | 'console-warning' | 'pageerror'
   text: string
+}
+
+const ignoredWarningPatterns = [
+  /GL Driver Message .*ReadPixels/i,
+  /^No available adapters\.$/i,
+]
+
+function shouldIgnoreWarning(text: string) {
+  return ignoredWarningPatterns.some((pattern) => pattern.test(text))
 }
 
 function collectBrowserIssues(page: Page) {
@@ -18,7 +27,14 @@ function collectBrowserIssues(page: Page) {
 
   page.on('console', (message) => {
     if (message.type() === 'error') {
-      issues.push({ kind: 'console', text: message.text() })
+      issues.push({ kind: 'console-error', text: message.text() })
+    }
+
+    if (message.type() === 'warning') {
+      const text = message.text()
+      if (!shouldIgnoreWarning(text)) {
+        issues.push({ kind: 'console-warning', text })
+      }
     }
   })
 

@@ -1,4 +1,4 @@
-@import "@llmviz/styles/variables.scss";
+@use "@llmviz/styles/variables.scss" as *;
 
 .controls {
     position: absolute;
