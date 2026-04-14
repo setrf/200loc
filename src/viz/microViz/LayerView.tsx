@@ -51,6 +51,17 @@ interface CanvasData {
   scene: MicroVizProgramData
 }
 
+function setDebugProgramState(state: MicroVizProgramState | null) {
+  const globalWithDebug = globalThis as typeof globalThis & {
+    __microVizDebug?: MicroVizProgramState
+  }
+  if (state) {
+    globalWithDebug.__microVizDebug = state
+  } else if (globalWithDebug.__microVizDebug) {
+    delete globalWithDebug.__microVizDebug
+  }
+}
+
 class MicroCanvasRender {
   progState: MicroVizProgramState
   stopped = false
@@ -323,6 +334,7 @@ export const MicroLayerView = forwardRef<MicroLayerViewHandle, MicroLayerViewPro
           resizeObserver.observe(activeCanvas)
           activeCanvas.addEventListener('wheel', handleWheel, { passive: false })
           setCanvasRender(canvasRenderLocal)
+          setDebugProgramState(canvasRenderLocal.progState)
           onRenderModeChange('webgl')
         } catch {
           if (!stale) {
@@ -339,6 +351,7 @@ export const MicroLayerView = forwardRef<MicroLayerViewHandle, MicroLayerViewPro
         activeCanvas.removeEventListener('wheel', handleWheel)
         resizeObserver?.disconnect()
         canvasRenderLocal?.destroy()
+        setDebugProgramState(null)
         setCanvasRender(null)
       }
     }, [canvasEl, onHoverFocusChange, onRenderModeChange, sceneModelData])

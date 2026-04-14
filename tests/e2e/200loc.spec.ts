@@ -290,6 +290,49 @@ test.describe('desktop walkthrough', () => {
     expect(issues).toEqual([])
   })
 
+  test('preserves manual zoom across same-region phase advances', async ({ page }) => {
+    const issues = collectBrowserIssues(page)
+    const scene = page.locator('.scene-panel')
+    const eventSurface = page.locator('.scene-panel__event-surface')
+    await scene.scrollIntoViewIfNeeded()
+    await expect(page.locator('.scene-panel canvas')).toBeVisible()
+
+    const box = await eventSurface.boundingBox()
+    if (!box) {
+      throw new Error('Scene event surface bounding box was not available')
+    }
+
+    const readCameraZoom = () =>
+      page.evaluate(() => {
+        const win = window as Window & {
+          __microVizDebug?: { camera?: { angle?: { z?: number } } }
+        }
+        return win.__microVizDebug?.camera?.angle?.z ?? null
+      })
+
+    const initialZoom = await readCameraZoom()
+    expect(initialZoom).not.toBeNull()
+
+    await page.mouse.move(box.x + box.width * 0.5, box.y + box.height * 0.55)
+    await page.mouse.wheel(0, 900)
+    await page.waitForTimeout(500)
+
+    const zoomed = await readCameraZoom()
+    expect(zoomed).not.toBeNull()
+    expect(zoomed).not.toBe(initialZoom)
+
+    await advanceOnePhase(page)
+    const afterFirstStep = await readCameraZoom()
+    await advanceOnePhase(page)
+    const afterSecondStep = await readCameraZoom()
+
+    expect(afterFirstStep).not.toBeNull()
+    expect(afterSecondStep).not.toBeNull()
+    expect(Math.abs((afterFirstStep ?? 0) - (zoomed ?? 0))).toBeLessThan(0.25)
+    expect(Math.abs((afterSecondStep ?? 0) - (zoomed ?? 0))).toBeLessThan(0.25)
+    expect(issues).toEqual([])
+  })
+
   test('shows in-scene hover readouts for access-backed matrices', async ({
     page,
   }) => {

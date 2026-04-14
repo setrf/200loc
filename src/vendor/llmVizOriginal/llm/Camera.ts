@@ -174,6 +174,20 @@ export function updateCamera(state: IProgramState, view: IRenderView) {
     }
 }
 
+export function cancelCameraMotion(camera: ICamera) {
+    camera.desiredCamera = undefined;
+    camera.desiredCameraTransition = undefined;
+    camera.centerDesired = undefined;
+    camera.angleDesired = undefined;
+    camera.angleZDesired = undefined;
+    camera.transition.centerT = undefined;
+    camera.transition.angleT = undefined;
+    camera.transition.angleZT = undefined;
+    camera.transition.centerInit = undefined;
+    camera.transition.angleInit = undefined;
+    camera.transition.angleZInit = undefined;
+}
+
 
 export interface ISpringConfig {
     tension: number;

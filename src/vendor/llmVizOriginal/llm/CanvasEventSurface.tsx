@@ -4,6 +4,7 @@ import { useProgramState } from "./Sidebar";
 import { clamp } from "@llmviz/utils/data";
 import { useGlobalDrag, useTouchEvents } from "@llmviz/utils/pointer";
 import { Vec3 } from "@llmviz/utils/vector";
+import { cancelCameraMotion } from "./Camera";
 import s from './LayerView.module.scss';
 
 export const CanvasEventSurface: React.FC<{
@@ -13,6 +14,7 @@ export const CanvasEventSurface: React.FC<{
     let progState = useProgramState();
 
     let updateRenderState = useCallback((fn: (ps: IProgramState) => void) => {
+        cancelCameraMotion(progState.camera);
         fn(progState);
         progState.markDirty();
     }, [progState]);

@@ -4,6 +4,7 @@ import type { VizFrame } from '../llmViz/types'
 import type { ICamera } from '../../vendor/llmVizOriginal/llm/Camera'
 import type { IBlkDef } from '../../vendor/llmVizOriginal/llm/GptModelLayout'
 import {
+  cancelCameraMotion,
   genModelViewMatrices,
   updateCamera,
 } from '../../vendor/llmVizOriginal/llm/Camera'
@@ -263,9 +264,11 @@ function manageMicroVizMovement(
         : null
 
   if (targetPose) {
+    cancelCameraMotion(state.camera)
     state.camera.center = targetPose.center.clone()
     state.camera.angle = targetPose.angle.clone()
   } else {
+    cancelCameraMotion(state.camera)
     state.camera.center = nextCenter
     state.camera.angle = nextAngle
   }
