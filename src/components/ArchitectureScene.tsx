@@ -195,14 +195,26 @@ export function ArchitectureScene({
     [abstractLayout, viewportSize, vizFrame.cameraPoseId],
   )
 
-  const handleLayerHoverChange = useCallback(
+  const setHoverFocusState = useCallback(
     (focusId: FocusRangeKey | null) => {
-      setHoverFocusId({
-        phaseId: phase.id,
-        focusId,
+      setHoverFocusId((current) => {
+        if (current.phaseId === phase.id && current.focusId === focusId) {
+          return current
+        }
+        return {
+          phaseId: phase.id,
+          focusId,
+        }
       })
     },
     [phase.id],
+  )
+
+  const handleLayerHoverChange = useCallback(
+    (focusId: FocusRangeKey | null) => {
+      setHoverFocusState(focusId)
+    },
+    [setHoverFocusState],
   )
 
   const updateHoverFromPoint = useCallback(
@@ -216,14 +228,14 @@ export function ArchitectureScene({
         y: clientY - bounds.top,
       })
       if (!focusId) {
-        setHoverFocusId({ phaseId: phase.id, focusId: null })
+        setHoverFocusState(null)
         return
       }
       const nextFocusId =
         focusId in vizFocusRanges ? (focusId as FocusRangeKey) : null
-      setHoverFocusId({ phaseId: phase.id, focusId: nextFocusId })
+      setHoverFocusState(nextFocusId)
     },
-    [phase.id, projectedScene, renderMode],
+    [projectedScene, renderMode, setHoverFocusState],
   )
 
   useEffect(() => {
@@ -246,7 +258,7 @@ export function ArchitectureScene({
       aria-label="Architecture scene"
       onMouseEnter={() => onFocusRanges(phase.codeRanges)}
       onMouseLeave={() => {
-        setHoverFocusId({ phaseId: phase.id, focusId: null })
+        setHoverFocusState(null)
         onFocusRanges(null)
       }}
     >
@@ -255,7 +267,7 @@ export function ArchitectureScene({
         data-testid="scene-viewport"
         ref={viewportRef}
         onMouseMove={(event) => updateHoverFromPoint(event.clientX, event.clientY)}
-        onMouseLeave={() => setHoverFocusId({ phaseId: phase.id, focusId: null })}
+        onMouseLeave={() => setHoverFocusState(null)}
         onDoubleClick={handleViewportDoubleClick}
         onContextMenu={(event) => event.preventDefault()}
       >
