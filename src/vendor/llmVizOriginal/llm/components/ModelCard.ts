@@ -26,6 +26,11 @@ export interface IModelCardLayoutMetrics {
     paramY: number;
 }
 
+export interface IModelCardVisibility {
+    scale: number;
+    opacity: number;
+}
+
 function fitTextScale(textWidth: number, preferredScale: number, maxWidth: number, minScale: number) {
     if (textWidth <= 0 || maxWidth <= 0) {
         return preferredScale;
@@ -104,21 +109,37 @@ export function computeModelCardLayout(
     };
 }
 
+export function computeModelCardVisibility(currentZoom: number, referenceZoom: number) : IModelCardVisibility {
+    if (referenceZoom <= 0) {
+        return { scale: 1.0, opacity: 1.0 };
+    }
+
+    let zoomRatio = clamp(currentZoom / referenceZoom, 0.0, 2.0);
+    let opacity = clamp((zoomRatio - 0.62) / 0.28, 0.0, 1.0);
+    let scale = lerp(0.72, 1.0, opacity);
+    return { scale, opacity };
+}
+
 export function drawModelCard(state: IProgramState, layout: IGptModelLayout, title: string, offset: Vec3) {
     let { render } = state;
     let { camPos } = cameraToMatrixView(state.camera);
     let dist = camPos.dist(new Vec3(0, 0, -30)); //.add(offset));
 
-    let scale = clamp(dist / 500.0, 1.0, 800.0);
+    let visibility = computeModelCardVisibility(state.camera.angle.z, state.camera.zoomReference ?? state.camera.angle.z);
+    if (visibility.opacity <= 0.02) {
+        return;
+    }
+
+    let scale = clamp(dist / 500.0, 1.0, 800.0) * visibility.scale;
 
     let pinY = -118;
     let mtx = Mat4f.fromScaleTranslation(new Vec3(scale, scale, scale), new Vec3(0, pinY, 0).add(offset))
         .mul(Mat4f.fromTranslation(new Vec3(0, -pinY, 0)));
 
     let thick = 1.0 / 10.0 * scale;
-    let borderColor = Vec4.fromHexColor("#555599", 0.8);
-    let backgroundColor = Vec4.fromHexColor("#93c5fd", 0.3);
-    let titleColor = Vec4.fromHexColor("#000000", 1.0);
+    let borderColor = Vec4.fromHexColor("#555599", 0.8 * visibility.opacity);
+    let backgroundColor = Vec4.fromHexColor("#93c5fd", 0.3 * visibility.opacity);
+    let titleColor = Vec4.fromHexColor("#000000", visibility.opacity);
     let n = new Vec3(0, 0, 1);
 
     let lineOpts: ILineOpts = { color: borderColor, mtx, thick, n };
