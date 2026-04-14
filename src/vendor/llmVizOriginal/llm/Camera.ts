@@ -143,6 +143,19 @@ export function cameraMoveToDesired(camera: ICamera, dt: number) {
 }
 
 export function updateCamera(state: IProgramState, view: IRenderView) {
+    // A new target should supersede any in-flight transition immediately.
+    if (state.camera.desiredCamera) {
+        state.camera.desiredCameraTransition = {
+            t: 0,
+            initialPos: {
+                center: state.camera.center.clone(),
+                angle: state.camera.angle.clone(),
+            },
+            targetPos: state.camera.desiredCamera,
+        }
+        state.camera.desiredCamera = undefined;
+        view.markDirty();
+    }
 
     let transition = state.camera.desiredCameraTransition;
 
@@ -158,20 +171,6 @@ export function updateCamera(state: IProgramState, view: IRenderView) {
         } else {
             state.camera.desiredCameraTransition = undefined;
         }
-    }
-
-    // take a frame before we start moving the camera
-    if (state.camera.desiredCamera) {
-        state.camera.desiredCameraTransition = {
-            t: 0,
-            initialPos: {
-                center: state.camera.center,
-                angle: state.camera.angle,
-            },
-            targetPos: state.camera.desiredCamera,
-        }
-        state.camera.desiredCamera = undefined;
-        view.markDirty();
     }
 }
 
