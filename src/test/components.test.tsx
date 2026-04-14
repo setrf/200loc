@@ -1,9 +1,11 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ArchitectureScene } from '../components/ArchitectureScene'
+import { getFallbackCameraPoseForPhase } from '../components/architectureSceneFallback'
 import { CodeViewer } from '../components/CodeViewer'
 import { Controls } from '../components/Controls'
 import { SegmentTabs } from '../components/SegmentTabs'
+import { getCameraPose } from '../viz/llmViz/layout'
 import { inferencePhases, trainingAppendix } from '../walkthrough/phases'
 import { loadBundle, makeTrace } from './helpers/fixtures'
 
@@ -53,17 +55,87 @@ describe('ui components', () => {
   it('highlights active code lines', () => {
     render(
       <CodeViewer
-        source={'first\nsecond\nthird'}
+        source={'def first():\n    print("second")\nthird'}
         activeRanges={[{ start: 2, end: 2 }]}
       />,
     )
-    expect(screen.getByText('second').closest('li')).toHaveClass('is-active')
+    expect(screen.getByText('Python')).toBeInTheDocument()
+    expect(screen.getByText('print')).toHaveClass('code-viewer__token--builtin')
+    expect(screen.getByText('"second"')).toHaveClass('code-viewer__token--string')
+    expect(screen.getByText('print').closest('li')).toHaveClass('is-active')
+    expect(screen.getByText('first')).toHaveClass('code-viewer__token--definition')
     expect(screen.getByText('first').closest('li')).not.toHaveClass('is-active')
   })
 
   it('renders blank code lines safely', () => {
     render(<CodeViewer source={'first\n\nthird'} activeRanges={[]} />)
     expect(screen.getAllByRole('listitem')).toHaveLength(3)
+  })
+
+  it('auto-scrolls the first active code line into view when the range changes', () => {
+    const scrollIntoView = vi.fn()
+    Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
+      configurable: true,
+      value: scrollIntoView,
+    })
+
+    const { rerender } = render(
+      <CodeViewer
+        source={'line one\nline two\nline three\nline four'}
+        activeRanges={[{ start: 2, end: 2 }]}
+      />,
+    )
+
+    expect(scrollIntoView).toHaveBeenCalledWith({ block: 'center', behavior: 'smooth' })
+
+    scrollIntoView.mockClear()
+
+    rerender(
+      <CodeViewer
+        source={'line one\nline two\nline three\nline four'}
+        activeRanges={[{ start: 4, end: 4 }]}
+      />,
+    )
+
+    expect(scrollIntoView).toHaveBeenCalledWith({ block: 'center', behavior: 'smooth' })
+    expect(screen.getAllByRole('listitem')).toHaveLength(4)
+  })
+
+  it('does not auto-scroll when the active line is already visible', () => {
+    const scrollIntoView = vi.fn()
+    Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
+      configurable: true,
+      value: scrollIntoView,
+    })
+    const rect = (top: number, bottom: number, height: number) => ({
+      x: 0,
+      y: top,
+      top,
+      bottom,
+      left: 0,
+      right: 0,
+      width: 0,
+      height,
+      toJSON: () => ({}),
+    })
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      if (this.tagName === 'OL') {
+        return rect(0, 240, 240)
+      }
+      if (this.tagName === 'LI') {
+        return rect(40, 72, 32)
+      }
+      return rect(0, 0, 0)
+    })
+
+    render(
+      <CodeViewer
+        source={'line one\nline two\nline three\nline four'}
+        activeRanges={[{ start: 2, end: 2 }]}
+      />,
+    )
+
+    expect(scrollIntoView).not.toHaveBeenCalled()
   })
 
   it('renders the story controls, appendix toggle, and hover mapping', () => {
@@ -143,6 +215,16 @@ describe('ui components', () => {
     expect(onFocusRanges).toHaveBeenCalledWith(inferencePhases[1].codeRanges)
     fireEvent.mouseLeave(scene)
     expect(onFocusRanges).toHaveBeenLastCalledWith(null)
+
+    fireEvent.mouseEnter(document.querySelector('.scene-panel__fallback-edge')!)
+    expect(onFocusRanges).toHaveBeenLastCalledWith(inferencePhases[1].codeRanges)
+    fireEvent.mouseLeave(document.querySelector('.scene-panel__fallback-edge')!)
+    expect(onFocusRanges).toHaveBeenLastCalledWith(null)
+
+    fireEvent.mouseEnter(document.querySelector('.scene-panel__fallback-node')!)
+    expect(onFocusRanges).toHaveBeenLastCalledWith(inferencePhases[1].codeRanges)
+    fireEvent.mouseLeave(document.querySelector('.scene-panel__fallback-node')!)
+    expect(onFocusRanges).toHaveBeenLastCalledWith(null)
   })
 
   it('keeps the scene shell stable as phases change', async () => {
@@ -200,5 +282,21 @@ describe('ui components', () => {
 
     expect(screen.getByTestId('fallback-scene')).toBeInTheDocument()
     expect(screen.queryByText('append or stop')).not.toBeInTheDocument()
+  })
+
+  it('uses phase-specific fallback framing for the lower readout phases', () => {
+    const lmHeadPose = getFallbackCameraPoseForPhase(inferencePhases[10]!)
+    const probabilitiesPose = getFallbackCameraPoseForPhase(inferencePhases[11]!)
+    const samplePose = getFallbackCameraPoseForPhase(inferencePhases[12]!)
+    const defaultPose = getFallbackCameraPoseForPhase({
+      ...inferencePhases[0]!,
+      id: 'unknown-phase',
+    } as typeof inferencePhases[number])
+
+    expect(lmHeadPose.panY).toBeLessThan(-880)
+    expect(probabilitiesPose.panY).toBeLessThan(lmHeadPose.panY)
+    expect(samplePose.panY).toBeLessThan(probabilitiesPose.panY)
+    expect(samplePose.scale).toBeGreaterThan(probabilitiesPose.scale)
+    expect(defaultPose).toEqual(getCameraPose(inferencePhases[0]!.viz.cameraPoseId))
   })
 })

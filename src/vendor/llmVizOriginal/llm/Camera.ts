@@ -105,7 +105,7 @@ export function camScaleToScreen(state: IProgramState, modelPt: Vec3) {
 
 export function cameraMoveToDesired(camera: ICamera, dt: number) {
 
-    // This is making me nauseous. Gonna do jump-to instead of smooth transition for now.
+    // Move toward the current guided camera target over a short transition.
 
     // We'll use the velocity to check if we've applied the desired value, so we know when to
     // modify the main camera

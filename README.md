@@ -19,7 +19,7 @@ It keeps one promise: show how a tiny GPT performs next-token inference, step by
 - No backend.
 - No training simulation in the browser.
 - No model picker or arbitrary checkpoint loader.
-- No 3D scene or pan-and-zoom world.
+- One guided scene, not a dashboard of separate panels.
 
 ## Stack
 
@@ -29,13 +29,16 @@ It keeps one promise: show how a tiny GPT performs next-token inference, step by
 - Plain CSS
 - Native WebGPU API
 - Vitest + Testing Library
+- Playwright
 
 ## Project Layout
 
 - `src/App.tsx`: app shell, bootstrap, walkthrough orchestration
 - `src/model/`: tokenizer, CPU engine, WebGPU engine, runtime coordination
 - `src/walkthrough/`: phase definitions and reducer-driven UI state
-- `src/components/`: code viewer, controls, appendix, and tensor cards
+- `src/components/`: code viewer, controls, tabs, and the architecture scene shell
+- `src/viz/microViz/`: microgpt scene layout, bridge, and program logic
+- `src/vendor/llmVizOriginal/`: Brendan Bycroft render, camera, and interaction code reused by the scene
 - `public/assets/microgpt.py`: canonical reference source shown in the UI
 - `public/assets/microgpt-model.json`: exported tiny checkpoint used in the browser
 - `scripts/export_microgpt_bundle.py`: offline export path for rebuilding the model bundle
@@ -89,11 +92,13 @@ npm run build
 
 ## Verification
 
-The current test suite covers all `src/**/*.ts(x)` files at:
+Use the standard checks to verify the current tree:
 
-- `100%` statements
-- `100%` branches
-- `100%` functions
-- `100%` lines
+```bash
+npm test
+npx vitest run --coverage
+npm run lint
+npm run build
+```
 
-That includes tokenizer behavior, math helpers, CPU inference, WebGPU runtime behavior, reducer transitions, component rendering, and the single-page app flow.
+That suite covers tokenizer behavior, math helpers, CPU inference, WebGPU runtime behavior, reducer transitions, component rendering, the single-page app flow, and the Playwright browser checks.

@@ -1,5 +1,5 @@
 """
-Train Karpathy's microgpt.py exactly once and export a tiny JSON bundle for the browser.
+Train Karpathy's microgpt.py and export the browser bundle used by the app.
 """
 
 from __future__ import annotations
