@@ -132,11 +132,11 @@ describe('ui components', () => {
       />,
     )
 
-    expect(screen.getByText('microgpt scene')).toBeInTheDocument()
     expect(await screen.findByTestId('fallback-scene')).toBeInTheDocument()
-    expect(screen.getAllByText('wte').length).toBeGreaterThan(0)
+    expect(screen.getByText('drag to pan · wheel to zoom · double click to reset')).toBeInTheDocument()
     expect(screen.queryByText('Original llm-viz')).not.toBeInTheDocument()
     expect(screen.queryByTestId('vendored-layer-view')).not.toBeInTheDocument()
+    expect(screen.queryByText('visible cache')).not.toBeInTheDocument()
 
     const scene = screen.getByLabelText('Architecture scene')
     fireEvent.mouseEnter(scene)
@@ -145,7 +145,7 @@ describe('ui components', () => {
     expect(onFocusRanges).toHaveBeenLastCalledWith(null)
   })
 
-  it('switches the microgpt focus window as phases change', async () => {
+  it('keeps the scene shell stable as phases change', async () => {
     const { rerender } = render(
       <ArchitectureScene
         trace={makeTrace()}
@@ -157,7 +157,8 @@ describe('ui components', () => {
       />,
     )
 
-    expect(await screen.findByText('attention scores')).toBeInTheDocument()
+    expect(await screen.findByTestId('fallback-scene')).toBeInTheDocument()
+    expect(screen.queryByText('attention scores')).not.toBeInTheDocument()
 
     rerender(
       <ArchitectureScene
@@ -170,7 +171,8 @@ describe('ui components', () => {
       />,
     )
 
-    expect(screen.getByText('attention weights')).toBeInTheDocument()
+    expect(screen.getByTestId('fallback-scene')).toBeInTheDocument()
+    expect(screen.queryByText('attention weights')).not.toBeInTheDocument()
 
     rerender(
       <ArchitectureScene
@@ -183,7 +185,7 @@ describe('ui components', () => {
       />,
     )
 
-    expect(screen.getByText('mlp block')).toBeInTheDocument()
+    expect(screen.getByTestId('fallback-scene')).toBeInTheDocument()
 
     rerender(
       <ArchitectureScene
@@ -196,6 +198,7 @@ describe('ui components', () => {
       />,
     )
 
-    expect(screen.getByText('append or stop')).toBeInTheDocument()
+    expect(screen.getByTestId('fallback-scene')).toBeInTheDocument()
+    expect(screen.queryByText('append or stop')).not.toBeInTheDocument()
   })
 })

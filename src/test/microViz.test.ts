@@ -112,12 +112,14 @@ describe('micro viz bridge', () => {
     expect(layout.weightCount).toBe(4192)
     expect(layout.blocks['norm-1'].cube.name).toBe('rmsnorm 1')
     expect(layout.blocks['norm-2'].cube.name).toBe('rmsnorm 2')
-    expect(layout.blocks['q-project'].cube.name).toBe('Wq')
+    expect(layout.blocks['q-project'].cube.name).toBe('Q weights')
     expect(layout.blocks['mlp-fc1'].cube.name).toBe('fc1')
     expect(layout.blocks.sample.cube.name).toBe('sample / stop')
     expect(layout.edges.some((edge) => edge.id === 'probabilities-to-sample')).toBe(
       true,
     )
+    expect(layout.transformerBlocks).toHaveLength(1)
+    expect(layout.model.inputTokens.localBuffer).toHaveLength(16)
   })
 
   it('maps walkthrough phases onto microgpt blocks, edges, and bindings', () => {
@@ -214,26 +216,36 @@ describe('micro viz bridge', () => {
       bundle,
       phaseState,
       trace,
-      3,
+      ['BOS', 'e', 'm'],
     )
 
-    expect(textures.dynamicTextures['context-mask'].localBuffer?.slice(0, 4)).toEqual(
-      Float32Array.from([1, 1, 1, 0]),
+    expect(textures.dynamicTextures.context.localBuffer?.slice(0, 4)).toEqual(
+      Float32Array.from([1, 4 / 26, 12 / 26, 0]),
     )
-    expect(textures.dynamicTextures['x-after-embed'].localBuffer).toEqual(
-      Float32Array.from(trace.xAfterEmbed),
+    expect(textures.dynamicTextures['residual-grid'].localBuffer?.length).toBe(256)
+    const weightRowStart = trace.positionId * bundle.config.blockSize
+    expect(
+      textures.dynamicTextures['attention-head-1-weights'].localBuffer?.slice(
+        weightRowStart,
+        weightRowStart + 4,
+      ),
+    ).toEqual(
+      Float32Array.from([
+        trace.heads[0]!.weights[0]!,
+        trace.heads[0]!.weights[1]!,
+        trace.heads[0]!.weights[2]!,
+        0,
+      ]),
     )
-    expect(textures.dynamicTextures['attention-head-1-weights'].localBuffer?.slice(0, 3)).toEqual(
-      Float32Array.from(trace.heads[0]!.weights),
-    )
-    expect(textures.dynamicTextures.sample.localBuffer?.[trace.sampledTokenId]).toBe(1)
+    expect(textures.dynamicTextures['sample-grid'].localBuffer?.[trace.positionId]).toBe(1)
     expect(layout.blocks['token-embedding'].cube.access?.src).toBe(textures.staticTextures.wte)
     expect(layout.blocks['attention-head-1'].cube.access?.src).toBe(
       textures.dynamicTextures['attention-head-1-weights'],
     )
     expect(layout.blocks.probabilities.cube.access?.src).toBe(
-      textures.dynamicTextures.probs,
+      textures.dynamicTextures['probs-grid'],
     )
+    expect(layout.model.inputLen).toBe(3)
   })
 
   it('applies phase focus and connector emphasis to the bridged scene', () => {
@@ -268,9 +280,9 @@ describe('micro viz bridge', () => {
       phaseState,
     )
 
-    expect(layout.blocks['q-project'].cube.opacity).toBe(1)
-    expect(layout.blocks['q-project'].cube.highlight).toBe(1)
-    expect(layout.blocks.context.cube.opacity).toBe(0.2)
+    expect(layout.blocks['q-project'].cube.opacity).toBe(0.96)
+    expect(layout.blocks['q-project'].cube.highlight).toBe(0.52)
+    expect(layout.blocks.context.cube.opacity).toBeGreaterThan(0.6)
     expect(ctx.camera.desiredCamera).toBe(layout.cameraPoses.attention)
 
     drawMicroVizEdges(
@@ -281,7 +293,7 @@ describe('micro viz bridge', () => {
     expect(addLineMock).toHaveBeenCalledTimes(layout.edges.length)
     expect(addLineMock).toHaveBeenCalledWith(
       ctx.renderState.lineRender,
-      2.4,
+      2.6,
       expect.anything(),
       expect.anything(),
       expect.anything(),

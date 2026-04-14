@@ -95,14 +95,98 @@ export interface MicroVizEdge {
   codeFocusId: VizEdgeId | VizNodeId | null
 }
 
+export interface MicroVizNormGroup {
+  lnAgg1: IBlkDef
+  lnAgg2: IBlkDef
+  lnSigma: IBlkDef
+  lnMu: IBlkDef
+  lnResid: IBlkDef
+  cubes: IBlkDef[]
+}
+
+export interface MicroVizHeadGroup {
+  qWeightBlock: IBlkDef
+  kWeightBlock: IBlkDef
+  vWeightBlock: IBlkDef
+  qBiasBlock: IBlkDef
+  kBiasBlock: IBlkDef
+  vBiasBlock: IBlkDef
+  qBlock: IBlkDef
+  kBlock: IBlkDef
+  vBlock: IBlkDef
+  attnMtx: IBlkDef
+  attnMtxAgg1: IBlkDef
+  attnMtxAgg2: IBlkDef
+  attnMtxSm: IBlkDef
+  vOutBlock: IBlkDef
+  qLabel: IBlkLabel
+  kLabel: IBlkLabel
+  vLabel: IBlkLabel
+  biasLabel: IBlkLabel
+  mtxLabel: IBlkLabel
+  vectorLabel: IBlkLabel
+  headLabel: IBlkLabel
+  cubes: IBlkDef[]
+  labels: IBlkLabel[]
+}
+
+export interface MicroVizTransformerBlock {
+  ln1: MicroVizNormGroup
+  heads: MicroVizHeadGroup[]
+  cubes: IBlkDef[]
+  labels: IBlkLabel[]
+  transformerLabel: IBlkLabel
+  projLabel: IBlkLabel
+  selfAttendLabel: IBlkLabel
+  mlpLabel: IBlkLabel
+  projWeight: IBlkDef
+  projBias: IBlkDef
+  attnOut: IBlkDef
+  attnResidual: IBlkDef
+  ln2: MicroVizNormGroup
+  mlpFcWeight: IBlkDef
+  mlpFcBias: IBlkDef
+  mlpFc: IBlkDef
+  mlpAct: IBlkDef
+  mlpProjWeight: IBlkDef
+  mlpProjBias: IBlkDef
+  mlpResult: IBlkDef
+  mlpResidual: IBlkDef
+}
+
+export interface MicroVizCardModel {
+  inputTokens: {
+    localBuffer: Float32Array
+  }
+  inputLen: number
+  sortedBuf: Float32Array
+}
+
 export interface MicroVizLayout {
   cubes: IBlkDef[]
   labels: IBlkLabel[]
   blocks: Record<MicroVizBlockId, MicroVizBlock>
+  cubeFocusIds: Record<number, VizNodeId | VizEdgeId | null>
   edges: MicroVizEdge[]
   shape: MicroVizShape
   weightCount: number
   cameraPoses: Record<CameraPoseId, ICameraPos>
+  cell: number
+  margin: number
+  height: number
+  idxObj: IBlkDef
+  tokEmbedObj: IBlkDef
+  posEmbedObj: IBlkDef
+  residual0: IBlkDef
+  embedLabel: IBlkLabel
+  transformerBlocks: MicroVizTransformerBlock[]
+  lmHeadWeight: IBlkDef
+  logits: IBlkDef
+  logitsAgg1: IBlkDef
+  logitsAgg2: IBlkDef
+  logitsSoftmax: IBlkDef
+  logitsTransposed: boolean
+  model: MicroVizCardModel
 }
 
 export type MicroVizStaticModel = SceneModelData

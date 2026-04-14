@@ -4,8 +4,11 @@ import type {
   MicroVizBlockId,
   MicroVizEdge,
   MicroVizEdgeId,
+  MicroVizHeadGroup,
   MicroVizLayout,
+  MicroVizNormGroup,
   MicroVizShape,
+  MicroVizTransformerBlock,
 } from './types'
 import { Mat4f } from '../../vendor/llmVizOriginal/utils/matrix'
 import { Vec3 } from '../../vendor/llmVizOriginal/utils/vector'
@@ -17,10 +20,8 @@ import {
 } from '../../vendor/llmVizOriginal/llm/GptModelLayout'
 import { DimStyle } from '../../vendor/llmVizOriginal/llm/walkthrough/WalkthroughTools'
 
-const defaultDepth = 16
-const headWidth = 58
-const headHeight = 46
-
+const cell = 5
+const margin = 12
 function makeAccessMatrix(x: number[], y: number[]) {
   const x4 = x.length === 4 ? x : [...x, 0]
   const y4 = y.length === 4 ? y : [...y, 0]
@@ -37,43 +38,15 @@ function createAccess(): IBlkAccess {
   }
 }
 
-function makeCube(args: {
-  t: 'w' | 'i' | 'a'
-  x: number
-  y: number
-  z?: number
-  dx: number
-  dy: number
-  dz?: number
-  cx: number
-  cy: number
-  cz?: number
-  name: string
-}) {
-  const cube: IBlkDef = {
-    idx: -1,
-    t: args.t,
-    x: args.x,
-    y: args.y,
-    z: args.z ?? -((args.dz ?? defaultDepth) / 2),
-    dx: args.dx,
-    dy: args.dy,
-    dz: args.dz ?? defaultDepth,
-    cx: args.cx,
-    cy: args.cy,
-    cz: args.cz ?? 1,
-    dimX: args.t === 'w' ? DimStyle.Weights : DimStyle.Intermediates,
-    dimY: args.t === 'w' ? DimStyle.Weights : DimStyle.Intermediates,
-    name: args.name,
-    access: createAccess(),
-    opacity: 1,
-    highlight: 0,
-    small: false,
-    special: BlkSpecial.None,
-    localMtx: Mat4f.identity,
-  }
+function mkLabel(visible: number, cubes: IBlkDef[]) {
+  return { visible, cubes } satisfies IBlkLabel
+}
 
-  return cube
+function countParams(model: SceneModelData) {
+  return Object.values(model.weights).reduce(
+    (total, matrix) => total + matrix.rows * matrix.cols,
+    0,
+  )
 }
 
 function makeBlock(
@@ -93,353 +66,7 @@ function makeEdge(
   return { id, from, to, codeFocusId } satisfies MicroVizEdge
 }
 
-function countParams(model: SceneModelData) {
-  return Object.values(model.weights).reduce(
-    (total, matrix) => total + matrix.rows * matrix.cols,
-    0,
-  )
-}
-
 export function buildMicroVizLayout(model: SceneModelData): MicroVizLayout {
-  const blocks = {
-    context: makeBlock(
-      'context',
-      makeCube({
-        t: 'a',
-        x: -88,
-        y: 36,
-        dx: 176,
-        dy: 22,
-        dz: 12,
-        cx: model.config.blockSize,
-        cy: 1,
-        name: 'context',
-      }),
-      'context',
-    ),
-    'token-embedding': makeBlock(
-      'token-embedding',
-      makeCube({
-        t: 'w',
-        x: -112,
-        y: 96,
-        dx: 74,
-        dy: 88,
-        cx: model.weights.wte.cols,
-        cy: model.weights.wte.rows,
-        name: 'token embed',
-      }),
-      'token-embedding',
-    ),
-    'position-embedding': makeBlock(
-      'position-embedding',
-      makeCube({
-        t: 'w',
-        x: 40,
-        y: 96,
-        dx: 74,
-        dy: 72,
-        cx: model.weights.wpe.cols,
-        cy: model.weights.wpe.rows,
-        name: 'position embed',
-      }),
-      'position-embedding',
-    ),
-    'residual-stream': makeBlock(
-      'residual-stream',
-      makeCube({
-        t: 'i',
-        x: -58,
-        y: 214,
-        dx: 116,
-        dy: 24,
-        cx: model.config.nEmbd,
-        cy: 1,
-        name: 'residual',
-      }),
-      'residual-stream',
-    ),
-    'norm-1': makeBlock(
-      'norm-1',
-      makeCube({
-        t: 'i',
-        x: -46,
-        y: 270,
-        dx: 92,
-        dy: 22,
-        cx: model.config.nEmbd,
-        cy: 1,
-        name: 'rmsnorm 1',
-      }),
-      'norm-1',
-    ),
-    'q-project': makeBlock(
-      'q-project',
-      makeCube({
-        t: 'w',
-        x: -142,
-        y: 334,
-        dx: 72,
-        dy: 72,
-        cx: model.weights['layer0.attn_wq'].cols,
-        cy: model.weights['layer0.attn_wq'].rows,
-        name: 'Wq',
-      }),
-      'qkv',
-    ),
-    'k-project': makeBlock(
-      'k-project',
-      makeCube({
-        t: 'w',
-        x: -36,
-        y: 334,
-        dx: 72,
-        dy: 72,
-        cx: model.weights['layer0.attn_wk'].cols,
-        cy: model.weights['layer0.attn_wk'].rows,
-        name: 'Wk',
-      }),
-      'qkv',
-    ),
-    'v-project': makeBlock(
-      'v-project',
-      makeCube({
-        t: 'w',
-        x: 70,
-        y: 334,
-        dx: 72,
-        dy: 72,
-        cx: model.weights['layer0.attn_wv'].cols,
-        cy: model.weights['layer0.attn_wv'].rows,
-        name: 'Wv',
-      }),
-      'qkv',
-    ),
-    'attention-head-1': makeBlock(
-      'attention-head-1',
-      makeCube({
-        t: 'i',
-        x: -160,
-        y: 444,
-        dx: headWidth,
-        dy: headHeight,
-        cx: model.config.blockSize,
-        cy: model.config.headDim,
-        name: 'head 1',
-      }),
-      'attention-head-1',
-    ),
-    'attention-head-2': makeBlock(
-      'attention-head-2',
-      makeCube({
-        t: 'i',
-        x: -72,
-        y: 444,
-        dx: headWidth,
-        dy: headHeight,
-        cx: model.config.blockSize,
-        cy: model.config.headDim,
-        name: 'head 2',
-      }),
-      'attention-head-2',
-    ),
-    'attention-head-3': makeBlock(
-      'attention-head-3',
-      makeCube({
-        t: 'i',
-        x: 16,
-        y: 444,
-        dx: headWidth,
-        dy: headHeight,
-        cx: model.config.blockSize,
-        cy: model.config.headDim,
-        name: 'head 3',
-      }),
-      'attention-head-3',
-    ),
-    'attention-head-4': makeBlock(
-      'attention-head-4',
-      makeCube({
-        t: 'i',
-        x: 104,
-        y: 444,
-        dx: headWidth,
-        dy: headHeight,
-        cx: model.config.blockSize,
-        cy: model.config.headDim,
-        name: 'head 4',
-      }),
-      'attention-head-4',
-    ),
-    'attention-out': makeBlock(
-      'attention-out',
-      makeCube({
-        t: 'w',
-        x: -58,
-        y: 548,
-        dx: 116,
-        dy: 72,
-        cx: model.weights['layer0.attn_wo'].cols,
-        cy: model.weights['layer0.attn_wo'].rows,
-        name: 'Wo',
-      }),
-      'attention-mix',
-    ),
-    'residual-add-1': makeBlock(
-      'residual-add-1',
-      makeCube({
-        t: 'i',
-        x: -58,
-        y: 646,
-        dx: 116,
-        dy: 24,
-        cx: model.config.nEmbd,
-        cy: 1,
-        name: 'residual add',
-      }),
-      'residual-add-1',
-    ),
-    'norm-2': makeBlock(
-      'norm-2',
-      makeCube({
-        t: 'i',
-        x: -46,
-        y: 702,
-        dx: 92,
-        dy: 22,
-        cx: model.config.nEmbd,
-        cy: 1,
-        name: 'rmsnorm 2',
-      }),
-      'norm-2',
-    ),
-    'mlp-fc1': makeBlock(
-      'mlp-fc1',
-      makeCube({
-        t: 'w',
-        x: -138,
-        y: 768,
-        dx: 94,
-        dy: 136,
-        cx: model.weights['layer0.mlp_fc1'].cols,
-        cy: model.weights['layer0.mlp_fc1'].rows,
-        name: 'fc1',
-      }),
-      'mlp',
-    ),
-    'mlp-relu': makeBlock(
-      'mlp-relu',
-      makeCube({
-        t: 'i',
-        x: -22,
-        y: 802,
-        dx: 52,
-        dy: 96,
-        cx: 8,
-        cy: 8,
-        name: 'relu',
-      }),
-      'mlp',
-    ),
-    'mlp-fc2': makeBlock(
-      'mlp-fc2',
-      makeCube({
-        t: 'w',
-        x: 52,
-        y: 802,
-        dx: 118,
-        dy: 72,
-        cx: model.weights['layer0.mlp_fc2'].cols,
-        cy: model.weights['layer0.mlp_fc2'].rows,
-        name: 'fc2',
-      }),
-      'mlp',
-    ),
-    logits: makeBlock(
-      'logits',
-      makeCube({
-        t: 'w',
-        x: -58,
-        y: 958,
-        dx: 116,
-        dy: 84,
-        cx: model.weights.lm_head.cols,
-        cy: model.weights.lm_head.rows,
-        name: 'lm head',
-      }),
-      'logits',
-    ),
-    probabilities: makeBlock(
-      'probabilities',
-      makeCube({
-        t: 'i',
-        x: -58,
-        y: 1076,
-        dx: 116,
-        dy: 24,
-        cx: model.config.vocabSize,
-        cy: 1,
-        name: 'probabilities',
-      }),
-      'probabilities',
-    ),
-    sample: makeBlock(
-      'sample',
-      makeCube({
-        t: 'i',
-        x: -58,
-        y: 1134,
-        dx: 116,
-        dy: 22,
-        cx: model.config.vocabSize,
-        cy: 1,
-        name: 'sample / stop',
-      }),
-      'sample',
-    ),
-  } satisfies Record<MicroVizBlockId, MicroVizBlock>
-
-  const edges = [
-    makeEdge('context-to-token-embedding', 'context', 'token-embedding', 'context-to-token-embedding'),
-    makeEdge('context-to-position-embedding', 'context', 'position-embedding', 'context-to-position-embedding'),
-    makeEdge('token-embedding-to-residual-stream', 'token-embedding', 'residual-stream', 'token-embedding-to-residual-stream'),
-    makeEdge('position-embedding-to-residual-stream', 'position-embedding', 'residual-stream', 'position-embedding-to-residual-stream'),
-    makeEdge('residual-stream-to-norm-1', 'residual-stream', 'norm-1', 'residual-stream-to-norm-1'),
-    makeEdge('norm-1-to-q-project', 'norm-1', 'q-project', 'norm-1-to-qkv'),
-    makeEdge('norm-1-to-k-project', 'norm-1', 'k-project', 'norm-1-to-qkv'),
-    makeEdge('norm-1-to-v-project', 'norm-1', 'v-project', 'norm-1-to-qkv'),
-    makeEdge('q-project-to-attention-head-1', 'q-project', 'attention-head-1', 'qkv-to-attention-head-1'),
-    makeEdge('q-project-to-attention-head-2', 'q-project', 'attention-head-2', 'qkv-to-attention-head-2'),
-    makeEdge('q-project-to-attention-head-3', 'q-project', 'attention-head-3', 'qkv-to-attention-head-3'),
-    makeEdge('q-project-to-attention-head-4', 'q-project', 'attention-head-4', 'qkv-to-attention-head-4'),
-    makeEdge('k-project-to-attention-head-1', 'k-project', 'attention-head-1', 'qkv-to-attention-head-1'),
-    makeEdge('k-project-to-attention-head-2', 'k-project', 'attention-head-2', 'qkv-to-attention-head-2'),
-    makeEdge('k-project-to-attention-head-3', 'k-project', 'attention-head-3', 'qkv-to-attention-head-3'),
-    makeEdge('k-project-to-attention-head-4', 'k-project', 'attention-head-4', 'qkv-to-attention-head-4'),
-    makeEdge('v-project-to-attention-head-1', 'v-project', 'attention-head-1', 'qkv-to-attention-head-1'),
-    makeEdge('v-project-to-attention-head-2', 'v-project', 'attention-head-2', 'qkv-to-attention-head-2'),
-    makeEdge('v-project-to-attention-head-3', 'v-project', 'attention-head-3', 'qkv-to-attention-head-3'),
-    makeEdge('v-project-to-attention-head-4', 'v-project', 'attention-head-4', 'qkv-to-attention-head-4'),
-    makeEdge('attention-head-1-to-attention-out', 'attention-head-1', 'attention-out', 'attention-head-1-to-attention-mix'),
-    makeEdge('attention-head-2-to-attention-out', 'attention-head-2', 'attention-out', 'attention-head-2-to-attention-mix'),
-    makeEdge('attention-head-3-to-attention-out', 'attention-head-3', 'attention-out', 'attention-head-3-to-attention-mix'),
-    makeEdge('attention-head-4-to-attention-out', 'attention-head-4', 'attention-out', 'attention-head-4-to-attention-mix'),
-    makeEdge('attention-out-to-residual-add-1', 'attention-out', 'residual-add-1', 'attention-mix-to-residual-add-1'),
-    makeEdge('residual-add-1-to-norm-2', 'residual-add-1', 'norm-2', 'residual-add-1-to-norm-2'),
-    makeEdge('norm-2-to-mlp-fc1', 'norm-2', 'mlp-fc1', 'norm-2-to-mlp'),
-    makeEdge('mlp-fc1-to-mlp-relu', 'mlp-fc1', 'mlp-relu', 'norm-2-to-mlp'),
-    makeEdge('mlp-relu-to-mlp-fc2', 'mlp-relu', 'mlp-fc2', 'norm-2-to-mlp'),
-    makeEdge('mlp-fc2-to-logits', 'mlp-fc2', 'logits', 'mlp-to-logits'),
-    makeEdge('logits-to-probabilities', 'logits', 'probabilities', 'logits-to-probabilities'),
-    makeEdge('probabilities-to-sample', 'probabilities', 'sample', 'probabilities-to-sample'),
-  ]
-
-  const cubes = Object.values(blocks).map((block, index) => {
-    block.cube.idx = index
-    return block.cube
-  })
-  const labels: IBlkLabel[] = []
-
   const shape: MicroVizShape = {
     B: 1,
     T: model.config.blockSize,
@@ -450,38 +77,1053 @@ export function buildMicroVizLayout(model: SceneModelData): MicroVizLayout {
     vocabSize: model.config.vocabSize,
   }
 
+  let y = 0
+  const cubes: IBlkDef[] = []
+  const cubeFocusIds: Record<number, VizNodeId | VizEdgeId | null> = {}
+
+  function registerCube(cube: IBlkDef, focusId: VizNodeId | VizEdgeId | null) {
+    cube.idx = cubes.length
+    cubes.push(cube)
+    cubeFocusIds[cube.idx] = focusId
+  }
+
+  function mk(args: {
+    t: 'w' | 'i' | 'a'
+    xL?: number
+    xR?: number
+    xM?: number
+    zF?: number
+    zB?: number
+    zM?: number
+    y: number
+    cx: number
+    cy: number
+    cz?: number
+    name: string
+    dimX?: DimStyle
+    dimY?: DimStyle
+    special?: BlkSpecial
+    hidden?: boolean
+    small?: boolean
+  }) {
+    const dx = args.cx * cell
+    const dy = args.cy * cell
+    const dz = (args.cz ?? 1) * cell
+    const x =
+      args.xL != null
+        ? args.xL
+        : args.xR != null
+          ? args.xR - dx
+          : (args.xM ?? 0) - dx / 2
+    const z =
+      args.zB != null
+        ? args.zB
+        : args.zF != null
+          ? args.zF - dz
+          : (args.zM ?? 0) - dz / 2
+
+    return {
+      idx: -1,
+      t: args.t,
+      x,
+      y: args.y,
+      z,
+      dx,
+      dy,
+      dz,
+      cx: args.cx,
+      cy: args.cy,
+      cz: args.cz ?? 1,
+      dimX:
+        args.dimX ?? (args.t === 'w' ? DimStyle.Weights : DimStyle.Intermediates),
+      dimY:
+        args.dimY ?? (args.t === 'w' ? DimStyle.Weights : DimStyle.Intermediates),
+      name: args.name,
+      access: createAccess(),
+      opacity: args.hidden ? 0 : 0.82,
+      highlight: 0.24,
+      small: args.small ?? false,
+      special: args.special ?? BlkSpecial.None,
+      localMtx: Mat4f.identity,
+    } satisfies IBlkDef
+  }
+
+  const leftX = -(shape.T * cell) / 2 - margin
+  const rightX = (shape.T * cell) / 2 + margin
+
+  const idxObj = mk({
+    t: 'i',
+    xM: 0,
+    zM: 0,
+    y,
+    cx: shape.T,
+    cy: 1,
+    cz: shape.B,
+    dimX: DimStyle.T,
+    dimY: DimStyle.None,
+    name: 'tokens',
+  })
+  registerCube(idxObj, 'context')
+
+  y += cell + margin
+
+  const tokEmbedObj = mk({
+    t: 'w',
+    xR: leftX,
+    zM: 0,
+    y,
+    cx: shape.C,
+    cy: shape.vocabSize,
+    name: 'token embed',
+    dimX: DimStyle.C,
+    dimY: DimStyle.n_vocab,
+  })
+  const posEmbedObj = mk({
+    t: 'w',
+    xL: rightX,
+    zM: 0,
+    y,
+    cx: shape.C,
+    cy: shape.T,
+    name: 'position embed',
+    dimX: DimStyle.C,
+    dimY: DimStyle.T,
+  })
+  const residual0 = mk({
+    t: 'i',
+    xM: 0,
+    zM: 0,
+    y,
+    cx: shape.T,
+    cy: shape.C,
+    cz: shape.B,
+    dimX: DimStyle.T,
+    dimY: DimStyle.C,
+    name: 'input embed',
+  })
+  registerCube(tokEmbedObj, 'token-embedding')
+  registerCube(posEmbedObj, 'position-embedding')
+  registerCube(residual0, 'residual-stream')
+  const embedLabel = mkLabel(1, [idxObj, tokEmbedObj, posEmbedObj, residual0])
+
+  y += shape.C * cell + margin * 2
+
+  function createRmsNorm(
+    source: IBlkDef,
+    focusId: VizNodeId,
+    title: string,
+  ): MicroVizNormGroup {
+    const aggLeft = leftX - (shape.T + 2) * cell - 2 * margin
+    const lnAgg1 = mk({
+      t: 'a',
+      xR: aggLeft,
+      zM: 0,
+      y,
+      cx: shape.T,
+      cy: 1,
+      cz: shape.B,
+      dimX: DimStyle.T,
+      dimY: DimStyle.None,
+      name: `${title} mean`,
+      small: true,
+    })
+    const lnAgg2 = mk({
+      t: 'a',
+      xR: aggLeft,
+      zM: 0,
+      y: y + cell,
+      cx: shape.T,
+      cy: 1,
+      cz: shape.B,
+      dimX: DimStyle.T,
+      dimY: DimStyle.None,
+      name: `${title} rms`,
+      small: true,
+    })
+    const hiddenLeft = aggLeft - shape.T * cell - margin
+    const lnSigma = mk({
+      t: 'w',
+      xR: hiddenLeft,
+      zM: 0,
+      y: y + 2 * cell + margin,
+      cx: 1,
+      cy: shape.C,
+      name: '',
+      hidden: true,
+      small: true,
+    })
+    const lnMu = mk({
+      t: 'w',
+      xR: hiddenLeft - cell - margin,
+      zM: 0,
+      y: y + 2 * cell + margin,
+      cx: 1,
+      cy: shape.C,
+      name: '',
+      hidden: true,
+      small: true,
+    })
+    const lnResid = mk({
+      t: 'i',
+      xM: 0,
+      zM: 0,
+      y: y + 2 * cell + margin,
+      cx: shape.T,
+      cy: shape.C,
+      cz: shape.B,
+      dimX: DimStyle.T,
+      dimY: DimStyle.C,
+      name: title,
+    })
+    registerCube(lnAgg1, focusId)
+    registerCube(lnAgg2, focusId)
+    registerCube(lnSigma, focusId)
+    registerCube(lnMu, focusId)
+    registerCube(lnResid, focusId)
+    y = lnResid.y + lnResid.dy + margin
+    return {
+      lnAgg1,
+      lnAgg2,
+      lnSigma,
+      lnMu,
+      lnResid,
+      cubes: [lnAgg1, lnAgg2, lnSigma, lnMu, lnResid],
+    }
+  }
+
+  function createHead(headIndex: number, ln1: MicroVizNormGroup, topY: number) {
+    const groupSpan = shape.A * cell * 3 + margin * 2
+    const headSpan = groupSpan + margin * 2
+    const headMid = (headIndex - (shape.nHeads - 1) / 2) * headSpan
+    const qMid = headMid + shape.A * cell + margin
+    const kMid = headMid
+    const vMid = headMid - shape.A * cell - margin
+    const weightLeft = leftX - (shape.T + 2) * cell - 4 * margin - shape.C * cell
+    const vectorLeft = leftX - (shape.T + 2) * cell - 2 * margin
+    const attnSoftmaxLeft = vectorLeft - (shape.T + 2) * cell - 2 * margin
+
+    const qWeightBlock = mk({
+      t: 'w',
+      xR: weightLeft,
+      zM: qMid,
+      y: topY,
+      cx: shape.C,
+      cy: shape.A,
+      name: 'Q weights',
+      dimX: DimStyle.C,
+      dimY: DimStyle.A,
+    })
+    const kWeightBlock = mk({
+      t: 'w',
+      xR: weightLeft,
+      zM: kMid,
+      y: topY,
+      cx: shape.C,
+      cy: shape.A,
+      name: 'K weights',
+      dimX: DimStyle.C,
+      dimY: DimStyle.A,
+    })
+    const vWeightBlock = mk({
+      t: 'w',
+      xR: weightLeft,
+      zM: vMid,
+      y: topY,
+      cx: shape.C,
+      cy: shape.A,
+      name: 'V weights',
+      dimX: DimStyle.C,
+      dimY: DimStyle.A,
+    })
+    const qBiasBlock = mk({
+      t: 'w',
+      xR: weightLeft - shape.C * cell - margin,
+      zM: qMid,
+      y: topY,
+      cx: 1,
+      cy: shape.A,
+      name: '',
+      hidden: true,
+      small: true,
+    })
+    const kBiasBlock = mk({
+      t: 'w',
+      xR: weightLeft - shape.C * cell - margin,
+      zM: kMid,
+      y: topY,
+      cx: 1,
+      cy: shape.A,
+      name: '',
+      hidden: true,
+      small: true,
+    })
+    const vBiasBlock = mk({
+      t: 'w',
+      xR: weightLeft - shape.C * cell - margin,
+      zM: vMid,
+      y: topY,
+      cx: 1,
+      cy: shape.A,
+      name: '',
+      hidden: true,
+      small: true,
+    })
+    const qBlock = mk({
+      t: 'i',
+      xR: vectorLeft,
+      zM: qMid,
+      y: topY,
+      cx: shape.T,
+      cy: shape.A,
+      cz: shape.B,
+      dimX: DimStyle.T,
+      dimY: DimStyle.A,
+      name: 'Q vectors',
+    })
+    const kBlock = mk({
+      t: 'i',
+      xR: vectorLeft,
+      zM: kMid,
+      y: topY,
+      cx: shape.T,
+      cy: shape.A,
+      cz: shape.B,
+      dimX: DimStyle.T,
+      dimY: DimStyle.A,
+      name: 'K vectors',
+    })
+    const vBlock = mk({
+      t: 'i',
+      xR: vectorLeft,
+      zM: vMid,
+      y: topY,
+      cx: shape.T,
+      cy: shape.A,
+      cz: shape.B,
+      dimX: DimStyle.T,
+      dimY: DimStyle.A,
+      name: 'V vectors',
+    })
+
+    const attnMtx = mk({
+      t: 'i',
+      xR: vectorLeft,
+      zM: headMid,
+      y: topY + shape.A * cell + margin,
+      cx: shape.T,
+      cy: shape.T,
+      cz: shape.B,
+      dimX: DimStyle.T,
+      dimY: DimStyle.T,
+      name: 'attention scores',
+      special: BlkSpecial.Attention,
+    })
+    const attnMtxAgg1 = mk({
+      t: 'a',
+      xR: attnSoftmaxLeft,
+      zM: headMid,
+      y: attnMtx.y,
+      cx: 1,
+      cy: shape.T,
+      cz: shape.B,
+      dimX: DimStyle.None,
+      dimY: DimStyle.T,
+      name: '',
+      small: true,
+    })
+    const attnMtxAgg2 = mk({
+      t: 'a',
+      xR: attnSoftmaxLeft - cell - margin / 2,
+      zM: headMid,
+      y: attnMtx.y,
+      cx: 1,
+      cy: shape.T,
+      cz: shape.B,
+      dimX: DimStyle.None,
+      dimY: DimStyle.T,
+      name: '',
+      small: true,
+    })
+    const attnMtxSm = mk({
+      t: 'i',
+      xR: attnSoftmaxLeft - (shape.T + 2) * cell - margin,
+      zM: headMid,
+      y: attnMtx.y,
+      cx: shape.T,
+      cy: shape.T,
+      cz: shape.B,
+      dimX: DimStyle.T,
+      dimY: DimStyle.T,
+      name: 'attention',
+      special: BlkSpecial.Attention,
+    })
+    const vOutBlock = mk({
+      t: 'i',
+      xR: vectorLeft,
+      zM: headMid,
+      y: attnMtx.y + shape.T * cell + margin,
+      cx: shape.T,
+      cy: shape.A,
+      cz: shape.B,
+      dimX: DimStyle.T,
+      dimY: DimStyle.A,
+      name: 'head output',
+    })
+
+    const focusId = (`attention-head-${headIndex + 1}` as VizNodeId) satisfies VizNodeId
+    ;[
+      qWeightBlock,
+      kWeightBlock,
+      vWeightBlock,
+      qBiasBlock,
+      kBiasBlock,
+      vBiasBlock,
+      qBlock,
+      kBlock,
+      vBlock,
+      attnMtx,
+      attnMtxAgg1,
+      attnMtxAgg2,
+      attnMtxSm,
+      vOutBlock,
+    ].forEach((cube) => registerCube(cube, focusId))
+
+    const headCubes = [
+      qWeightBlock,
+      kWeightBlock,
+      vWeightBlock,
+      qBiasBlock,
+      kBiasBlock,
+      vBiasBlock,
+      qBlock,
+      kBlock,
+      vBlock,
+      attnMtx,
+      attnMtxAgg1,
+      attnMtxAgg2,
+      attnMtxSm,
+      vOutBlock,
+    ]
+
+    const qLabel = mkLabel(0.78, [qWeightBlock, qBlock])
+    const kLabel = mkLabel(0.78, [kWeightBlock, kBlock])
+    const vLabel = mkLabel(0.78, [vWeightBlock, vBlock])
+    const biasLabel = mkLabel(0, [qBiasBlock, kBiasBlock, vBiasBlock])
+    const mtxLabel = mkLabel(0.68, [attnMtx, attnMtxSm])
+    const vectorLabel = mkLabel(0.68, [vOutBlock])
+    const headLabel = mkLabel(0.9, headCubes)
+
+    return {
+      qWeightBlock,
+      kWeightBlock,
+      vWeightBlock,
+      qBiasBlock,
+      kBiasBlock,
+      vBiasBlock,
+      qBlock,
+      kBlock,
+      vBlock,
+      attnMtx,
+      attnMtxAgg1,
+      attnMtxAgg2,
+      attnMtxSm,
+      vOutBlock,
+      qLabel,
+      kLabel,
+      vLabel,
+      biasLabel,
+      mtxLabel,
+      vectorLabel,
+      headLabel,
+      cubes: headCubes,
+      labels: [qLabel, kLabel, vLabel, biasLabel, mtxLabel, vectorLabel, headLabel],
+    } satisfies MicroVizHeadGroup
+  }
+
+  const ln1 = createRmsNorm(residual0, 'norm-1', 'rmsnorm 1')
+  const headTop = ln1.lnResid.y
+  const heads = Array.from({ length: shape.nHeads }, (_, headIndex) =>
+    createHead(headIndex, ln1, headTop),
+  )
+
+  const attnBottom = Math.max(...heads.map((head) => head.vOutBlock.y + head.vOutBlock.dy))
+  const projLeft = leftX - (shape.T + 2) * cell - 4 * margin - shape.C * cell
+  const attnOut = mk({
+    t: 'i',
+    xM: 0,
+    zM: 0,
+    y: attnBottom + margin,
+    cx: shape.T,
+    cy: shape.C,
+    cz: shape.B,
+    dimX: DimStyle.T,
+    dimY: DimStyle.C,
+    name: 'attention out',
+  })
+  const projWeight = mk({
+    t: 'w',
+    xR: projLeft,
+    zM: 0,
+    y: attnOut.y,
+    cx: shape.C,
+    cy: shape.C,
+    name: 'projection',
+    dimX: DimStyle.C,
+    dimY: DimStyle.C,
+  })
+  const projBias = mk({
+    t: 'w',
+    xR: projLeft - shape.C * cell - margin,
+    zM: 0,
+    y: attnOut.y,
+    cx: 1,
+    cy: shape.C,
+    name: '',
+    hidden: true,
+    small: true,
+  })
+  const attnResidual = mk({
+    t: 'i',
+    xM: 0,
+    zM: 0,
+    y: attnOut.y,
+    cx: shape.T,
+    cy: shape.C,
+    cz: shape.B,
+    dimX: DimStyle.T,
+    dimY: DimStyle.C,
+    name: 'attention residual',
+  })
+  ;[projWeight, projBias, attnOut, attnResidual].forEach((cube) =>
+    registerCube(cube, cube === attnResidual ? 'residual-add-1' : 'attention-mix'),
+  )
+
+  y = attnResidual.y + attnResidual.dy + margin * 2
+
+  const ln2 = createRmsNorm(attnResidual, 'norm-2', 'rmsnorm 2')
+
+  const mlpFcWeight = mk({
+    t: 'w',
+    xR: projLeft,
+    zM: 0,
+    y,
+    cx: shape.C,
+    cy: shape.C * 4,
+    name: 'fc1',
+    dimX: DimStyle.C,
+    dimY: DimStyle.C4,
+  })
+  const mlpFcBias = mk({
+    t: 'w',
+    xR: projLeft - shape.C * cell - margin,
+    zM: 0,
+    y,
+    cx: 1,
+    cy: shape.C * 4,
+    name: '',
+    hidden: true,
+    small: true,
+  })
+  const mlpFc = mk({
+    t: 'i',
+    xM: 0,
+    zM: 0,
+    y,
+    cx: shape.C * 4,
+    cy: shape.T,
+    cz: shape.B,
+    dimX: DimStyle.C4,
+    dimY: DimStyle.T,
+    name: 'fc1 output',
+  })
+  registerCube(mlpFcWeight, 'mlp')
+  registerCube(mlpFcBias, 'mlp')
+  registerCube(mlpFc, 'mlp')
+
+  y += shape.T * cell + margin
+
+  const mlpAct = mk({
+    t: 'i',
+    xM: 0,
+    zM: 0,
+    y,
+    cx: shape.C * 4,
+    cy: shape.T,
+    cz: shape.B,
+    dimX: DimStyle.C4,
+    dimY: DimStyle.T,
+    name: 'relu',
+  })
+  registerCube(mlpAct, 'mlp')
+
+  y += shape.T * cell + margin
+
+  const mlpProjWeight = mk({
+    t: 'w',
+    xR: projLeft,
+    zM: 0,
+    y,
+    cx: shape.C * 4,
+    cy: shape.C,
+    name: 'fc2',
+    dimX: DimStyle.C4,
+    dimY: DimStyle.C,
+  })
+  const mlpProjBias = mk({
+    t: 'w',
+    xR: projLeft - shape.C * 4 * cell - margin,
+    zM: 0,
+    y,
+    cx: 1,
+    cy: shape.C,
+    name: '',
+    hidden: true,
+    small: true,
+  })
+  const mlpResult = mk({
+    t: 'i',
+    xM: 0,
+    zM: 0,
+    y,
+    cx: shape.T,
+    cy: shape.C,
+    cz: shape.B,
+    dimX: DimStyle.T,
+    dimY: DimStyle.C,
+    name: 'mlp result',
+  })
+  const mlpResidual = mk({
+    t: 'i',
+    xM: 0,
+    zM: 0,
+    y,
+    cx: shape.T,
+    cy: shape.C,
+    cz: shape.B,
+    dimX: DimStyle.T,
+    dimY: DimStyle.C,
+    name: 'mlp residual',
+  })
+  ;[mlpProjWeight, mlpProjBias, mlpResult, mlpResidual].forEach((cube) =>
+    registerCube(cube, cube === mlpResult || cube === mlpResidual ? 'mlp' : 'mlp'),
+  )
+
+  const transformerCubes = [
+    ...ln1.cubes,
+    ...heads.flatMap((head) => head.cubes),
+    projWeight,
+    projBias,
+    attnOut,
+    attnResidual,
+    ...ln2.cubes,
+    mlpFcWeight,
+    mlpFcBias,
+    mlpFc,
+    mlpAct,
+    mlpProjWeight,
+    mlpProjBias,
+    mlpResult,
+    mlpResidual,
+  ]
+  const projLabel = mkLabel(0.72, [projWeight, attnOut, attnResidual])
+  const selfAttendLabel = mkLabel(0.82, [
+    ...ln1.cubes,
+    ...heads.flatMap((head) => head.cubes),
+    ...[projWeight, attnOut, attnResidual],
+  ])
+  const mlpLabel = mkLabel(0.82, [
+    ...ln2.cubes,
+    mlpFcWeight,
+    mlpFc,
+    mlpAct,
+    mlpProjWeight,
+    mlpResult,
+    mlpResidual,
+  ])
+  const transformerLabel = mkLabel(0.95, transformerCubes)
+
+  y += shape.C * cell + margin * 2
+
+  const lmHeadWeight = mk({
+    t: 'w',
+    xR: leftX - shape.T * cell - margin,
+    zM: 0,
+    y,
+    cx: shape.C,
+    cy: shape.vocabSize,
+    name: 'lm head',
+    dimX: DimStyle.C,
+    dimY: DimStyle.n_vocab,
+  })
+  const logits = mk({
+    t: 'i',
+    xM: 0,
+    zM: 0,
+    y,
+    cx: shape.T,
+    cy: shape.vocabSize,
+    cz: shape.B,
+    dimX: DimStyle.T,
+    dimY: DimStyle.n_vocab,
+    name: 'logits',
+  })
+  registerCube(lmHeadWeight, 'logits')
+  registerCube(logits, 'logits')
+
+  y += shape.vocabSize * cell + margin
+
+  const logitsAgg2 = mk({
+    t: 'a',
+    xM: 0,
+    zM: 0,
+    y,
+    cx: shape.T,
+    cy: 1,
+    cz: shape.B,
+    dimX: DimStyle.T,
+    dimY: DimStyle.None,
+    name: 'softmax max',
+    small: true,
+  })
+  const logitsAgg1 = mk({
+    t: 'a',
+    xM: 0,
+    zM: 0,
+    y: y + cell,
+    cx: shape.T,
+    cy: 1,
+    cz: shape.B,
+    dimX: DimStyle.T,
+    dimY: DimStyle.None,
+    name: 'softmax exp',
+    small: true,
+  })
+  registerCube(logitsAgg2, 'probabilities')
+  registerCube(logitsAgg1, 'probabilities')
+
+  y += 2 * cell + margin
+
+  const logitsSoftmax = mk({
+    t: 'i',
+    xM: 0,
+    zM: 0,
+    y,
+    cx: shape.T,
+    cy: shape.vocabSize,
+    cz: shape.B,
+    dimX: DimStyle.T,
+    dimY: DimStyle.n_vocab,
+    name: 'probabilities',
+  })
+  registerCube(logitsSoftmax, 'probabilities')
+
+  y += shape.vocabSize * cell + margin
+
+  const sampleBlock = mk({
+    t: 'i',
+    xM: 0,
+    zM: 0,
+    y,
+    cx: shape.T,
+    cy: 1,
+    cz: shape.B,
+    dimX: DimStyle.T,
+    dimY: DimStyle.None,
+    name: 'sample / stop',
+  })
+  registerCube(sampleBlock, 'sample')
+
+  const transformerBlock: MicroVizTransformerBlock = {
+    ln1,
+    heads,
+    cubes: transformerCubes,
+    labels: [
+      transformerLabel,
+      projLabel,
+      selfAttendLabel,
+      mlpLabel,
+      ...heads.flatMap((head) => head.labels),
+    ],
+    transformerLabel,
+    projLabel,
+    selfAttendLabel,
+    mlpLabel,
+    projWeight,
+    projBias,
+    attnOut,
+    attnResidual,
+    ln2,
+    mlpFcWeight,
+    mlpFcBias,
+    mlpFc,
+    mlpAct,
+    mlpProjWeight,
+    mlpProjBias,
+    mlpResult,
+    mlpResidual,
+  }
+
+  const blocks = {
+    context: makeBlock('context', idxObj, 'context'),
+    'token-embedding': makeBlock('token-embedding', tokEmbedObj, 'token-embedding'),
+    'position-embedding': makeBlock(
+      'position-embedding',
+      posEmbedObj,
+      'position-embedding',
+    ),
+    'residual-stream': makeBlock('residual-stream', residual0, 'residual-stream'),
+    'norm-1': makeBlock('norm-1', ln1.lnResid, 'norm-1'),
+    'q-project': makeBlock('q-project', heads[0]!.qWeightBlock, 'qkv'),
+    'k-project': makeBlock('k-project', heads[0]!.kWeightBlock, 'qkv'),
+    'v-project': makeBlock('v-project', heads[0]!.vWeightBlock, 'qkv'),
+    'attention-head-1': makeBlock(
+      'attention-head-1',
+      heads[0]!.attnMtxSm,
+      'attention-head-1',
+    ),
+    'attention-head-2': makeBlock(
+      'attention-head-2',
+      heads[1]!.attnMtxSm,
+      'attention-head-2',
+    ),
+    'attention-head-3': makeBlock(
+      'attention-head-3',
+      heads[2]!.attnMtxSm,
+      'attention-head-3',
+    ),
+    'attention-head-4': makeBlock(
+      'attention-head-4',
+      heads[3]!.attnMtxSm,
+      'attention-head-4',
+    ),
+    'attention-out': makeBlock('attention-out', attnOut, 'attention-mix'),
+    'residual-add-1': makeBlock('residual-add-1', attnResidual, 'residual-add-1'),
+    'norm-2': makeBlock('norm-2', ln2.lnResid, 'norm-2'),
+    'mlp-fc1': makeBlock('mlp-fc1', mlpFcWeight, 'mlp'),
+    'mlp-relu': makeBlock('mlp-relu', mlpAct, 'mlp'),
+    'mlp-fc2': makeBlock('mlp-fc2', mlpProjWeight, 'mlp'),
+    logits: makeBlock('logits', logits, 'logits'),
+    probabilities: makeBlock('probabilities', logitsSoftmax, 'probabilities'),
+    sample: makeBlock('sample', sampleBlock, 'sample'),
+  } satisfies Record<MicroVizBlockId, MicroVizBlock>
+
+  const edges = [
+    makeEdge(
+      'context-to-token-embedding',
+      'context',
+      'token-embedding',
+      'context-to-token-embedding',
+    ),
+    makeEdge(
+      'context-to-position-embedding',
+      'context',
+      'position-embedding',
+      'context-to-position-embedding',
+    ),
+    makeEdge(
+      'token-embedding-to-residual-stream',
+      'token-embedding',
+      'residual-stream',
+      'token-embedding-to-residual-stream',
+    ),
+    makeEdge(
+      'position-embedding-to-residual-stream',
+      'position-embedding',
+      'residual-stream',
+      'position-embedding-to-residual-stream',
+    ),
+    makeEdge(
+      'residual-stream-to-norm-1',
+      'residual-stream',
+      'norm-1',
+      'residual-stream-to-norm-1',
+    ),
+    makeEdge('norm-1-to-q-project', 'norm-1', 'q-project', 'norm-1-to-qkv'),
+    makeEdge('norm-1-to-k-project', 'norm-1', 'k-project', 'norm-1-to-qkv'),
+    makeEdge('norm-1-to-v-project', 'norm-1', 'v-project', 'norm-1-to-qkv'),
+    makeEdge(
+      'q-project-to-attention-head-1',
+      'q-project',
+      'attention-head-1',
+      'qkv-to-attention-head-1',
+    ),
+    makeEdge(
+      'q-project-to-attention-head-2',
+      'q-project',
+      'attention-head-2',
+      'qkv-to-attention-head-2',
+    ),
+    makeEdge(
+      'q-project-to-attention-head-3',
+      'q-project',
+      'attention-head-3',
+      'qkv-to-attention-head-3',
+    ),
+    makeEdge(
+      'q-project-to-attention-head-4',
+      'q-project',
+      'attention-head-4',
+      'qkv-to-attention-head-4',
+    ),
+    makeEdge(
+      'k-project-to-attention-head-1',
+      'k-project',
+      'attention-head-1',
+      'qkv-to-attention-head-1',
+    ),
+    makeEdge(
+      'k-project-to-attention-head-2',
+      'k-project',
+      'attention-head-2',
+      'qkv-to-attention-head-2',
+    ),
+    makeEdge(
+      'k-project-to-attention-head-3',
+      'k-project',
+      'attention-head-3',
+      'qkv-to-attention-head-3',
+    ),
+    makeEdge(
+      'k-project-to-attention-head-4',
+      'k-project',
+      'attention-head-4',
+      'qkv-to-attention-head-4',
+    ),
+    makeEdge(
+      'v-project-to-attention-head-1',
+      'v-project',
+      'attention-head-1',
+      'qkv-to-attention-head-1',
+    ),
+    makeEdge(
+      'v-project-to-attention-head-2',
+      'v-project',
+      'attention-head-2',
+      'qkv-to-attention-head-2',
+    ),
+    makeEdge(
+      'v-project-to-attention-head-3',
+      'v-project',
+      'attention-head-3',
+      'qkv-to-attention-head-3',
+    ),
+    makeEdge(
+      'v-project-to-attention-head-4',
+      'v-project',
+      'attention-head-4',
+      'qkv-to-attention-head-4',
+    ),
+    makeEdge(
+      'attention-head-1-to-attention-out',
+      'attention-head-1',
+      'attention-out',
+      'attention-head-1-to-attention-mix',
+    ),
+    makeEdge(
+      'attention-head-2-to-attention-out',
+      'attention-head-2',
+      'attention-out',
+      'attention-head-2-to-attention-mix',
+    ),
+    makeEdge(
+      'attention-head-3-to-attention-out',
+      'attention-head-3',
+      'attention-out',
+      'attention-head-3-to-attention-mix',
+    ),
+    makeEdge(
+      'attention-head-4-to-attention-out',
+      'attention-head-4',
+      'attention-out',
+      'attention-head-4-to-attention-mix',
+    ),
+    makeEdge(
+      'attention-out-to-residual-add-1',
+      'attention-out',
+      'residual-add-1',
+      'attention-mix-to-residual-add-1',
+    ),
+    makeEdge(
+      'residual-add-1-to-norm-2',
+      'residual-add-1',
+      'norm-2',
+      'residual-add-1-to-norm-2',
+    ),
+    makeEdge('norm-2-to-mlp-fc1', 'norm-2', 'mlp-fc1', 'norm-2-to-mlp'),
+    makeEdge('mlp-fc1-to-mlp-relu', 'mlp-fc1', 'mlp-relu', 'norm-2-to-mlp'),
+    makeEdge('mlp-relu-to-mlp-fc2', 'mlp-relu', 'mlp-fc2', 'norm-2-to-mlp'),
+    makeEdge('mlp-fc2-to-logits', 'mlp-fc2', 'logits', 'mlp-to-logits'),
+    makeEdge(
+      'logits-to-probabilities',
+      'logits',
+      'probabilities',
+      'logits-to-probabilities',
+    ),
+    makeEdge(
+      'probabilities-to-sample',
+      'probabilities',
+      'sample',
+      'probabilities-to-sample',
+    ),
+  ] satisfies MicroVizEdge[]
+
+  const height = sampleBlock.y + sampleBlock.dy + margin * 6
+  const overviewY = height * 0.62
+  const cameraPoses = {
+    overview: {
+      center: new Vec3(-26, overviewY, -20),
+      angle: new Vec3(288, 17, 24),
+    },
+    input: {
+      center: new Vec3(-24, overviewY * 0.96, -16),
+      angle: new Vec3(288, 17, 22.5),
+    },
+    attention: {
+      center: new Vec3(-42, overviewY, -6),
+      angle: new Vec3(287, 18, 23.5),
+    },
+    residual: {
+      center: new Vec3(-18, overviewY * 1.04, -14),
+      angle: new Vec3(288, 17, 22.8),
+    },
+    readout: {
+      center: new Vec3(-12, overviewY * 1.08, -12),
+      angle: new Vec3(287, 17, 22.2),
+    },
+    sample: {
+      center: new Vec3(-8, overviewY * 1.12, -10),
+      angle: new Vec3(287, 16, 21.8),
+    },
+  }
+
   return {
     cubes,
-    labels,
+    labels: [embedLabel, ...transformerBlock.labels],
     blocks,
+    cubeFocusIds,
     edges,
     shape,
     weightCount: countParams(model),
-    cameraPoses: {
-      overview: {
-        center: new Vec3(0, 610, 0),
-        angle: new Vec3(292, 16, 7.1),
-      },
-      input: {
-        center: new Vec3(0, 210, 0),
-        angle: new Vec3(292, 16, 5.4),
-      },
-      attention: {
-        center: new Vec3(0, 500, 0),
-        angle: new Vec3(292, 16, 5.1),
-      },
-      residual: {
-        center: new Vec3(0, 760, 0),
-        angle: new Vec3(292, 16, 4.8),
-      },
-      readout: {
-        center: new Vec3(0, 1010, 0),
-        angle: new Vec3(292, 16, 4.5),
-      },
-      sample: {
-        center: new Vec3(0, 1125, 0),
-        angle: new Vec3(292, 16, 4.2),
-      },
+    cameraPoses,
+    cell,
+    margin,
+    height,
+    idxObj,
+    tokEmbedObj,
+    posEmbedObj,
+    residual0,
+    embedLabel,
+    transformerBlocks: [transformerBlock],
+    lmHeadWeight,
+    logits,
+    logitsAgg1,
+    logitsAgg2,
+    logitsSoftmax,
+    logitsTransposed: false,
+    model: {
+      inputTokens: { localBuffer: new Float32Array(shape.T) },
+      inputLen: 0,
+      sortedBuf: new Float32Array(shape.T * shape.vocabSize * 2),
     },
   }
 }

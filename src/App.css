@@ -392,26 +392,21 @@
 .scene-panel {
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  padding: 18px 18px 16px;
+  padding: 8px 10px 12px;
 }
 
 .scene-panel__viewport {
   position: relative;
   flex: 1 0 auto;
-  height: clamp(560px, 62vh, 760px);
-  min-height: 560px;
+  height: clamp(720px, 74vh, 1180px);
+  min-height: 720px;
   overflow: hidden;
   overscroll-behavior: contain;
   touch-action: none;
-  border: 1px solid rgba(148, 163, 184, 0.12);
-  border-radius: 22px;
-  background:
-    linear-gradient(rgba(97, 175, 239, 0.06) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(97, 175, 239, 0.06) 1px, transparent 1px),
-    radial-gradient(circle at top, rgba(97, 175, 239, 0.12), transparent 26%),
-    #090d12;
-  background-size: 28px 28px, 28px 28px, auto, auto;
+  border: 1px solid rgba(88, 101, 242, 0.18);
+  border-radius: 18px;
+  background: #f3f3f3;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.6);
 }
 
 .llmviz-embed,
@@ -448,12 +443,68 @@
   bottom: 14px;
   z-index: 2;
   padding: 8px 12px;
-  border: 1px solid rgba(148, 163, 184, 0.18);
+  border: 1px solid rgba(78, 96, 161, 0.18);
   border-radius: 999px;
-  background: rgba(7, 11, 15, 0.84);
-  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.88);
+  color: #5d6478;
   font: 500 0.74rem/1.2 var(--mono);
   letter-spacing: 0.01em;
+}
+
+.scene-panel__loading {
+  position: absolute;
+  left: 14px;
+  bottom: 14px;
+  z-index: 2;
+  padding: 8px 12px;
+  border: 1px solid rgba(78, 96, 161, 0.18);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.88);
+  color: #5d6478;
+  font: 500 0.74rem/1.2 var(--mono);
+}
+
+.scene-panel__fallback {
+  width: 100%;
+  height: 100%;
+  display: block;
+  background: #f3f3f3;
+}
+
+.scene-panel__fallback-edge {
+  stroke: rgba(80, 181, 88, 0.35);
+  stroke-width: 1.6;
+}
+
+.scene-panel__fallback-edge.is-active {
+  stroke: rgba(24, 153, 34, 0.9);
+  stroke-width: 2.6;
+}
+
+.scene-panel__fallback-node polygon:nth-of-type(1) {
+  fill: rgba(170, 185, 220, 0.58);
+  stroke: rgba(67, 83, 121, 0.32);
+}
+
+.scene-panel__fallback-node polygon:nth-of-type(2) {
+  fill: rgba(218, 226, 242, 0.92);
+  stroke: rgba(67, 83, 121, 0.28);
+}
+
+.scene-panel__fallback-node polygon:nth-of-type(3) {
+  fill: rgba(80, 87, 145, 0.9);
+  stroke: rgba(67, 83, 121, 0.28);
+}
+
+.scene-panel__fallback-node.is-active polygon:nth-of-type(2),
+.scene-panel__fallback-node.is-active polygon:nth-of-type(3) {
+  fill: rgba(92, 185, 92, 0.88);
+}
+
+.scene-panel__fallback-node text {
+  fill: rgba(24, 26, 35, 0.88);
+  font: 600 11px/1.1 var(--mono);
+  text-transform: lowercase;
 }
 
 .scene-panel__legend,

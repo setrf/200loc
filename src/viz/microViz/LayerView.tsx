@@ -72,8 +72,8 @@ class MicroCanvasRender {
     this.progState = initMicroVizProgramState(canvasEl, fontAtlasData, sceneModelData)
     this.progState.markDirty = this.markDirty
     this.blockFocusByIndex = new Map(
-      Object.values(this.progState.layout.blocks).map(({ cube, codeFocusId }) => [
-        cube.idx,
+      Object.entries(this.progState.layout.cubeFocusIds).map(([cubeIdx, codeFocusId]) => [
+        Number(cubeIdx),
         codeFocusId && codeFocusId in vizFocusRanges
           ? (codeFocusId as FocusRangeKey)
           : null,

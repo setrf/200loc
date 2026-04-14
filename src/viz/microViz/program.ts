@@ -7,20 +7,26 @@ import {
   updateCamera,
 } from '../../vendor/llmVizOriginal/llm/Camera'
 import { drawBlockInfo } from '../../vendor/llmVizOriginal/llm/components/BlockInfo'
+import { drawModelCard } from '../../vendor/llmVizOriginal/llm/components/ModelCard'
+import { drawBlockLabels } from '../../vendor/llmVizOriginal/llm/components/SectionLabels'
 import { runMouseHitTesting } from '../../vendor/llmVizOriginal/llm/Interaction'
 import type { IRenderView } from '../../vendor/llmVizOriginal/llm/render/modelRender'
 import {
+  drawText,
   fetchFontAtlasData,
   type IFontAtlasData,
+  type IFontOpts,
+  measureText,
 } from '../../vendor/llmVizOriginal/llm/render/fontRender'
 import {
   initRender,
   renderModel,
   resetRenderBuffers,
 } from '../../vendor/llmVizOriginal/llm/render/modelRender'
+import { RenderPhase } from '../../vendor/llmVizOriginal/llm/render/sharedRender'
 import { Mat4f } from '../../vendor/llmVizOriginal/utils/matrix'
 import { Subscriptions } from '../../vendor/llmVizOriginal/utils/hooks'
-import { Vec3 } from '../../vendor/llmVizOriginal/utils/vector'
+import { Vec3, Vec4 } from '../../vendor/llmVizOriginal/utils/vector'
 import type { IMovementInfo } from '../../vendor/llmVizOriginal/llm/components/MovementControls'
 import { MovementAction } from '../../vendor/llmVizOriginal/llm/components/MovementControls'
 import { createMicroVizTextures, drawMicroVizEdges } from './bridge'
@@ -175,7 +181,7 @@ export function setMicroVizProgramData(
     state.microViz.sceneModelData,
     phaseState,
     data.trace,
-    data.contextTokens.length,
+    data.contextTokens,
   )
   applyMicroVizPhase(state.microViz.renderContext, phaseState)
 }
@@ -255,8 +261,43 @@ export function runMicroVizProgram(
   genModelViewMatrices(state as never, state.layout as never)
 
   drawMicroVizEdges(renderContext, phaseState)
+  drawModelCard(
+    state as never,
+    {
+      ...state.layout,
+      blocks: state.layout.transformerBlocks,
+    } as never,
+    'microgpt',
+    new Vec3(),
+  )
   drawBlockInfo(state as never)
   runMouseHitTesting(state as never)
+  state.render.sharedRender.activePhase = RenderPhase.Opaque
+  drawBlockLabels(
+    state.render as never,
+    {
+      ...state.layout,
+      blocks: state.layout.transformerBlocks,
+    } as never,
+  )
+
+  state.render.sharedRender.activePhase = RenderPhase.Overlay2D
+  const opts: IFontOpts = {
+    color: Vec4.fromHexColor('#000000', 0.76),
+    size: 14,
+    mtx: new Mat4f(),
+  }
+  for (let lineIndex = 0; lineIndex < state.display.lines.length; lineIndex += 1) {
+    const line = state.display.lines[lineIndex]!
+    const width = measureText(state.render.modelFontBuf, line, opts)
+    drawText(
+      state.render.modelFontBuf,
+      line,
+      state.render.size.x - width - 10,
+      20 + lineIndex * opts.size * 1.35,
+      opts,
+    )
+  }
 
   renderModel({
     render: state.render,
