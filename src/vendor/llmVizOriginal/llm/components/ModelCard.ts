@@ -110,12 +110,24 @@ export function computeModelCardLayout(
 }
 
 export function computeModelCardVisibility(currentZoom: number, referenceZoom: number) : IModelCardVisibility {
+    return computeModelCardVisibilityFromDelta(currentZoom, referenceZoom, 0, 0);
+}
+
+export function computeModelCardVisibilityFromDelta(
+    currentZoom: number,
+    referenceZoom: number,
+    centerDelta: number,
+    angleDelta: number,
+) : IModelCardVisibility {
     if (referenceZoom <= 0) {
         return { scale: 1.0, opacity: 1.0 };
     }
 
     let zoomRatio = clamp(currentZoom / referenceZoom, 0.0, 2.0);
-    let opacity = clamp((zoomRatio - 0.62) / 0.28, 0.0, 1.0);
+    let zoomOpacity = clamp((zoomRatio - 0.62) / 0.28, 0.0, 1.0);
+    let centerOpacity = clamp(1.0 - centerDelta / 48.0, 0.0, 1.0);
+    let angleOpacity = clamp(1.0 - angleDelta / 18.0, 0.0, 1.0);
+    let opacity = Math.min(zoomOpacity, centerOpacity, angleOpacity);
     let scale = lerp(0.72, 1.0, opacity);
     return { scale, opacity };
 }
@@ -125,7 +137,15 @@ export function drawModelCard(state: IProgramState, layout: IGptModelLayout, tit
     let { camPos } = cameraToMatrixView(state.camera);
     let dist = camPos.dist(new Vec3(0, 0, -30)); //.add(offset));
 
-    let visibility = computeModelCardVisibility(state.camera.angle.z, state.camera.zoomReference ?? state.camera.angle.z);
+    let overviewPose = (layout as IGptModelLayout & { cameraPoses?: { overview?: { center: Vec3; angle: Vec3 } } }).cameraPoses?.overview;
+    let centerDelta = overviewPose ? state.camera.center.dist(overviewPose.center) : 0;
+    let angleDelta = overviewPose ? state.camera.angle.sub(overviewPose.angle).len() : 0;
+    let visibility = computeModelCardVisibilityFromDelta(
+        state.camera.angle.z,
+        state.camera.zoomReference ?? state.camera.angle.z,
+        centerDelta,
+        angleDelta,
+    );
     if (visibility.opacity <= 0.02) {
         return;
     }

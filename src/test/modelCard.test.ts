@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   computeModelCardLayout,
   computeModelCardVisibility,
+  computeModelCardVisibilityFromDelta,
 } from '../vendor/llmVizOriginal/llm/components/ModelCard'
 
 describe('model card layout', () => {
@@ -35,5 +36,13 @@ describe('model card layout', () => {
     expect(mid.opacity).toBeLessThan(1)
     expect(hidden.opacity).toBe(0)
     expect(hidden.scale).toBeLessThan(1)
+  })
+
+  it('also fades the overview card when the camera moves away from the overview shot', () => {
+    const panned = computeModelCardVisibilityFromDelta(11.2, 11.2, 60, 0)
+    const rotated = computeModelCardVisibilityFromDelta(11.2, 11.2, 0, 24)
+
+    expect(panned.opacity).toBe(0)
+    expect(rotated.opacity).toBe(0)
   })
 })
