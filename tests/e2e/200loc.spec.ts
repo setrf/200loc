@@ -254,6 +254,51 @@ test.describe('desktop walkthrough', () => {
     await expect(page.locator('.scene-panel canvas')).toBeVisible()
     expect(issues).toEqual([])
   })
+
+  test('survives a long mixed interaction session without scene corruption', async ({
+    page,
+  }) => {
+    const issues = collectBrowserIssues(page)
+    const scene = page.locator('.scene-panel')
+    const eventSurface = page.locator('.scene-panel__event-surface')
+    await eventSurface.scrollIntoViewIfNeeded()
+    await expect(page.locator('.scene-panel canvas')).toBeVisible()
+
+    const box = await eventSurface.boundingBox()
+    if (!box) {
+      throw new Error('Scene event surface bounding box was not available')
+    }
+
+    for (let cycle = 0; cycle < 3; cycle += 1) {
+      for (let step = 0; step < 8; step += 1) {
+        await page.getByRole('button', { name: 'Next' }).click()
+        await page.waitForTimeout(120)
+      }
+
+      for (let move = 0; move < 24; move += 1) {
+        const x = box.x + box.width * (0.28 + (move % 8) * 0.055)
+        const y = box.y + box.height * (0.42 + ((move / 8) % 3) * 0.06)
+        await page.mouse.move(x, y)
+        await page.waitForTimeout(24)
+      }
+
+      await expectSceneToChange(scene, async () => {
+        await page.mouse.move(box.x + box.width * 0.46, box.y + box.height * 0.54)
+        await page.mouse.down()
+        await page.mouse.move(box.x + box.width * 0.68, box.y + box.height * 0.7, {
+          steps: 14,
+        })
+        await page.mouse.up()
+        await page.waitForTimeout(220)
+      })
+
+      await page.getByRole('button', { name: 'Prev' }).click()
+      await page.waitForTimeout(120)
+    }
+
+    await expect(page.locator('.scene-panel canvas')).toBeVisible()
+    expect(issues).toEqual([])
+  })
 })
 
 test.describe('mobile walkthrough', () => {
