@@ -52,6 +52,8 @@ vi.mock('../vendor/llmVizOriginal/utils/renderPhases', () => ({
 const bundle = loadBundle()
 const tokenLabel = (tokenId: number) =>
   tokenId === 26 ? 'BOS' : bundle.vocab[tokenId] ?? String(tokenId)
+const phaseById = (id: (typeof inferencePhases)[number]['id']) =>
+  inferencePhases.find((phase) => phase.id === id)!
 
 function walkFiles(dir: string, out: string[] = []) {
   for (const entry of readdirSync(dir)) {
@@ -140,13 +142,13 @@ describe('micro viz bridge', () => {
 
     const qkvFrame = buildVizFrame(
       trace,
-      inferencePhases[4],
+      phaseById('qkv'),
       bundle,
       contextTokens,
       tokenLabel,
     )
     const qkvPhaseState = buildMicroVizPhaseState(
-      inferencePhases[4],
+      phaseById('qkv'),
       qkvFrame,
       layout,
     )
@@ -164,13 +166,13 @@ describe('micro viz bridge', () => {
 
     const mlpFrame = buildVizFrame(
       trace,
-      inferencePhases[9],
+      phaseById('mlp'),
       bundle,
       contextTokens,
       tokenLabel,
     )
     const mlpPhaseState = buildMicroVizPhaseState(
-      inferencePhases[9],
+      phaseById('mlp'),
       mlpFrame,
       layout,
     )
@@ -195,13 +197,13 @@ describe('micro viz bridge', () => {
     const trace = makeTrace()
     const frame = buildVizFrame(
       trace,
-      inferencePhases[6],
+      phaseById('attention-softmax'),
       bundle,
       ['BOS', 'e', 'm'],
       tokenLabel,
     )
     const phaseState = buildMicroVizPhaseState(
-      inferencePhases[6],
+      phaseById('attention-softmax'),
       frame,
       layout,
     )
@@ -336,13 +338,13 @@ describe('micro viz bridge', () => {
     const layout = buildMicroVizLayout(bundle)
     const frame = buildVizFrame(
       makeTrace(),
-      inferencePhases[4],
+      phaseById('qkv'),
       bundle,
       ['BOS', 'e', 'm'],
       tokenLabel,
     )
     const phaseState = buildMicroVizPhaseState(
-      inferencePhases[4],
+      phaseById('qkv'),
       frame,
       layout,
     )
@@ -386,8 +388,8 @@ describe('micro viz bridge', () => {
   it('uses the live walkthrough phase ids for attention-softmax and attention output emphasis', () => {
     const layout = buildMicroVizLayout(bundle)
     const softmaxPhaseState = buildMicroVizPhaseState(
-      inferencePhases[6],
-      buildVizFrame(makeTrace(), inferencePhases[6], bundle, ['BOS', 'e', 'm'], tokenLabel),
+      phaseById('attention-softmax'),
+      buildVizFrame(makeTrace(), phaseById('attention-softmax'), bundle, ['BOS', 'e', 'm'], tokenLabel),
       layout,
     )
     const ctx: {
@@ -420,8 +422,8 @@ describe('micro viz bridge', () => {
     expect(layout.transformerBlocks[0]?.heads[0]?.mtxLabel.visible).toBe(1)
 
     const attnOutPhaseState = buildMicroVizPhaseState(
-      inferencePhases[8],
-      buildVizFrame(makeTrace(), inferencePhases[8], bundle, ['BOS', 'e', 'm'], tokenLabel),
+      phaseById('attn-out'),
+      buildVizFrame(makeTrace(), phaseById('attn-out'), bundle, ['BOS', 'e', 'm'], tokenLabel),
       layout,
     )
     applyMicroVizPhase(
@@ -432,8 +434,8 @@ describe('micro viz bridge', () => {
     expect(layout.transformerBlocks[0]?.projLabel.visible).toBe(1)
 
     const lmHeadPhaseState = buildMicroVizPhaseState(
-      inferencePhases[10],
-      buildVizFrame(makeTrace(), inferencePhases[10], bundle, ['BOS', 'e', 'm'], tokenLabel),
+      phaseById('lm-head'),
+      buildVizFrame(makeTrace(), phaseById('lm-head'), bundle, ['BOS', 'e', 'm'], tokenLabel),
       layout,
     )
     expect(lmHeadPhaseState.dimHover).toBeDefined()
@@ -456,28 +458,28 @@ describe('micro viz bridge', () => {
     const contextTokens = ['BOS', 'e', 'm']
     const layout = buildMicroVizLayout(bundle)
     const qkvState = buildMicroVizPhaseState(
-      inferencePhases[4],
-      buildVizFrame(trace, inferencePhases[4], bundle, contextTokens, tokenLabel),
+      phaseById('qkv'),
+      buildVizFrame(trace, phaseById('qkv'), bundle, contextTokens, tokenLabel),
       layout,
     )
     const scoreState = buildMicroVizPhaseState(
-      inferencePhases[5],
-      buildVizFrame(trace, inferencePhases[5], bundle, contextTokens, tokenLabel),
+      phaseById('attention-scores'),
+      buildVizFrame(trace, phaseById('attention-scores'), bundle, contextTokens, tokenLabel),
       layout,
     )
     const attnOutState = buildMicroVizPhaseState(
-      inferencePhases[8],
-      buildVizFrame(trace, inferencePhases[8], bundle, contextTokens, tokenLabel),
+      phaseById('attn-out'),
+      buildVizFrame(trace, phaseById('attn-out'), bundle, contextTokens, tokenLabel),
       layout,
     )
     const mlpState = buildMicroVizPhaseState(
-      inferencePhases[9],
-      buildVizFrame(trace, inferencePhases[9], bundle, contextTokens, tokenLabel),
+      phaseById('mlp'),
+      buildVizFrame(trace, phaseById('mlp'), bundle, contextTokens, tokenLabel),
       layout,
     )
     const sampleState = buildMicroVizPhaseState(
-      inferencePhases[13],
-      buildVizFrame(trace, inferencePhases[13], bundle, contextTokens, tokenLabel),
+      phaseById('append-or-stop'),
+      buildVizFrame(trace, phaseById('append-or-stop'), bundle, contextTokens, tokenLabel),
       layout,
     )
 

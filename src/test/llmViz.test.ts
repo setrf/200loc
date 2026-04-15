@@ -24,6 +24,8 @@ import { loadBundle, loadModelConfig, makeTrace } from './helpers/fixtures'
 const bundle = loadBundle()
 const modelConfig = loadModelConfig()
 const tokenLabel = (tokenId: number) => (tokenId === 26 ? 'BOS' : bundle.vocab[tokenId] ?? String(tokenId))
+const phaseById = (id: (typeof inferencePhases)[number]['id']) =>
+  inferencePhases.find((phase) => phase.id === id)!
 
 function makeCanvas() {
   return document.createElement('canvas')
@@ -168,32 +170,32 @@ describe('llm viz helpers', () => {
 
     const tokenWindow = buildTensorWindow(
       trace,
-      inferencePhases[1],
+      inferencePhases[3],
       bundle,
       contextTokens,
       tokenLabel,
     )
-    expect(tokenWindow.surfaces[0].label).toBe('wte')
+    expect(tokenWindow.surfaces[0].label).toBe('token meaning table')
     expect(tokenWindow.surfaces[0].rows).toBe(27)
     expect(tokenWindow.vectors[0].values).toHaveLength(16)
 
     const qkvWindow = buildTensorWindow(
       trace,
-      inferencePhases[4],
+      inferencePhases[9],
       bundle,
       contextTokens,
       tokenLabel,
     )
     expect(qkvWindow.surfaces.map((surface) => surface.label)).toEqual([
-      'attn_wq',
-      'attn_wk',
-      'attn_wv',
+      'query weight table',
+      'key weight table',
+      'value weight table',
     ])
     expect(qkvWindow.projection?.outputs).toHaveLength(3)
 
     const mlpWindow = buildTensorWindow(
       trace,
-      inferencePhases[9],
+      inferencePhases[22],
       bundle,
       contextTokens,
       tokenLabel,
@@ -205,22 +207,22 @@ describe('llm viz helpers', () => {
 
     const logitsWindow = buildTensorWindow(
       trace,
-      inferencePhases[10],
+      inferencePhases[26],
       bundle,
       contextTokens,
       tokenLabel,
     )
-    expect(logitsWindow.surfaces[0].label).toBe('lm_head')
+    expect(logitsWindow.surfaces[0].label).toBe('vocabulary scoring table')
     expect(logitsWindow.vectors[1].values).toHaveLength(27)
 
     const sampleWindow = buildTensorWindow(
       makeTrace({ sampledTokenId: 26 }),
-      inferencePhases[13],
+      inferencePhases[33],
       bundle,
       contextTokens,
       tokenLabel,
     )
-    expect(sampleWindow.lookups?.[0].description).toBe('Stop now.')
+    expect(sampleWindow.lookups?.[0].description).toBe('Treat this as the stop marker and end the loop.')
 
     const weightedValuesWindow = buildTensorWindow(
       makeTrace({
@@ -230,7 +232,7 @@ describe('llm viz helpers', () => {
           vSlices: [],
         })),
       }),
-      inferencePhases[7],
+      phaseById('weighted-values'),
       bundle,
       contextTokens,
       tokenLabel,
@@ -241,7 +243,7 @@ describe('llm viz helpers', () => {
 
     const attentionFrame = buildVizFrame(
       trace,
-      inferencePhases[5],
+      phaseById('attention-scores'),
       bundle,
       contextTokens,
       tokenLabel,
@@ -262,28 +264,28 @@ describe('llm viz helpers', () => {
     )
     expect(contextFrame.overlay.kind).toBe('context-cache')
     if (contextFrame.overlay.kind === 'context-cache') {
-      expect(contextFrame.overlay.focusWindow.title).toBe('visible cache')
+      expect(contextFrame.overlay.focusWindow.title).toBe('Readable history for this moment')
       expect(contextFrame.overlay.slots[0].isCurrent).toBe(true)
     }
 
     const probabilitiesWindow = buildTensorWindow(
       makeTrace({ topCandidates: [], sampledTokenId: 7 }),
-      inferencePhases[11],
+      phaseById('probabilities'),
       bundle,
       contextTokens,
       tokenLabel,
     )
-    expect(probabilitiesWindow.note).toContain('h')
+    expect(probabilitiesWindow.note).toContain('Highest probability right now')
 
     const emptyAttentionFrame = buildVizFrame(
       makeTrace({ heads: [] }),
-      inferencePhases[5],
+      phaseById('attention-scores'),
       bundle,
       [],
       tokenLabel,
     )
     expect(emptyAttentionFrame.emphasisNodeIds).toEqual(
-      inferencePhases[5]!.viz.emphasisNodeIds,
+      phaseById('attention-scores').viz.emphasisNodeIds,
     )
 
     const fifthHeadTemplate = makeTrace().heads[0]!
@@ -299,7 +301,7 @@ describe('llm viz helpers', () => {
           scores: [...fifthHeadTemplate.scores],
         })),
       }),
-      inferencePhases[5],
+      phaseById('attention-scores'),
       bundle,
       [],
       tokenLabel,
@@ -348,7 +350,7 @@ describe('llm viz helpers', () => {
     const layout = buildMicrogptLayout(modelConfig)
     const frame = buildVizFrame(
       makeTrace(),
-      inferencePhases[5],
+      phaseById('attention-scores'),
       bundle,
       ['BOS', 'e', 'm'],
       tokenLabel,
@@ -409,7 +411,7 @@ describe('llm viz helpers', () => {
     renderer.setFrame(
       buildVizFrame(
         makeTrace(),
-        inferencePhases[5],
+        phaseById('attention-scores'),
         bundle,
         ['BOS', 'e', 'm'],
         tokenLabel,

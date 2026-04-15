@@ -506,9 +506,6 @@ export function buildMicroVizPhaseState(
     frame.emphasisEdgeIds.flatMap((edgeId) => mapEdgeToMicro(edgeId)),
   )
 
-  const lineTitle = phase.title
-  const lineSubtitle = frame.currentSlotLabel
-  const lineTransition = frame.transitionLabel
   const sceneOffset = phaseSceneOffset(phase.viz.cameraPoseId)
   const cardOffset = phaseCardOffset(phase.viz.cameraPoseId, sceneOffset)
   const opacityByBlockId: MicroVizPhaseState['opacityByBlockId'] = {}
@@ -592,7 +589,7 @@ export function buildMicroVizPhaseState(
     emphasisEdgeIds,
     hoverBlockIndices,
     dimHover,
-    lines: [lineTitle, lineSubtitle, lineTransition],
+    lines: [],
     topOutputOpacity:
       phase.id === 'lm-head' ||
       phase.id === 'probabilities' ||

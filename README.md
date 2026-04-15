@@ -7,7 +7,7 @@ It keeps one promise: show how a tiny GPT performs next-token inference, step by
 ## What It Does
 
 - Shows the canonical `microgpt.py` source beside a synchronized walkthrough.
-- Explains one inference step at a time across 14 phases.
+- Explains inference across 34 guided steps grouped into 14 stages.
 - Runs a tiny char-level names model client-side.
 - Uses native WebGPU when available, with a CPU reference path for fallback and correctness.
 - Highlights the exact Python lines that correspond to the active visualization state.

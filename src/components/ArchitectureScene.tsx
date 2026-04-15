@@ -200,7 +200,7 @@ export function ArchitectureScene({
 
   useEffect(() => {
     currentPhaseTokenRef.current += 1
-  }, [phase.id])
+  }, [phase.stepId])
 
   const setHoverFocusState = useCallback(
     (focusId: FocusRangeKey | null) => {
@@ -256,7 +256,7 @@ export function ArchitectureScene({
       return
     }
     onFocusRanges(null)
-  }, [hoverFocusId, onFocusRanges, phase.id])
+  }, [hoverFocusId, onFocusRanges, phase.stepId])
 
   const handleViewportDoubleClick = () => {
     layerViewRef.current?.resetToCameraPose(phase.viz.cameraPoseId)

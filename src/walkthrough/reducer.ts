@@ -22,7 +22,6 @@ export interface WalkthroughState {
   sequenceTokenIds: number[]
   backend: BackendName
   fallbackReason?: string
-  appendixOpen: boolean
   hoverRanges: LineRange[] | null
   mobileTab: MobileTab
   error?: string
@@ -58,7 +57,6 @@ export type WalkthroughAction =
   | { type: 'phasePrev'; phaseCount: number }
   | { type: 'setPlaying'; playing: boolean }
   | { type: 'setHoverRanges'; ranges: LineRange[] | null }
-  | { type: 'toggleAppendix' }
   | { type: 'setMobileTab'; tab: MobileTab }
 
 export const initialWalkthroughState: WalkthroughState = {
@@ -74,7 +72,6 @@ export const initialWalkthroughState: WalkthroughState = {
   activePhaseIndex: 0,
   sequenceTokenIds: [],
   backend: 'cpu',
-  appendixOpen: false,
   hoverRanges: null,
   mobileTab: 'story',
 }
@@ -187,11 +184,6 @@ export function walkthroughReducer(
       return {
         ...state,
         hoverRanges: action.ranges,
-      }
-    case 'toggleAppendix':
-      return {
-        ...state,
-        appendixOpen: !state.appendixOpen,
       }
     case 'setMobileTab':
       return {

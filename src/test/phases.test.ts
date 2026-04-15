@@ -24,24 +24,56 @@ describe('phase line maps', () => {
 
   it('gives every phase grouped viz metadata and explanation copy', () => {
     const baseTrace = makeTrace()
-    const terminalTrace = makeTrace({ sampledTokenId: 26 })
-    const tokenLabel = (tokenId: number) => (tokenId === 26 ? 'BOS' : String(tokenId))
-
-    const explanationBodies = inferencePhases.map((phase, index) => {
-      const trace = index === inferencePhases.length - 1 ? terminalTrace : baseTrace
+    const summaries = inferencePhases.map((phase) => {
+      const trace = phase.id === 'append-or-stop'
+        ? makeTrace({ sampledTokenId: 26 })
+        : baseTrace
       expect(phase.select(trace)).toBeDefined()
+      expect(phase.groupTitle.length).toBeGreaterThan(0)
+      expect(phase.stepTitle.length).toBeGreaterThan(0)
+      expect(phase.stepId.length).toBeGreaterThan(0)
+      expect(phase.stepIndexWithinGroup).toBeGreaterThanOrEqual(1)
+      expect(phase.stepIndexWithinGroup).toBeLessThanOrEqual(phase.stepCountWithinGroup)
       expect(phase.viz.focusNodeId).toBeDefined()
       expect(phase.viz.cameraPoseId).toBeDefined()
       expect(phase.viz.overlayKind).toBeDefined()
       expect(vizFocusRanges[phase.viz.focusNodeId].length).toBeGreaterThan(0)
-      expect(phase.explanationTitle(trace, tokenLabel).length).toBeGreaterThan(0)
-      expect(phase.explanationWhy(trace, tokenLabel).length).toBeGreaterThan(0)
-      return phase.explanationBody(trace, tokenLabel)
+      expect(phase.copy.plainSummary.length).toBeGreaterThan(0)
+      expect(phase.copy.whatHappens.length).toBeGreaterThan(0)
+      expect(phase.copy.whyItMatters.length).toBeGreaterThan(0)
+      expect(phase.copy.sceneReading.length).toBeGreaterThan(0)
+      expect(phase.copy.codeConnection.length).toBeGreaterThan(0)
+      expect(phase.sceneCopy.windowTitle.length).toBeGreaterThan(0)
+      expect(phase.sceneCopy.windowSubtitle.length).toBeGreaterThan(0)
+      return phase.copy.plainSummary
     })
 
-    expect(explanationBodies).toHaveLength(inferencePhases.length)
-    expect(explanationBodies[0]).toContain('current slot')
-    expect(explanationBodies.at(-1)).toContain('Generation ends')
+    const groupCounts = Object.fromEntries(
+      Array.from(new Set(inferencePhases.map((phase) => phase.groupId))).map((groupId) => [
+        groupId,
+        inferencePhases.filter((phase) => phase.groupId === groupId).length,
+      ]),
+    )
+
+    expect(summaries).toHaveLength(34)
+    expect(summaries[0]).toContain('small band of text')
+    expect(summaries.at(-1)).toContain('loops back')
+    expect(groupCounts).toEqual({
+      tokenize: 3,
+      'token-embedding': 2,
+      'position-embedding': 2,
+      'embed-add-norm': 2,
+      qkv: 4,
+      'attention-scores': 2,
+      'attention-softmax': 2,
+      'weighted-values': 2,
+      'attn-out': 3,
+      mlp: 4,
+      'lm-head': 2,
+      probabilities: 2,
+      sample: 2,
+      'append-or-stop': 2,
+    })
     expect(trainingAppendix.every((section) => section.description.length > 0)).toBe(true)
   })
 

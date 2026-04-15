@@ -63,6 +63,7 @@ export function buildWeightSurface(
     highlightedRows?: number[]
     highlightedCols?: number[]
     colorScale?: TensorColorScale
+    label?: string
   } = {},
 ): TensorSurface {
   const colorScale = options.colorScale ?? 'diverging'
@@ -71,7 +72,7 @@ export function buildWeightSurface(
 
   return {
     id,
-    label: id,
+    label: options.label ?? id,
     rows: matrix.rows,
     cols: matrix.cols,
     data: values,
@@ -243,11 +244,12 @@ function tokenRows(sceneModelData: SceneModelData, tokenLabel: (tokenId: number)
 function buildContextWindow(
   trace: TokenStepTrace,
   contextTokens: string[],
+  phase: PhaseDefinition,
 ): SceneFocusWindow {
   return {
     id: 'context-window',
-    title: 'visible cache',
-    subtitle: `Everything left of p${trace.positionId} is readable now.`,
+    title: phase.sceneCopy.windowTitle,
+    subtitle: phase.sceneCopy.windowSubtitle,
     anchorNodeId: 'context',
     placement: 'below',
     surfaces: [],
@@ -256,10 +258,10 @@ function buildContextWindow(
       label: `p${index}:${token}`,
       description:
         index === trace.positionId
-          ? 'current slot being processed'
-          : 'cached slot visible to attention',
+          ? 'current slot being processed now'
+          : 'earlier visible slot the model is allowed to read',
     })),
-    note: 'The current token and every earlier visible token become the readable context band.',
+    note: phase.sceneCopy.note,
   }
 }
 
@@ -284,12 +286,12 @@ export function buildTensorWindow(
 
   switch (phase.id) {
     case 'tokenize':
-      return buildContextWindow(trace, contextTokens)
+      return buildContextWindow(trace, contextTokens, phase)
     case 'token-embedding':
       return {
         id: phase.viz.focusWindowId,
-        title: 'wte',
-        subtitle: `Lookup row ${currentToken} from the 27x16 token table.`,
+        title: phase.sceneCopy.windowTitle,
+        subtitle: phase.sceneCopy.windowSubtitle,
         anchorNodeId: 'token-embedding',
         placement: 'right',
         surfaces: [
@@ -298,26 +300,30 @@ export function buildTensorWindow(
             sceneModelData.weights.wte,
             tokenRows(sceneModelData, tokenLabel),
             weightCols,
-            { highlightedRows: [trace.tokenId] },
+            {
+              highlightedRows: [trace.tokenId],
+              label: 'token meaning table',
+            },
           ),
         ],
         vectors: [
-          buildVectorSurface('token-row', `row ${currentToken}`, trace.tokenEmbedding, {
+          buildVectorSurface('token-row', `current meaning for ${currentToken}`, trace.tokenEmbedding, {
             itemLabels: weightCols,
           }),
         ],
         lookups: [
           {
             label: currentSlotLabel,
-            description: `The token id for ${currentToken} selects this highlighted row.`,
+            description: `The token id for ${currentToken} selects this highlighted meaning row.`,
           },
         ],
+        note: phase.sceneCopy.note,
       }
     case 'position-embedding':
       return {
         id: phase.viz.focusWindowId,
-        title: 'wpe',
-        subtitle: `Lookup row p${trace.positionId} from the 16x16 position table.`,
+        title: phase.sceneCopy.windowTitle,
+        subtitle: phase.sceneCopy.windowSubtitle,
         anchorNodeId: 'position-embedding',
         placement: 'right',
         surfaces: [
@@ -326,13 +332,16 @@ export function buildTensorWindow(
             sceneModelData.weights.wpe,
             Array.from({ length: sceneModelData.config.blockSize }, (_, index) => `p${index}`),
             weightCols,
-            { highlightedRows: [trace.positionId] },
+            {
+              highlightedRows: [trace.positionId],
+              label: 'position signal table',
+            },
           ),
         ],
         vectors: [
           buildVectorSurface(
             'position-row',
-            `row p${trace.positionId}`,
+            `signal for p${trace.positionId}`,
             trace.positionEmbedding,
             {
               itemLabels: weightCols,
@@ -342,39 +351,40 @@ export function buildTensorWindow(
         lookups: [
           {
             label: `p${trace.positionId}`,
-            description: 'This row injects slot index information into the token state.',
+            description: 'This highlighted row marks where the current slot sits in the sequence.',
           },
         ],
+        note: phase.sceneCopy.note,
       }
     case 'embed-add-norm':
       return {
         id: phase.viz.focusWindowId,
-        title: 'residual build',
-        subtitle: 'Token row + position row -> summed state -> normalized state.',
+        title: phase.sceneCopy.windowTitle,
+        subtitle: phase.sceneCopy.windowSubtitle,
         anchorNodeId: 'norm-1',
         placement: 'right',
         surfaces: [],
         vectors: [
-          buildVectorSurface('token-vec', 'token vector', trace.tokenEmbedding, {
+          buildVectorSurface('token-vec', 'token meaning vector', trace.tokenEmbedding, {
             itemLabels: weightCols,
           }),
-          buildVectorSurface('position-vec', 'position vector', trace.positionEmbedding, {
+          buildVectorSurface('position-vec', 'position signal vector', trace.positionEmbedding, {
             itemLabels: weightCols,
           }),
-          buildVectorSurface('sum-vec', 'xAfterEmbed', trace.xAfterEmbed, {
+          buildVectorSurface('sum-vec', 'combined slot state', trace.xAfterEmbed, {
             itemLabels: weightCols,
           }),
-          buildVectorSurface('norm-vec', 'xAfterNorm', trace.xAfterNorm, {
+          buildVectorSurface('norm-vec', 'rescaled slot state', trace.xAfterNorm, {
             itemLabels: weightCols,
           }),
         ],
-        note: 'This is the first full slot state the transformer can read from.',
+        note: phase.sceneCopy.note,
       }
     case 'qkv':
       return {
         id: phase.viz.focusWindowId,
-        title: 'q / k / v projections',
-        subtitle: `The normalized slot ${currentSlotLabel} is multiplied by three 16x16 matrices.`,
+        title: phase.sceneCopy.windowTitle,
+        subtitle: phase.sceneCopy.windowSubtitle,
         anchorNodeId: 'qkv',
         placement: 'below',
         surfaces: [
@@ -383,70 +393,76 @@ export function buildTensorWindow(
             sceneModelData.weights['layer0.attn_wq'],
             weightCols,
             weightCols,
+            { label: 'query weight table' },
           ),
           buildWeightSurface(
             'attn_wk',
             sceneModelData.weights['layer0.attn_wk'],
             weightCols,
             weightCols,
+            { label: 'key weight table' },
           ),
           buildWeightSurface(
             'attn_wv',
             sceneModelData.weights['layer0.attn_wv'],
             weightCols,
             weightCols,
+            { label: 'value weight table' },
           ),
         ],
         vectors: [],
         projection: {
-          equation: 'x · Wq / x · Wk / x · Wv',
-          input: buildVectorSurface('qkv-input', 'input', attnInput, {
+          equation: 'current state x three learned read tables',
+          input: buildVectorSurface('qkv-input', 'current slot state', attnInput, {
             itemLabels: weightCols,
           }),
           outputs: [
-            buildVectorSurface('q-out', 'q', currentQ, {
+            buildVectorSurface('q-out', 'search request (query)', currentQ, {
               itemLabels: weightCols,
             }),
-            buildVectorSurface('k-out', 'k', currentK, {
+            buildVectorSurface('k-out', 'slot description (key)', currentK, {
               itemLabels: weightCols,
             }),
-            buildVectorSurface('v-out', 'v', currentV, {
+            buildVectorSurface('v-out', 'returnable information (value)', currentV, {
               itemLabels: weightCols,
             }),
           ],
         },
+        note: phase.sceneCopy.note,
       }
     case 'attention-scores':
       return {
         id: phase.viz.focusWindowId,
-        title: 'attention scores',
-        subtitle: `${currentSlotLabel} compares its query against every visible key.`,
+        title: phase.sceneCopy.windowTitle,
+        subtitle: phase.sceneCopy.windowSubtitle,
         anchorNodeId: 'attention-head-2',
         placement: 'below',
         surfaces: [],
         vectors: [],
         attention: trace.heads.map((head, headIndex) =>
-          buildAttentionSurface(headIndex, 'scores', head.scores, slotLabels, 'diverging'),
+          buildAttentionSurface(headIndex, 'raw match scores', head.scores, slotLabels, 'diverging'),
         ),
+        note: phase.sceneCopy.note,
       }
     case 'attention-softmax':
       return {
         id: phase.viz.focusWindowId,
-        title: 'attention weights',
-        subtitle: 'Softmax turns each score row into a probability distribution over visible slots.',
+        title: phase.sceneCopy.windowTitle,
+        subtitle: phase.sceneCopy.windowSubtitle,
         anchorNodeId: 'attention-head-2',
         placement: 'below',
         surfaces: [],
         vectors: [],
         attention: trace.heads.map((head, headIndex) =>
-          buildAttentionSurface(headIndex, 'weights', head.weights, slotLabels, 'sequential'),
+          buildAttentionSurface(headIndex, 'read weights', head.weights, slotLabels, 'sequential'),
         ),
+        note: phase.sceneCopy.note,
       }
     case 'weighted-values':
       return {
         id: phase.viz.focusWindowId,
-        title: 'value mixing',
-        subtitle: 'Each head blends visible value slices into one returned vector.',
+        title: phase.sceneCopy.windowTitle,
+        subtitle: phase.sceneCopy.windowSubtitle,
         anchorNodeId: 'attention-mix',
         placement: 'below',
         surfaces: [],
@@ -455,7 +471,7 @@ export function buildTensorWindow(
           const flattenedValues = head.vSlices.flat()
           const surface = {
             id: `values-h${headIndex + 1}`,
-            label: `values h${headIndex + 1}`,
+            label: `returnable information h${headIndex + 1}`,
             rows: head.vSlices.length,
             cols: sceneModelData.config.headDim,
             data: flattenedValues,
@@ -473,7 +489,7 @@ export function buildTensorWindow(
             surface,
             result: buildVectorSurface(
               `mixed-h${headIndex + 1}`,
-              'mixed value',
+              'returned result',
               head.mixedValue,
               {
                 itemLabels: visibleHeadDim,
@@ -481,12 +497,13 @@ export function buildTensorWindow(
             ),
           }
         }),
+        note: phase.sceneCopy.note,
       }
     case 'attn-out':
       return {
         id: phase.viz.focusWindowId,
-        title: 'attention write-back',
-        subtitle: 'Concatenate the four head reads, project them, then add the residual path back in.',
+        title: phase.sceneCopy.windowTitle,
+        subtitle: phase.sceneCopy.windowSubtitle,
         anchorNodeId: 'residual-add-1',
         placement: 'right',
         surfaces: [
@@ -495,25 +512,27 @@ export function buildTensorWindow(
             sceneModelData.weights['layer0.attn_wo'],
             weightCols,
             weightCols,
+            { label: 'write-back weight table' },
           ),
         ],
         vectors: [
-          buildVectorSurface('concat-heads', 'concat(heads)', attnConcat, {
+          buildVectorSurface('concat-heads', 'joined head results', attnConcat, {
             itemLabels: weightCols,
           }),
-          buildVectorSurface('attn-output', 'attnOutput', trace.attnOutput, {
+          buildVectorSurface('attn-output', 'projected read result', trace.attnOutput, {
             itemLabels: weightCols,
           }),
-          buildVectorSurface('attn-residual', 'xAfterAttnResidual', trace.xAfterAttnResidual, {
+          buildVectorSurface('attn-residual', 'updated running state', trace.xAfterAttnResidual, {
             itemLabels: weightCols,
           }),
         ],
+        note: phase.sceneCopy.note,
       }
     case 'mlp':
       return {
         id: phase.viz.focusWindowId,
-        title: 'mlp block',
-        subtitle: 'Expand to 64 dimensions, keep positive activations, then project back to 16.',
+        title: phase.sceneCopy.windowTitle,
+        subtitle: phase.sceneCopy.windowSubtitle,
         anchorNodeId: 'mlp',
         placement: 'below',
         surfaces: [
@@ -522,35 +541,38 @@ export function buildTensorWindow(
             sceneModelData.weights['layer0.mlp_fc1'],
             dimensionLabels(sceneModelData.weights['layer0.mlp_fc1'].rows),
             weightCols,
+            { label: 'expansion weight table' },
           ),
           buildWeightSurface(
             'mlp_fc2',
             sceneModelData.weights['layer0.mlp_fc2'],
             weightCols,
             dimensionLabels(sceneModelData.weights['layer0.mlp_fc2'].cols),
+            { label: 'projection weight table' },
           ),
         ],
         vectors: [
-          buildVectorSurface('mlp-input', 'mlp input', mlpInput, {
+          buildVectorSurface('mlp-input', 'local-computation input', mlpInput, {
             itemLabels: weightCols,
           }),
-          buildVectorSurface('mlp-hidden', 'hidden / ReLU', trace.mlpHidden, {
+          buildVectorSurface('mlp-hidden', 'hidden state after ReLU', trace.mlpHidden, {
             itemLabels: dimensionLabels(trace.mlpHidden.length),
             colorScale: 'sequential',
           }),
-          buildVectorSurface('mlp-output', 'mlp output', trace.mlpOutput, {
+          buildVectorSurface('mlp-output', 'projected local result', trace.mlpOutput, {
             itemLabels: weightCols,
           }),
-          buildVectorSurface('mlp-residual', 'xAfterMlpResidual', trace.xAfterMlpResidual, {
+          buildVectorSurface('mlp-residual', 'updated running state', trace.xAfterMlpResidual, {
             itemLabels: weightCols,
           }),
         ],
+        note: phase.sceneCopy.note,
       }
     case 'lm-head':
       return {
         id: phase.viz.focusWindowId,
-        title: 'lm_head',
-        subtitle: 'Project the final slot state into one raw score per vocabulary token.',
+        title: phase.sceneCopy.windowTitle,
+        subtitle: phase.sceneCopy.windowSubtitle,
         anchorNodeId: 'logits',
         placement: 'right',
         surfaces: [
@@ -561,50 +583,54 @@ export function buildTensorWindow(
             weightCols,
             {
               highlightedRows: trace.topCandidates.map((candidate) => candidate.tokenId),
+              label: 'vocabulary scoring table',
             },
           ),
         ],
         vectors: [
-          buildVectorSurface('residual-readout', 'readout input', trace.xAfterMlpResidual, {
+          buildVectorSurface('residual-readout', 'final slot state', trace.xAfterMlpResidual, {
             itemLabels: weightCols,
           }),
-          buildVectorSurface('logits', 'logits', trace.logits, {
+          buildVectorSurface('logits', 'raw next-token scores', trace.logits, {
             itemLabels: tokenRows(sceneModelData, tokenLabel),
             highlightedIndices: trace.topCandidates.map((candidate) => candidate.tokenId),
           }),
         ],
+        note: phase.sceneCopy.note,
       }
     case 'probabilities':
       return {
         id: phase.viz.focusWindowId,
-        title: 'probabilities',
-        subtitle: 'Temperature scaling and softmax convert logits into an explicit vocabulary distribution.',
+        title: phase.sceneCopy.windowTitle,
+        subtitle: phase.sceneCopy.windowSubtitle,
         anchorNodeId: 'probabilities',
         placement: 'right',
         surfaces: [],
         vectors: [
-          buildVectorSurface('probs', 'softmax(logits)', trace.probs, {
+          buildVectorSurface('probs', 'next-token probabilities', trace.probs, {
             itemLabels: tokenRows(sceneModelData, tokenLabel),
             highlightedIndices: trace.topCandidates.map((candidate) => candidate.tokenId),
             colorScale: 'sequential',
           }),
         ],
-        note: `Top read right now: ${tokenLabel(trace.topCandidates[0]?.tokenId ?? trace.sampledTokenId)}.`,
+        note: [
+          phase.sceneCopy.note,
+          `Highest probability right now: ${tokenLabel(trace.topCandidates[0]?.tokenId ?? trace.sampledTokenId)}.`,
+        ]
+          .filter(Boolean)
+          .join(' '),
       }
     case 'sample':
     case 'append-or-stop':
       return {
         id: phase.viz.focusWindowId,
-        title: phase.id === 'sample' ? 'sample token' : 'append or stop',
-        subtitle:
-          tokenLabel(trace.sampledTokenId) === 'BOS'
-            ? 'BOS ends generation for this tiny model.'
-            : `${tokenLabel(trace.sampledTokenId)} becomes the next visible slot.`,
+        title: phase.sceneCopy.windowTitle,
+        subtitle: phase.sceneCopy.windowSubtitle,
         anchorNodeId: 'sample',
         placement: 'right',
         surfaces: [],
         vectors: [
-          buildVectorSurface('sample-probs', 'distribution', trace.probs, {
+          buildVectorSurface('sample-probs', 'distribution used for the choice', trace.probs, {
             itemLabels: tokenRows(sceneModelData, tokenLabel),
             highlightedIndices: [trace.sampledTokenId],
             colorScale: 'sequential',
@@ -615,13 +641,14 @@ export function buildTensorWindow(
             label: `picked ${tokenLabel(trace.sampledTokenId)}`,
             description:
               tokenLabel(trace.sampledTokenId) === 'BOS'
-                ? 'Stop now.'
-                : `Append to p${trace.positionId + 1} and run the loop again.`,
+                ? 'Treat this as the stop marker and end the loop.'
+                : `Append this token at p${trace.positionId + 1} and run the loop again.`,
           },
         ],
+        note: phase.sceneCopy.note,
       }
     default:
-      return buildContextWindow(trace, contextTokens)
+      return buildContextWindow(trace, contextTokens, phase)
   }
 }
 

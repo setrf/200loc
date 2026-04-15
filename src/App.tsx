@@ -12,7 +12,6 @@ import { SegmentTabs } from './components/SegmentTabs'
 import { useAutoplay } from './hooks/useAutoplay'
 import {
   inferencePhases,
-  trainingAppendix,
   type LineRange,
 } from './walkthrough/phases'
 import {
@@ -233,8 +232,6 @@ export default function App() {
   const tokenLabel = tokenizerRef.current!.tokenLabel
   const currentTokenLabel = tokenLabel(trace.tokenId)
   const sampledTokenLabel = tokenLabel(trace.sampledTokenId)
-  const nextTokenLabel = sampledTokenLabel === 'BOS' ? 'stop' : sampledTokenLabel
-  const backendStatusLabel = state.backend === 'webgpu' ? 'WebGPU' : 'CPU fallback'
   const prefixChars = [...state.normalization.normalized]
   const generatedBeforeCurrent =
     state.activeTraceIndex > 0
@@ -257,18 +254,12 @@ export default function App() {
     state.activePhaseIndex < phaseCount - 1 ||
     state.activeTraceIndex < state.traces.length - 1 ||
     state.status !== 'terminal'
-  const transitionLabel = `p${trace.positionId}:${currentTokenLabel} -> p${trace.positionId + 1}:${nextTokenLabel}`
   return (
     <div className="app-shell">
       <header className="app-header">
         <div>
           <p className="eyebrow">200loc</p>
           <h2 className="app-header__title">How a tiny GPT predicts the next token</h2>
-        </div>
-        <div className="app-header__meta">
-          <span>{backendStatusLabel}</span>
-          <span>{phase.title}</span>
-          <span>{transitionLabel}</span>
         </div>
       </header>
 
@@ -295,11 +286,96 @@ export default function App() {
             state.mobileTab === 'code' ? '' : 'is-active'
           }`}
         >
+          <div className="story-scene__toolbar">
+            <div className="story-scene__toolbar-controls">
+              <label className="story-panel__field" htmlFor="prefix-input">
+                <span className="eyebrow">Prefix</span>
+                <input
+                  id="prefix-input"
+                  className="story-panel__input"
+                  value={state.prefixInput}
+                  onChange={(event) => handlePrefixChange(event.target.value)}
+                  placeholder="em"
+                  autoComplete="off"
+                  spellCheck={false}
+                />
+              </label>
+
+              <div className="story-panel__actions">
+                <button
+                  type="button"
+                  onClick={() => {
+                    dispatch({ type: 'setPlaying', playing: false })
+                    void hydrate(state.prefixInput)
+                  }}
+                >
+                  Reset
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    dispatch({ type: 'setPlaying', playing: false })
+                    dispatch({ type: 'phasePrev', phaseCount })
+                  }}
+                  disabled={!canPrev}
+                >
+                  Prev
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    dispatch({ type: 'setPlaying', playing: false })
+                    void advance()
+                  }}
+                  disabled={!canNext}
+                >
+                  Next
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (state.status === 'playing') {
+                      dispatch({ type: 'setPlaying', playing: false })
+                    } else {
+                      dispatch({ type: 'setPlaying', playing: true })
+                    }
+                  }}
+                  disabled={!canNext}
+                >
+                  {state.status === 'playing' ? 'Pause' : 'Play'}
+                </button>
+              </div>
+            </div>
+          </div>
+
           <div
             className={`story-scene__scene ${
               state.mobileTab === 'scene' ? 'is-active' : ''
             }`}
           >
+            <div
+              className="scene-panel__stage-chip"
+              onMouseEnter={() => handleFocusRanges(phase.codeRanges)}
+              onMouseLeave={() => handleFocusRanges(null)}
+            >
+              <div className="scene-panel__stage-chip-top">
+                <span className="eyebrow">Current stage</span>
+                <span className="scene-panel__stage-step">
+                  step {state.activePhaseIndex + 1} / {phaseCount}
+                </span>
+              </div>
+              <strong>{phase.groupTitle}</strong>
+              <span>
+                stage step {phase.stepIndexWithinGroup} / {phase.stepCountWithinGroup} ·{' '}
+                {phase.codeRanges
+                  .map((range) =>
+                    range.start === range.end
+                      ? `L${range.start}`
+                      : `L${range.start}-${range.end}`,
+                  )
+                  .join(', ')}
+              </span>
+            </div>
             <ArchitectureScene
               trace={trace}
               phase={phase}
@@ -316,45 +392,12 @@ export default function App() {
             }`}
           >
             <Controls
-              prefix={state.prefixInput}
-              normalization={state.normalization}
-              backend={state.backend}
-              fallbackReason={state.fallbackReason}
-              phaseTitle={phase.title}
-              phaseStep={state.activePhaseIndex + 1}
-              phaseCount={phaseCount}
-              transitionLabel={transitionLabel}
-              explanationTitle={phase.explanationTitle(trace, tokenLabel)}
-              explanationBody={phase.explanationBody(trace, tokenLabel)}
-              explanationWhy={phase.explanationWhy(trace, tokenLabel)}
-              codeRanges={phase.codeRanges}
-              appendixOpen={state.appendixOpen}
-              appendixSections={trainingAppendix}
-              playing={state.status === 'playing'}
-              canPrev={canPrev}
-              canNext={canNext}
-              onPrefixChange={handlePrefixChange}
-              onReset={() => {
-                dispatch({ type: 'setPlaying', playing: false })
-                void hydrate(state.prefixInput)
-              }}
-              onPrev={() => {
-                dispatch({ type: 'setPlaying', playing: false })
-                dispatch({ type: 'phasePrev', phaseCount })
-              }}
-              onNext={() => {
-                dispatch({ type: 'setPlaying', playing: false })
-                void advance()
-              }}
-              onTogglePlay={() => {
-                if (state.status === 'playing') {
-                  dispatch({ type: 'setPlaying', playing: false })
-                } else {
-                  dispatch({ type: 'setPlaying', playing: true })
-                }
-              }}
-              onToggleAppendix={() => dispatch({ type: 'toggleAppendix' })}
-              onFocusRanges={handleFocusRanges}
+              plainSummary={phase.copy.plainSummary}
+              whatHappens={phase.copy.whatHappens}
+              whyItMatters={phase.copy.whyItMatters}
+              technicalTerms={phase.copy.technicalTerms}
+              sceneReading={phase.copy.sceneReading}
+              codeConnection={phase.copy.codeConnection}
             />
           </div>
         </section>

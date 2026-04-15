@@ -3,6 +3,7 @@ import {
   initialWalkthroughState,
   walkthroughReducer,
 } from '../walkthrough/reducer'
+import { inferencePhases } from '../walkthrough/phases'
 
 const trace = {
   tokenId: 1,
@@ -22,6 +23,8 @@ const trace = {
   sampledTokenId: 3,
   topCandidates: [],
 }
+
+const phaseCount = inferencePhases.length
 
 describe('walkthrough reducer', () => {
   it('resets into a ready walkthrough session', () => {
@@ -72,11 +75,11 @@ describe('walkthrough reducer', () => {
         ...resetState,
         traces: withSecondTrace.traces,
         activeTraceIndex: 0,
-        activePhaseIndex: 13,
+        activePhaseIndex: phaseCount - 1,
       },
       {
         type: 'phaseNext',
-        phaseCount: 14,
+        phaseCount,
       },
     )
 
@@ -86,11 +89,11 @@ describe('walkthrough reducer', () => {
     const movedWithinTrace = walkthroughReducer(
       {
         ...withSecondTrace,
-        activePhaseIndex: 13,
+        activePhaseIndex: phaseCount - 1,
       },
       {
         type: 'phasePrev',
-        phaseCount: 14,
+        phaseCount,
       },
     )
 
@@ -99,11 +102,11 @@ describe('walkthrough reducer', () => {
 
     const movedBack = walkthroughReducer(withSecondTrace, {
       type: 'phasePrev',
-      phaseCount: 14,
+      phaseCount,
     })
 
     expect(movedBack.activeTraceIndex).toBe(0)
-    expect(movedBack.activePhaseIndex).toBe(13)
+    expect(movedBack.activePhaseIndex).toBe(phaseCount - 1)
   })
 
   it('covers the remaining reducer actions and no-op branches', () => {
@@ -135,9 +138,6 @@ describe('walkthrough reducer', () => {
     })
     expect(state.hoverRanges).toEqual([{ start: 1, end: 2 }])
 
-    state = walkthroughReducer(state, { type: 'toggleAppendix' })
-    expect(state.appendixOpen).toBe(true)
-
     state = walkthroughReducer(state, {
       type: 'setMobileTab',
       tab: 'code',
@@ -146,13 +146,13 @@ describe('walkthrough reducer', () => {
 
     const atEnd = {
       ...state,
-      activePhaseIndex: 13,
+      activePhaseIndex: phaseCount - 1,
     }
     const noOpNext = walkthroughReducer(
       atEnd,
       {
       type: 'phaseNext',
-      phaseCount: 14,
+      phaseCount,
       },
     )
     expect(noOpNext).toBe(atEnd)
@@ -166,7 +166,7 @@ describe('walkthrough reducer', () => {
       atBeginning,
       {
       type: 'phasePrev',
-      phaseCount: 14,
+      phaseCount,
       },
     )
     expect(noOpPrev).toBe(atBeginning)

@@ -56,15 +56,15 @@ async function activeLineNumbers(page: Page) {
 }
 
 async function stepLabel(page: Page) {
-  return (await page.locator('.story-panel__badge').textContent())?.trim() ?? ''
+  return (await page.locator('.scene-panel__stage-step').textContent())?.trim() ?? ''
 }
 
 async function phaseLabel(page: Page) {
-  return (await page.locator('.story-panel__phase-chip strong').textContent())?.trim() ?? ''
+  return (await page.locator('.scene-panel__stage-chip strong').textContent())?.trim() ?? ''
 }
 
-async function transitionLabel(page: Page) {
-  return (await page.locator('.story-panel__transition strong').textContent())?.trim() ?? ''
+async function stepTitleLabel(page: Page) {
+  return (await page.locator('.story-panel__summary').textContent())?.trim() ?? ''
 }
 
 async function advanceOnePhase(page: Page) {
@@ -134,60 +134,49 @@ test.describe('desktop walkthrough', () => {
 
     await prefix.fill('Em-12??')
     await expect(prefix).toHaveValue('em')
-    await expect(page.getByText('Only lowercase a-z are kept.')).toBeVisible()
 
     await prefix.fill('abcdefghijklmnopqrstuvwxyz')
     await expect(prefix).toHaveValue('abcdefghijklmno')
-    await expect(page.getByText('Prefix was capped at 15 characters.')).toBeVisible()
 
     await prefix.fill('em')
     await page.getByRole('button', { name: 'Reset' }).click()
 
-    expect(await transitionLabel(page)).toBe('p2:m -> p3:i')
+    await expect(page.locator('.story-panel__summary')).toContainText(
+      'See the readable history',
+    )
     expect(issues).toEqual([])
   })
 
-  test('keeps story, code, and training appendix highlights synchronized', async ({ page }) => {
+  test('keeps story and code highlights synchronized', async ({ page }) => {
     const issues = collectBrowserIssues(page)
 
     expect(await activeLineNumbers(page)).toEqual([23, 24, 25, 26, 27, 191, 192, 193, 194, 195, 196])
 
-    await advanceOnePhase(page)
+    for (let index = 0; index < 3; index += 1) {
+      await advanceOnePhase(page)
+    }
     expect(await phaseLabel(page)).toBe('Token Embedding')
-    expect(await activeLineNumbers(page)).toEqual([109])
-
-    await page.getByRole('button', { name: 'Show training note' }).click()
-    const datasetButton = page.getByRole('button', { name: /Dataset \+ Shuffle/i })
-    await datasetButton.hover()
-    expect(await activeLineNumbers(page)).toEqual([
-      14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27,
-    ])
-
-    await page.locator('.story-panel__appendix-body').hover({ position: { x: 4, y: 4 } })
-    await page.mouse.move(10, 10)
     expect(await activeLineNumbers(page)).toEqual([109])
     expect(issues).toEqual([])
   })
 
-  test('crosses the token boundary cleanly after the fourteenth phase', async ({ page }) => {
+  test('crosses the token boundary cleanly after the thirty-fourth step', async ({ page }) => {
     const issues = collectBrowserIssues(page)
     await page.getByRole('textbox', { name: 'Prefix' }).fill('em')
     await page.getByRole('button', { name: 'Reset' }).click()
-    await expect
-      .poll(() => transitionLabel(page), { timeout: 5_000 })
-      .toBe('p2:m -> p3:i')
+    await expect(page.locator('.scene-panel__stage-chip')).toContainText('Tokenize Prefix')
 
-    for (let index = 0; index < 13; index += 1) {
+    for (let index = 0; index < 33; index += 1) {
       await advanceOnePhase(page)
     }
 
-    expect(await stepLabel(page)).toBe('step 14 / 14')
+    expect(await stepLabel(page)).toBe('step 34 / 34')
     expect(await phaseLabel(page)).toBe('Append Or Stop')
 
     await advanceOnePhase(page)
-    expect(await stepLabel(page)).toBe('step 1 / 14')
+    expect(await stepLabel(page)).toBe('step 1 / 34')
     expect(await phaseLabel(page)).toBe('Tokenize Prefix')
-    expect(await transitionLabel(page)).toMatch(/^p3:i -> p4:/)
+    expect(await stepTitleLabel(page)).toBe('See the readable history')
     expect(issues).toEqual([])
   })
 
@@ -197,7 +186,7 @@ test.describe('desktop walkthrough', () => {
     await page.getByRole('button', { name: 'Play' }).click()
     await expect(page.getByRole('button', { name: 'Pause' })).toBeVisible()
     await page.waitForTimeout(1_500)
-    expect(await stepLabel(page)).not.toBe('step 1 / 14')
+    expect(await stepLabel(page)).not.toBe('step 1 / 34')
 
     await page.getByRole('button', { name: 'Pause' }).click()
     const pausedStep = await stepLabel(page)
@@ -347,20 +336,20 @@ test.describe('desktop walkthrough', () => {
     expect(issues).toEqual([])
   })
 
-  test('walks all fourteen phases without remounting or browser errors', async ({
+  test('walks all thirty-four steps without remounting or browser errors', async ({
     page,
   }) => {
     const issues = collectBrowserIssues(page)
-    const seenPhases = new Set<string>()
+    const seenSteps = new Set<string>()
 
-    seenPhases.add(await phaseLabel(page))
-    for (let index = 0; index < 13; index += 1) {
+    seenSteps.add(await stepTitleLabel(page))
+    for (let index = 0; index < 33; index += 1) {
       await advanceOnePhase(page)
-      seenPhases.add(await phaseLabel(page))
+      seenSteps.add(await stepTitleLabel(page))
     }
 
-    expect(await stepLabel(page)).toBe('step 14 / 14')
-    expect(seenPhases.size).toBe(14)
+    expect(await stepLabel(page)).toBe('step 34 / 34')
+    expect(seenSteps.size).toBe(34)
     expect(issues).toEqual([])
   })
 
@@ -391,7 +380,7 @@ test.describe('desktop walkthrough', () => {
         return win.__microVizDebug?.microViz?.phaseState?.cameraPoseId ?? null
       })
 
-    for (let index = 0; index < 4; index += 1) {
+    for (let index = 0; index < 9; index += 1) {
       await advanceOnePhase(page)
     }
 
@@ -425,7 +414,7 @@ test.describe('desktop walkthrough', () => {
     await expect(page.locator('.scene-panel canvas')).toBeVisible()
     expect(await page.evaluate(() => window.scrollY)).toBe(0)
 
-    for (let index = 0; index < 10; index += 1) {
+    for (let index = 0; index < 26; index += 1) {
       await advanceOnePhase(page)
     }
 
@@ -477,10 +466,10 @@ test.describe('desktop walkthrough', () => {
     await scene.scrollIntoViewIfNeeded()
     await expect(page.locator('.scene-panel canvas')).toBeVisible()
 
-    for (let index = 0; index < 4; index += 1) {
+    for (let index = 0; index < 9; index += 1) {
       await advanceOnePhase(page)
     }
-    await expect(page.locator('.story-panel__phase-chip')).toContainText('Q / K / V')
+    await expect(page.locator('.scene-panel__stage-chip')).toContainText('Q / K / V')
     await page.waitForTimeout(500)
 
     const hoverPoint = await findHoverablePoint(page, eventSurface)

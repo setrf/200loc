@@ -15,27 +15,12 @@ vi.mock('../model', () => ({
 
 vi.mock('../components/Controls', () => ({
   Controls: ({
-    phaseTitle,
-    onPrev,
-    onNext,
-    onTogglePlay,
+    plainSummary,
   }: {
-    phaseTitle: string
-    onPrev: () => void
-    onNext: () => void
-    onTogglePlay: () => void
+    plainSummary: string
   }) => (
     <div>
-      <span>{phaseTitle}</span>
-      <button type="button" onClick={onPrev}>
-        Force Prev
-      </button>
-      <button type="button" onClick={onNext}>
-        Force Next
-      </button>
-      <button type="button" onClick={onTogglePlay}>
-        Force Toggle
-      </button>
+      <span>{plainSummary}</span>
     </div>
   ),
 }))
@@ -112,9 +97,9 @@ describe('App forced control branches', () => {
     const { default: App } = await import('../App')
     render(<App />)
 
-    await screen.findAllByText('Tokenize Prefix')
+    await screen.findAllByText('See the readable history')
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Force Prev' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Prev' }))
     })
 
     expect(runtime.advance).not.toHaveBeenCalled()
@@ -140,22 +125,20 @@ describe('App forced control branches', () => {
     const { default: App } = await import('../App')
     render(<App />)
 
-    await screen.findAllByText('Tokenize Prefix')
+    await screen.findAllByText('See the readable history')
 
-    for (let index = 0; index < 13; index += 1) {
+    for (let index = 0; index < 33; index += 1) {
       await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: 'Force Next' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Next' }))
       })
     }
 
-    await waitFor(() => {
-      expect(screen.getAllByText('Append Or Stop').length).toBeGreaterThanOrEqual(2)
-    })
+    await screen.findByText('Append Or Stop')
 
     expect(runtime.advance).not.toHaveBeenCalled()
 
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Force Toggle' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Play' }))
     })
 
     expect(runtime.advance).not.toHaveBeenCalled()

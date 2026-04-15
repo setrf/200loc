@@ -2,11 +2,13 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { useEffect, useRef } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { PrefixNormalization } from '../model'
+import { inferencePhases } from '../walkthrough/phases'
 import { loadBundle, makeTrace } from './helpers/fixtures'
 
 const loadModelBundleMock = vi.fn()
 const createTokenizerMock = vi.fn()
 const runtimeCtorMock = vi.fn()
+const phaseCount = inferencePhases.length
 
 vi.mock('../model', () => ({
   loadModelBundle: loadModelBundleMock,
@@ -169,15 +171,13 @@ describe('App', () => {
 
     await screen.findByText('How a tiny GPT predicts the next token')
     expect(screen.getAllByText('microgpt').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('CPU fallback').length).toBeGreaterThan(0)
     expect(screen.getAllByText('Tokenize Prefix').length).toBeGreaterThan(0)
     expect(await screen.findByTestId('fallback-scene')).toBeInTheDocument()
-    expect(screen.getAllByText('p2:12 -> p3:stop').length).toBeGreaterThan(0)
     expect(findCodeLine('line 117').closest('li')).not.toHaveClass('is-active')
 
-    fireEvent.mouseEnter(screen.getAllByText('step 1 / 14')[0])
+    fireEvent.mouseEnter(screen.getAllByText(`step 1 / ${phaseCount}`)[0])
     expect(findCodeLine('line 23').closest('li')).toHaveClass('is-active')
-    fireEvent.mouseLeave(screen.getAllByText('step 1 / 14')[0])
+    fireEvent.mouseLeave(screen.getAllByText(`step 1 / ${phaseCount}`)[0])
     fireEvent.mouseEnter(screen.getByLabelText('Architecture scene'))
     expect(document.querySelectorAll('.code-viewer__line.is-active').length).toBeGreaterThan(0)
     fireEvent.mouseLeave(screen.getByLabelText('Architecture scene'))
@@ -190,37 +190,33 @@ describe('App', () => {
       expect(runtime.reset).toHaveBeenLastCalledWith('em')
     })
 
-    fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+    for (let index = 0; index < 3; index += 1) {
+      fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+    }
     expect(screen.getAllByText('Token Embedding').length).toBeGreaterThan(0)
-    expect(screen.getByText('Look up the row for 12')).toBeInTheDocument()
+    expect(screen.getByText('Look up a learned meaning vector')).toBeInTheDocument()
 
-    for (let index = 0; index < 5; index += 1) {
+    for (let index = 0; index < 12; index += 1) {
       fireEvent.click(screen.getByRole('button', { name: 'Next' }))
     }
     expect(
-      screen.getByText('Normalize the read weights for p2'),
+      screen.getByText('Convert raw scores into normalized weights'),
     ).toBeInTheDocument()
 
-    for (let index = 0; index < 5; index += 1) {
+    for (let index = 0; index < 13; index += 1) {
       fireEvent.click(screen.getByRole('button', { name: 'Next' }))
     }
     expect(
-      screen.getByText('Normalize the next-token distribution for p3'),
+      screen.getByText('Convert raw scores into probabilities'),
     ).toBeInTheDocument()
 
-    for (let index = 0; index < 2; index += 1) {
+    for (let index = 0; index < 5; index += 1) {
       fireEvent.click(screen.getByRole('button', { name: 'Next' }))
     }
     expect(screen.getAllByText('Append Or Stop').length).toBeGreaterThan(0)
-    expect(screen.getByText('Stop generation on BOS')).toBeInTheDocument()
-
-    fireEvent.click(screen.getByRole('button', { name: 'Show training note' }))
-    expect(screen.getByRole('button', { name: 'Hide training note' })).toBeInTheDocument()
-    expect(screen.getByText('Dataset + Shuffle')).toBeInTheDocument()
-
-    fireEvent.mouseEnter(screen.getByText('Dataset + Shuffle'))
-    expect(document.querySelectorAll('.code-viewer__line.is-active').length).toBeGreaterThan(0)
-    fireEvent.mouseLeave(screen.getByText('Dataset + Shuffle'))
+    expect(
+      screen.getByText('See the whole process as one repeating autoregressive loop'),
+    ).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('tab', { name: 'Scene' }))
     expect(screen.getByRole('tab', { name: 'Scene' })).toHaveAttribute(
@@ -258,7 +254,7 @@ describe('App', () => {
     render(<App />)
     await screen.findByText('How a tiny GPT predicts the next token')
 
-    for (let index = 0; index < 14; index += 1) {
+    for (let index = 0; index < phaseCount; index += 1) {
       fireEvent.click(screen.getByRole('button', { name: 'Next' }))
     }
 
@@ -287,8 +283,7 @@ describe('App', () => {
     render(<App />)
 
     await screen.findByText('How a tiny GPT predicts the next token')
-    expect(screen.getAllByText('p0:BOS -> p1:stop').length).toBeGreaterThan(0)
-    expect(screen.getByText('Stand on p0:BOS')).toBeInTheDocument()
+    expect(screen.getByText('See the readable history')).toBeInTheDocument()
   })
 
   it('falls back to the generic advance error message for non-Error rejections', async () => {
@@ -311,7 +306,7 @@ describe('App', () => {
     render(<App />)
     await screen.findByText('How a tiny GPT predicts the next token')
 
-    for (let index = 0; index < 14; index += 1) {
+    for (let index = 0; index < phaseCount; index += 1) {
       fireEvent.click(screen.getByRole('button', { name: 'Next' }))
     }
 
@@ -406,7 +401,7 @@ describe('App', () => {
     render(<App />)
 
     await screen.findByText('How a tiny GPT predicts the next token')
-    expect(screen.getAllByText('WebGPU').length).toBeGreaterThan(0)
+    expect(screen.getByText(`step 1 / ${phaseCount}`)).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: 'Reset' }))
     await waitFor(() => {
@@ -417,7 +412,8 @@ describe('App', () => {
     expect(screen.getByRole('button', { name: 'Pause' })).toBeInTheDocument()
 
     await waitFor(() => {
-      expect(screen.getAllByText('Token Embedding').length).toBeGreaterThan(0)
+      expect(screen.getAllByText('Tokenize Prefix').length).toBeGreaterThan(0)
+      expect(screen.getByText('Focus on the slot being processed now')).toBeInTheDocument()
     })
 
     fireEvent.click(screen.getByRole('button', { name: 'Pause' }))
@@ -461,14 +457,7 @@ describe('App', () => {
     render(<App />)
     await screen.findByText('How a tiny GPT predicts the next token')
 
-    fireEvent.mouseEnter(screen.getAllByText('p2:12 -> p3:stop')[0])
-    fireEvent.mouseLeave(screen.getAllByText('p2:12 -> p3:stop')[0])
-
-    for (let index = 0; index < 5; index += 1) {
-      fireEvent.click(screen.getByRole('button', { name: 'Next' }))
-    }
-
-    for (let index = 0; index < 8; index += 1) {
+    for (let index = 0; index < phaseCount - 1; index += 1) {
       fireEvent.click(screen.getByRole('button', { name: 'Next' }))
     }
 
@@ -484,15 +473,15 @@ describe('App', () => {
     })
 
     await waitFor(() => {
-      expect(screen.getAllByText('p3:7 -> p4:8').length).toBeGreaterThan(0)
+      expect(screen.getAllByText(`step 1 / ${phaseCount}`).length).toBeGreaterThan(0)
     })
 
-    for (let index = 0; index < 14; index += 1) {
+    for (let index = 0; index < phaseCount; index += 1) {
       fireEvent.click(screen.getByRole('button', { name: 'Next' }))
     }
 
     await waitFor(() => {
-      expect(screen.getAllByText('p4:8 -> p5:9').length).toBeGreaterThan(0)
+      expect(runtime.advance).toHaveBeenCalledTimes(2)
     })
     expect(runtime.advance).toHaveBeenCalledTimes(2)
     },
@@ -610,6 +599,6 @@ describe('App', () => {
       expect(prefix).toHaveValue('emi')
     })
     expect(runtime.reset).toHaveBeenLastCalledWith('em')
-    expect(screen.getAllByText('p2:12 -> p3:stop').length).toBeGreaterThan(0)
+    expect(screen.getAllByText(`step 1 / ${phaseCount}`).length).toBeGreaterThan(0)
   })
 })
