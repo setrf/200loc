@@ -302,9 +302,9 @@
 
 .story-scene__toolbar-main {
   display: grid;
-  grid-template-columns: max-content max-content minmax(0, 1fr);
-  align-items: end;
-  gap: 14px;
+  grid-template-columns: minmax(260px, 1.1fr) minmax(280px, 0.9fr);
+  align-items: center;
+  gap: 18px;
 }
 
 .scene-panel__meta {
@@ -347,7 +347,12 @@
 }
 
 .story-scene__toolbar-controls {
-  display: contents;
+  min-width: 0;
+  max-width: 360px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: stretch;
 }
 
 .story-panel__field {
@@ -374,7 +379,7 @@
 
 .story-panel__actions {
   display: flex;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   justify-content: flex-start;
   gap: 8px;
   min-width: 0;
