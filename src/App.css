@@ -302,9 +302,9 @@
 
 .story-scene__toolbar-main {
   display: grid;
-  grid-template-columns: minmax(360px, 460px) minmax(0, 1fr);
-  align-items: center;
-  gap: 18px;
+  grid-template-columns: max-content max-content minmax(0, 1fr);
+  align-items: end;
+  gap: 14px;
 }
 
 .scene-panel__meta {
@@ -325,7 +325,7 @@
   flex-direction: column;
   justify-content: center;
   gap: 6px;
-  padding-left: 18px;
+  padding-left: 14px;
   border-left: 1px solid var(--border);
 }
 
@@ -347,14 +347,11 @@
 }
 
 .story-scene__toolbar-controls {
-  display: grid;
-  grid-template-columns: minmax(140px, 176px) minmax(0, 1fr);
-  gap: 16px;
-  align-items: end;
+  display: contents;
 }
 
 .story-panel__field {
-  min-width: 0;
+  width: 124px;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -379,14 +376,16 @@
   display: flex;
   flex-wrap: nowrap;
   justify-content: flex-start;
-  gap: 10px;
+  gap: 8px;
+  min-width: 0;
 }
 
-.story-panel__actions button {
-  flex: 0 0 auto;
+.story-scene__toolbar button {
+  min-height: 38px;
+  padding: 0 12px;
 }
 
-@media (max-width: 1180px) {
+@media (max-width: 1020px) {
   .story-scene__toolbar-main {
     grid-template-columns: 1fr;
     align-items: stretch;
