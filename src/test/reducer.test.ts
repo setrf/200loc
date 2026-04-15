@@ -98,7 +98,7 @@ describe('walkthrough reducer', () => {
     )
 
     expect(movedWithinTrace.activeTraceIndex).toBe(1)
-    expect(movedWithinTrace.activePhaseIndex).toBe(12)
+    expect(movedWithinTrace.activePhaseIndex).toBe(phaseCount - 2)
 
     const movedBack = walkthroughReducer(withSecondTrace, {
       type: 'phasePrev',

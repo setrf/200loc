@@ -1,11 +1,15 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { PrefixNormalization } from '../model'
+import { inferencePhases } from '../walkthrough/phases'
 import { loadBundle, makeTrace } from './helpers/fixtures'
 
 const loadModelBundleMock = vi.fn()
 const createTokenizerMock = vi.fn()
 const runtimeCtorMock = vi.fn()
+const firstBeat = inferencePhases[0]!.copy.beats[0]!.segments
+  .map((segment) => segment.text)
+  .join('')
 
 vi.mock('../model', () => ({
   loadModelBundle: loadModelBundleMock,
@@ -15,12 +19,12 @@ vi.mock('../model', () => ({
 
 vi.mock('../components/Controls', () => ({
   Controls: ({
-    plainSummary,
+    beats,
   }: {
-    plainSummary: string
+    beats: { segments: { text: string }[] }[]
   }) => (
     <div>
-      <span>{plainSummary}</span>
+      <span>{beats[0]?.segments.map((segment) => segment.text).join('')}</span>
     </div>
   ),
 }))
@@ -97,7 +101,7 @@ describe('App forced control branches', () => {
     const { default: App } = await import('../App')
     render(<App />)
 
-    await screen.findAllByText('See the readable history')
+    await screen.findAllByText(firstBeat)
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: 'Prev' }))
     })
@@ -125,7 +129,7 @@ describe('App forced control branches', () => {
     const { default: App } = await import('../App')
     render(<App />)
 
-    await screen.findAllByText('See the readable history')
+    await screen.findAllByText(firstBeat)
 
     for (let index = 0; index < 33; index += 1) {
       await act(async () => {

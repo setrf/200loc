@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { buildTensorWindow } from '../viz/llmViz/frame'
+import { getGlossaryEntry } from '../walkthrough/glossary'
 import { inferencePhases, trainingAppendix, vizFocusRanges } from '../walkthrough/phases'
 import { loadBundle, makeTrace } from './helpers/fixtures'
 
@@ -38,14 +39,20 @@ describe('phase line maps', () => {
       expect(phase.viz.cameraPoseId).toBeDefined()
       expect(phase.viz.overlayKind).toBeDefined()
       expect(vizFocusRanges[phase.viz.focusNodeId].length).toBeGreaterThan(0)
-      expect(phase.copy.plainSummary.length).toBeGreaterThan(0)
-      expect(phase.copy.whatHappens.length).toBeGreaterThan(0)
-      expect(phase.copy.whyItMatters.length).toBeGreaterThan(0)
-      expect(phase.copy.sceneReading.length).toBeGreaterThan(0)
-      expect(phase.copy.codeConnection.length).toBeGreaterThan(0)
+      expect(phase.copy.beats.length).toBeGreaterThan(0)
+      expect(phase.copy.beats[0]?.kind).toBe('core')
+      expect(phase.copy.beats.every((beat) => beat.segments.length > 0)).toBe(true)
+      expect(phase.copy.beats.some((beat) => beat.kind === 'scene')).toBe(true)
+      expect(phase.copy.beats.some((beat) => beat.kind === 'code')).toBe(true)
+      expect(
+        phase.copy.beats
+          .flatMap((beat) => beat.segments)
+          .filter((segment) => segment.kind === 'term')
+          .every((segment) => getGlossaryEntry(segment.glossaryId).title.length > 0),
+      ).toBe(true)
       expect(phase.sceneCopy.windowTitle.length).toBeGreaterThan(0)
       expect(phase.sceneCopy.windowSubtitle.length).toBeGreaterThan(0)
-      return phase.copy.plainSummary
+      return phase.copy.beats[0]?.segments.map((segment) => segment.text).join('') ?? ''
     })
 
     const groupCounts = Object.fromEntries(
@@ -56,7 +63,7 @@ describe('phase line maps', () => {
     )
 
     expect(summaries).toHaveLength(34)
-    expect(summaries[0]).toContain('small band of text')
+    expect(summaries[0]).toContain('small piece of text')
     expect(summaries.at(-1)).toContain('loops back')
     expect(groupCounts).toEqual({
       tokenize: 3,

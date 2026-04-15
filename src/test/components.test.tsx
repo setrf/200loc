@@ -1,11 +1,12 @@
-import { fireEvent, render, screen } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { act, fireEvent, render, screen } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ArchitectureScene } from '../components/ArchitectureScene'
 import { getFallbackCameraPoseForPhase } from '../components/architectureSceneFallback'
 import { CodeViewer } from '../components/CodeViewer'
 import { Controls } from '../components/Controls'
 import { SegmentTabs } from '../components/SegmentTabs'
 import { getCameraPose } from '../viz/llmViz/layout'
+import type { StoryBeat } from '../walkthrough/phases'
 import { inferencePhases } from '../walkthrough/phases'
 import { loadBundle, makeTrace } from './helpers/fixtures'
 
@@ -13,22 +14,40 @@ const bundle = loadBundle()
 const phaseById = (id: (typeof inferencePhases)[number]['id']) =>
   inferencePhases.find((phase) => phase.id === id)!
 
+function setMatchMedia(matches: boolean) {
+  Object.defineProperty(window, 'matchMedia', {
+    writable: true,
+    value: vi.fn().mockReturnValue({
+      matches,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }),
+  })
+}
+
+function flattenBeat(beat: StoryBeat) {
+  return beat.segments.map((segment) => segment.text).join('')
+}
+
 function makeControlsProps() {
   const firstPhase = inferencePhases[0]
   return {
-    plainSummary: firstPhase.copy.plainSummary,
-    whatHappens: firstPhase.copy.whatHappens,
-    whyItMatters: firstPhase.copy.whyItMatters,
-    technicalTerms: firstPhase.copy.technicalTerms,
-    sceneReading: firstPhase.copy.sceneReading,
-    codeConnection: firstPhase.copy.codeConnection,
+    beats: firstPhase.copy.beats,
+    mobileTab: 'story' as const,
+    stepId: firstPhase.stepId,
+    trace: makeTrace(),
   }
 }
 
 describe('ui components', () => {
+  beforeEach(() => {
+    setMatchMedia(false)
+  })
+
   afterEach(() => {
     vi.restoreAllMocks()
     vi.unstubAllGlobals()
+    vi.useRealTimers()
   })
 
   it('highlights active code lines', () => {
@@ -119,20 +138,141 @@ describe('ui components', () => {
 
   it('renders the story controls and hover mapping', () => {
     const props = makeControlsProps()
-    render(<Controls {...props} />)
+    const { container } = render(<Controls {...props} />)
 
-    expect(screen.getByText(props.plainSummary)).toBeInTheDocument()
-    expect(screen.getByText('New terms in this step')).toBeInTheDocument()
+    expect(screen.getByLabelText('Step explanation')).toBeInTheDocument()
+    expect(container.querySelector('.story-panel__summary')?.textContent).toContain(
+      flattenBeat(props.beats[0]!),
+    )
+    expect(container.querySelectorAll('.story-panel__lesson > *')).toHaveLength(1)
+    expect(container.querySelectorAll('.story-panel__beat')).toHaveLength(0)
+    expect(container.querySelectorAll('.story-panel__beat-label')).toHaveLength(0)
+    expect(screen.queryByText('New terms')).not.toBeInTheDocument()
+    expect(screen.queryByText(/In the scene:/)).not.toBeInTheDocument()
+    expect(container.querySelectorAll('[data-glossary-id]').length).toBeGreaterThan(0)
   })
 
-  it('renders explanation sections without the terms block when absent', () => {
+  it('renders a single guided block without term beats when absent', () => {
     const props = makeControlsProps()
-    props.technicalTerms = []
+    props.beats = props.beats.filter((beat) => beat.kind !== 'term')
 
+    const { container } = render(<Controls {...props} />)
+
+    expect(container.querySelectorAll('.story-panel__beat-label')).toHaveLength(0)
+    expect(container.querySelector('.story-panel__summary')?.textContent).toContain(
+      flattenBeat(props.beats[0]!),
+    )
+  })
+
+  it('shows a desktop annotation popup on hover and keeps it open when pinned', async () => {
+    vi.useFakeTimers()
+    const props = makeControlsProps()
     render(<Controls {...props} />)
 
-    expect(screen.queryByText('New terms in this step')).not.toBeInTheDocument()
-    expect(screen.getByText('How to read the scene')).toBeInTheDocument()
+    const trigger = screen.getByRole('button', { name: 'Context' })
+    fireEvent.mouseEnter(trigger)
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+
+    await act(async () => {
+      vi.advanceTimersByTime(280)
+    })
+
+    expect(screen.getByRole('dialog')).toHaveTextContent('Context')
+
+    fireEvent.click(trigger)
+    fireEvent.mouseLeave(trigger)
+    fireEvent.mouseLeave(screen.getByRole('dialog'))
+
+    await act(async () => {
+      vi.advanceTimersByTime(160)
+    })
+
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+
+    fireEvent.mouseDown(document.body)
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('keeps the hover popup alive when moving from the trigger into the popup', async () => {
+    vi.useFakeTimers()
+    const props = makeControlsProps()
+    render(<Controls {...props} />)
+
+    const trigger = screen.getByRole('button', { name: 'Context' })
+    fireEvent.mouseEnter(trigger)
+
+    await act(async () => {
+      vi.advanceTimersByTime(280)
+    })
+
+    const popup = screen.getByRole('dialog')
+    fireEvent.mouseLeave(trigger)
+    fireEvent.mouseEnter(popup)
+
+    await act(async () => {
+      vi.advanceTimersByTime(160)
+    })
+
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('allows only one desktop popup at a time', async () => {
+    vi.useFakeTimers()
+    const beats: StoryBeat[] = [
+      {
+        kind: 'core',
+        segments: [
+          { kind: 'term', text: 'Context', glossaryId: 'context' },
+          { kind: 'text', text: ' meets ' },
+          { kind: 'term', text: 'slot', glossaryId: 'slot' },
+          { kind: 'text', text: '.' },
+        ],
+      },
+    ]
+
+    render(
+      <Controls
+        beats={beats}
+        mobileTab="story"
+        stepId="custom-step"
+        trace={makeTrace()}
+      />,
+    )
+
+    const contextTrigger = screen.getByRole('button', { name: 'Context' })
+    const slotTrigger = screen.getByRole('button', { name: 'slot' })
+
+    fireEvent.mouseEnter(contextTrigger)
+    await act(async () => {
+      vi.advanceTimersByTime(280)
+    })
+    expect(screen.getByRole('dialog')).toHaveTextContent('Context')
+
+    fireEvent.mouseEnter(slotTrigger)
+    await act(async () => {
+      vi.advanceTimersByTime(280)
+    })
+
+    expect(screen.getAllByRole('dialog')).toHaveLength(1)
+    expect(screen.getByRole('dialog')).toHaveTextContent('Slot')
+  })
+
+  it('renders an inline popin instead of a floating popup on compact viewports', () => {
+    setMatchMedia(true)
+    const props = makeControlsProps()
+    const { container } = render(<Controls {...props} />)
+
+    const trigger = screen.getByRole('button', { name: 'Context' })
+    fireEvent.click(trigger)
+
+    expect(container.querySelector('.annotation-popup--inline')).toBeInTheDocument()
+    expect(document.querySelector('.annotation-popup--floating')).not.toBeInTheDocument()
+
+    fireEvent.click(trigger)
+    expect(container.querySelector('.annotation-popup--inline')).not.toBeInTheDocument()
   })
 
   it('switches mobile tabs through the callback', () => {

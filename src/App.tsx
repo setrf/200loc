@@ -395,12 +395,10 @@ export default function App() {
             }`}
           >
             <Controls
-              plainSummary={phase.copy.plainSummary}
-              whatHappens={phase.copy.whatHappens}
-              whyItMatters={phase.copy.whyItMatters}
-              technicalTerms={phase.copy.technicalTerms}
-              sceneReading={phase.copy.sceneReading}
-              codeConnection={phase.copy.codeConnection}
+              beats={phase.copy.beats}
+              mobileTab={state.mobileTab}
+              stepId={phase.stepId}
+              trace={trace}
             />
           </div>
         </section>

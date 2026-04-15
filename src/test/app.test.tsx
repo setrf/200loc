@@ -9,6 +9,10 @@ const loadModelBundleMock = vi.fn()
 const createTokenizerMock = vi.fn()
 const runtimeCtorMock = vi.fn()
 const phaseCount = inferencePhases.length
+const phaseBeat = (index: number) =>
+  inferencePhases[index]!.copy.beats[0]!.segments
+    .map((segment) => segment.text)
+    .join('')
 
 vi.mock('../model', () => ({
   loadModelBundle: loadModelBundleMock,
@@ -194,29 +198,23 @@ describe('App', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Next' }))
     }
     expect(screen.getAllByText('Token Embedding').length).toBeGreaterThan(0)
-    expect(screen.getByText('Look up a learned meaning vector')).toBeInTheDocument()
+    expect(screen.getByText(phaseBeat(3))).toBeInTheDocument()
 
     for (let index = 0; index < 12; index += 1) {
       fireEvent.click(screen.getByRole('button', { name: 'Next' }))
     }
-    expect(
-      screen.getByText('Convert raw scores into normalized weights'),
-    ).toBeInTheDocument()
+    expect(screen.getByText(phaseBeat(15))).toBeInTheDocument()
 
     for (let index = 0; index < 13; index += 1) {
       fireEvent.click(screen.getByRole('button', { name: 'Next' }))
     }
-    expect(
-      screen.getByText('Convert raw scores into probabilities'),
-    ).toBeInTheDocument()
+    expect(screen.getByText(phaseBeat(28))).toBeInTheDocument()
 
     for (let index = 0; index < 5; index += 1) {
       fireEvent.click(screen.getByRole('button', { name: 'Next' }))
     }
     expect(screen.getAllByText('Append Or Stop').length).toBeGreaterThan(0)
-    expect(
-      screen.getByText('See the whole process as one repeating autoregressive loop'),
-    ).toBeInTheDocument()
+    expect(screen.getByText(phaseBeat(33))).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('tab', { name: 'Scene' }))
     expect(screen.getByRole('tab', { name: 'Scene' })).toHaveAttribute(
@@ -283,7 +281,7 @@ describe('App', () => {
     render(<App />)
 
     await screen.findByText('How a tiny GPT predicts the next token')
-    expect(screen.getByText('See the readable history')).toBeInTheDocument()
+    expect(screen.getByText(phaseBeat(0))).toBeInTheDocument()
   })
 
   it('falls back to the generic advance error message for non-Error rejections', async () => {
@@ -413,7 +411,7 @@ describe('App', () => {
 
     await waitFor(() => {
       expect(screen.getAllByText('Tokenize Prefix').length).toBeGreaterThan(0)
-      expect(screen.getByText('Focus on the slot being processed now')).toBeInTheDocument()
+      expect(screen.getByText(phaseBeat(1))).toBeInTheDocument()
     })
 
     fireEvent.click(screen.getByRole('button', { name: 'Pause' }))
@@ -600,5 +598,86 @@ describe('App', () => {
     })
     expect(runtime.reset).toHaveBeenLastCalledWith('em')
     expect(screen.getAllByText(`step 1 / ${phaseCount}`).length).toBeGreaterThan(0)
+  })
+
+  it('closes an open annotation when the phase advances or the walkthrough resets', async () => {
+    const runtime = makeRuntime()
+    runtime.reset.mockResolvedValue({
+      trace: makeTrace(),
+      session: { visibleTokenIds: [4, 12], done: false },
+      diagnostics: {
+        activeBackend: 'cpu',
+        fallbackReason: 'WebGPU unavailable',
+      },
+    })
+
+    loadModelBundleMock.mockResolvedValue(bundleStub)
+    createTokenizerMock.mockReturnValue(makeTokenizer())
+    runtimeCtorMock.mockImplementation(function () {
+      return runtime
+    })
+    mockSourceFetch(sourceText)
+
+    const { default: App } = await import('../App')
+    render(<App />)
+
+    await screen.findByText('How a tiny GPT predicts the next token')
+
+    fireEvent.click(document.querySelector('.annotation-trigger') as HTMLElement)
+    expect(screen.getByRole('dialog')).toHaveTextContent('Context')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    })
+
+    fireEvent.click(document.querySelector('.annotation-trigger') as HTMLElement)
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reset' }))
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    })
+  })
+
+  it('closes a compact-story popin when the user leaves the Story tab', async () => {
+    Object.defineProperty(window, 'matchMedia', {
+      writable: true,
+      value: vi.fn().mockReturnValue({
+        matches: true,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      }),
+    })
+
+    const runtime = makeRuntime()
+    runtime.reset.mockResolvedValue({
+      trace: makeTrace(),
+      session: { visibleTokenIds: [4, 12], done: false },
+      diagnostics: {
+        activeBackend: 'cpu',
+        fallbackReason: 'WebGPU unavailable',
+      },
+    })
+
+    loadModelBundleMock.mockResolvedValue(bundleStub)
+    createTokenizerMock.mockReturnValue(makeTokenizer())
+    runtimeCtorMock.mockImplementation(function () {
+      return runtime
+    })
+    mockSourceFetch(sourceText)
+
+    const { default: App } = await import('../App')
+    render(<App />)
+
+    await screen.findByText('How a tiny GPT predicts the next token')
+
+    fireEvent.click(document.querySelector('.annotation-trigger') as HTMLElement)
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Scene' }))
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    })
   })
 })
