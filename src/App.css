@@ -302,9 +302,9 @@
 
 .story-scene__toolbar-main {
   display: grid;
-  grid-template-columns: minmax(260px, 1.1fr) minmax(280px, 0.9fr);
-  align-items: center;
-  gap: 18px;
+  grid-template-columns: minmax(280px, 320px) minmax(0, 1fr);
+  align-items: stretch;
+  gap: 24px;
 }
 
 .scene-panel__meta {
@@ -324,8 +324,8 @@
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 6px;
-  padding-left: 14px;
+  gap: 10px;
+  padding-left: 22px;
   border-left: 1px solid var(--border);
 }
 
@@ -347,16 +347,16 @@
 }
 
 .story-scene__toolbar-controls {
-  min-width: 0;
-  max-width: 360px;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
-  align-items: stretch;
+  align-content: center;
+  min-width: 0;
 }
 
 .story-panel__field {
-  width: 124px;
+  grid-column: 1 / -1;
+  width: auto;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -378,16 +378,13 @@
 }
 
 .story-panel__actions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-start;
-  gap: 8px;
-  min-width: 0;
+  display: contents;
 }
 
 .story-scene__toolbar button {
   min-height: 38px;
   padding: 0 12px;
+  width: 100%;
 }
 
 @media (max-width: 1020px) {
@@ -952,6 +949,10 @@
   .scene-panel__header {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .story-scene__toolbar-controls {
+    grid-template-columns: 1fr;
   }
 
   .story-scene__toolbar-main {
