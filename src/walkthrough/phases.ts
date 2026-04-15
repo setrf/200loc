@@ -197,7 +197,9 @@ const inferenceGroups: GroupSeed[] = [
             ' means the text the model is allowed to read before it makes its next guess.',
           ),
           scene(
-            'Look at the highlighted context strip. Every slot inside it is available to the model right now.',
+            'Look at the highlighted context strip. Every slot inside it is part of the ',
+            annotate('visible-history', 'visible history'),
+            ' available to the model right now.',
           ),
           code(
             'These lines build the visible ',
@@ -279,10 +281,8 @@ const inferenceGroups: GroupSeed[] = [
     select: (trace) => trace.tokenEmbedding,
     sceneCopy: {
       windowTitle: 'Meaning lookup for the current token',
-      windowSubtitle:
-        'The current token id selects one learned row from the token table.',
-      note:
-        'That learned row is the first numeric description of what the current token tends to mean in many contexts.',
+      windowSubtitle: 'The current token id selects one learned row from the token table.',
+      note: 'That learned row is the first numeric description of what the current token tends to mean in many contexts.',
     },
     steps: [
       {
@@ -303,7 +303,9 @@ const inferenceGroups: GroupSeed[] = [
             ' beneath it. That pulled-out row is the token description for this step.',
           ),
           code(
-            'This highlighted line uses the current token id to fetch one learned row from the ',
+            'This highlighted line uses the current token id to fetch one ',
+            annotate('learned-row', 'learned row'),
+            ' from the ',
             annotate('token-table', 'token table'),
             '.',
           ),
@@ -382,7 +384,9 @@ const inferenceGroups: GroupSeed[] = [
             'The model also needs to know where this token sits in the sequence, not just which token it is.',
           ),
           core(
-            'So it looks up a second learned row using the current position, giving this slot an order signal.',
+            'So it looks up a second ',
+            annotate('learned-row', 'learned row'),
+            ' using the current position, giving this slot an order signal.',
           ),
           scene(
             'Look at the highlighted row in the second table. It is chosen by position, not by token identity.',
@@ -413,7 +417,9 @@ const inferenceGroups: GroupSeed[] = [
             annotate('wpe', 'WPE'),
             ' is the ',
             annotate('position-table', 'position table'),
-            ' that stores one learned row for each possible slot position.',
+            ' that stores one ',
+            annotate('learned-row', 'learned row'),
+            ' for each possible slot position.',
           ),
           scene(
             'Look at the extracted ',
@@ -452,8 +458,7 @@ const inferenceGroups: GroupSeed[] = [
       windowTitle: 'Build the running state for this slot',
       windowSubtitle:
         'The model adds token meaning and position, then rescales the result before attention reads it.',
-      note:
-        'This combined vector is the first full working state for the current slot.',
+      note: 'This combined vector is the first full working state for the current slot.',
     },
     steps: [
       {
@@ -461,7 +466,9 @@ const inferenceGroups: GroupSeed[] = [
         stepTitle: 'Combine what the token is with where it is',
         copy: lesson([
           core(
-            'The model now combines the token meaning signal and the position signal into one shared working state.',
+            'The model now combines the token meaning signal and the position signal into one shared ',
+            annotate('working-state', 'working state'),
+            '.',
           ),
           core(
             'It adds the two ',
@@ -474,7 +481,9 @@ const inferenceGroups: GroupSeed[] = [
             ' is the main running state that carries information through the model and gets updated along the way.',
           ),
           scene(
-            'Look at the first two vectors as ingredients and the summed vector as the new working state for this slot.',
+            'Look at the first two vectors as ingredients and the summed vector as the new ',
+            annotate('working-state', 'working state'),
+            ' for this slot.',
           ),
           code(
             'The first highlighted line adds the token vector and the position vector into the slot state used by later layers.',
@@ -486,7 +495,9 @@ const inferenceGroups: GroupSeed[] = [
         stepTitle: 'Rescale the running state before attention reads it',
         copy: lesson([
           core(
-            'Before the model reads from this working state, it adjusts the overall size of the numbers so the next math stays stable.',
+            'Before the model reads from this ',
+            annotate('working-state', 'working state'),
+            ', it adjusts the overall size of the numbers so the next math stays stable.',
           ),
           core(
             'This keeps later layers reacting to the pattern in the state, not to whether the numbers happen to be unusually large or small.',
@@ -560,7 +571,9 @@ const inferenceGroups: GroupSeed[] = [
           core(
             'The model turns the current slot into helper ',
             annotate('vector', 'vectors'),
-            ' that let it search the visible history, compare possible matches, and pull back useful information.',
+            ' that let it search the ',
+            annotate('visible-history', 'visible history'),
+            ', compare possible matches, and pull back useful information.',
           ),
           term(
             annotate('attention', 'Attention'),
@@ -570,7 +583,9 @@ const inferenceGroups: GroupSeed[] = [
             'Look at the three tables and three output strips in the lower window. They are three different learned views of the same slot state.',
           ),
           code(
-            'These highlighted lines apply three learned weight tables to prepare the attention read.',
+            'These highlighted lines apply three learned ',
+            annotate('weight-table', 'weight tables'),
+            ' to prepare the attention read.',
           ),
         ]),
       },
@@ -592,10 +607,14 @@ const inferenceGroups: GroupSeed[] = [
             ' the current slot uses to ask what it should retrieve.',
           ),
           scene(
-            'Look at the output labeled as the search request. That is what will be compared against the visible history.',
+            'Look at the output labeled as the search request. That is what will be compared against the ',
+            annotate('visible-history', 'visible history'),
+            '.',
           ),
           code(
-            'Part of this projection block multiplies the slot state by the query weights to create the query vectors.',
+            'Part of this projection block multiplies the slot state by the query ',
+            annotate('weight-table', 'weight table'),
+            ' to create the query vectors.',
           ),
         ]),
         sceneCopy: {
@@ -623,7 +642,9 @@ const inferenceGroups: GroupSeed[] = [
             'Look at the key output strip. Those are the slot descriptions that the query will be compared against.',
           ),
           code(
-            'This same projection block applies a second weight table to create the key vectors.',
+            'This same projection block applies a second ',
+            annotate('weight-table', 'weight table'),
+            ' to create the key vectors.',
           ),
         ]),
         sceneCopy: {
@@ -697,7 +718,9 @@ const inferenceGroups: GroupSeed[] = [
         stepTitle: 'Compute raw match scores',
         copy: lesson([
           core(
-            'The current search request is now compared against the slot descriptions from the visible history.',
+            'The current search request is now compared against the slot descriptions from the ',
+            annotate('visible-history', 'visible history'),
+            '.',
           ),
           core(
             'Each attention head produces one raw match number for each visible slot, giving the model a first guess about what looks relevant.',
@@ -779,7 +802,9 @@ const inferenceGroups: GroupSeed[] = [
         stepTitle: 'Convert raw scores into normalized weights',
         copy: lesson([
           core(
-            'The raw match numbers are now turned into cleaner read weights.',
+            'The raw match numbers are now turned into cleaner ',
+            annotate('read-weight', 'read weights'),
+            '.',
           ),
           core(
             'A rescaling step makes the weights positive and forces them to add up to one, so the model can divide its attention in a controlled way.',
@@ -792,7 +817,9 @@ const inferenceGroups: GroupSeed[] = [
             'Look at the weight view. Taller bars or stronger cells mean that head plans to read more from that visible slot.',
           ),
           code(
-            'The highlighted normalization lines apply softmax to the raw attention scores and produce the read weights.',
+            'The highlighted normalization lines apply softmax to the raw attention scores and produce the ',
+            annotate('read-weight', 'read weights'),
+            '.',
           ),
         ]),
       },
@@ -801,7 +828,9 @@ const inferenceGroups: GroupSeed[] = [
         stepTitle: 'Read the weights as a probability-like focus pattern',
         copy: lesson([
           core(
-            'After normalization, each row can be read as a focus pattern over the visible slots.',
+            'After normalization, each row can be read as a ',
+            annotate('focus-pattern', 'focus pattern'),
+            ' over the visible slots.',
           ),
           core(
             'Different rows may concentrate on different parts of the history, which is why the model can gather several kinds of evidence at once.',
@@ -809,7 +838,9 @@ const inferenceGroups: GroupSeed[] = [
           term(
             'An ',
             annotate('attention-head', 'attention head'),
-            ' is one independent read channel with its own query, key, value, and focus pattern.',
+            ' is one independent read channel with its own query, key, value, and ',
+            annotate('focus-pattern', 'focus pattern'),
+            '.',
           ),
           scene(
             'Compare the rows across heads. Different heads can place their focus on different visible positions at the same time.',
@@ -850,8 +881,7 @@ const inferenceGroups: GroupSeed[] = [
     select: (trace) => trace.heads.map((head) => head.mixedValue),
     sceneCopy: {
       windowTitle: 'Blend returned information from visible slots',
-      windowSubtitle:
-        'Each head uses its read weights to mix value vectors into one returned result.',
+      windowSubtitle: 'Each head uses its read weights to mix value vectors into one returned result.',
       note:
         'This is the actual information transfer step of attention.',
     },
@@ -861,7 +891,9 @@ const inferenceGroups: GroupSeed[] = [
         stepTitle: 'Blend returned information using the read weights',
         copy: lesson([
           core(
-            'The model now uses the read weights to mix together the value vectors from the visible slots.',
+            'The model now uses the ',
+            annotate('read-weight', 'read weights'),
+            ' to mix together the value vectors from the visible slots.',
           ),
           core(
             'Each head gives more influence to slots with larger weights and less influence to slots with smaller weights, producing one returned vector.',
@@ -870,7 +902,9 @@ const inferenceGroups: GroupSeed[] = [
             'Look at each head’s panel. The table shows candidate value vectors, and the result strip shows the single mixed vector that comes back.',
           ),
           code(
-            'These highlighted lines multiply value vectors by their weights and sum the results for each head.',
+            'These highlighted lines multiply value vectors by their ',
+            annotate('read-weight', 'weights'),
+            ' and sum the results for each head.',
           ),
         ]),
       },
@@ -961,10 +995,14 @@ const inferenceGroups: GroupSeed[] = [
             '.',
           ),
           scene(
-            'Look at the weight table and the second vector in the lower window. They show the attention result after it has been projected back down.',
+            'Look at the ',
+            annotate('weight-table', 'weight table'),
+            ' and the second vector in the lower window. They show the attention result after it has been projected back down.',
           ),
           code(
-            'This same highlighted range applies the attention output weights to the combined head vector.',
+            'This same highlighted range applies the attention output ',
+            annotate('weight-table', 'weights'),
+            ' to the combined head vector.',
           ),
         ]),
         sceneCopy: {
@@ -979,7 +1017,9 @@ const inferenceGroups: GroupSeed[] = [
             'The attention result is added onto the running slot state instead of replacing it.',
           ),
           core(
-            'That way, the model keeps the earlier state and layers new information from the visible history on top of it.',
+            'That way, the model keeps the earlier state and layers new information from the ',
+            annotate('visible-history', 'visible history'),
+            ' on top of it.',
           ),
           term(
             'A ',
@@ -1063,10 +1103,14 @@ const inferenceGroups: GroupSeed[] = [
             ' is a temporary internal representation used during computation before the block produces its final output.',
           ),
           scene(
-            'Look at the first weight table and the larger vector strip. They show the slot being expanded into a bigger workspace.',
+            'Look at the first ',
+            annotate('weight-table', 'weight table'),
+            ' and the larger vector strip. They show the slot being expanded into a bigger workspace.',
           ),
           code(
-            'The early lines in this MLP range apply the first feed-forward weight table and create the hidden vector.',
+            'The early lines in this MLP range apply the first feed-forward ',
+            annotate('weight-table', 'weight table'),
+            ' and create the hidden vector.',
           ),
         ]),
       },

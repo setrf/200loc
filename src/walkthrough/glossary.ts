@@ -17,6 +17,15 @@ const glossaryData = {
     ],
     relatedIds: ['slot', 'causal-masking'],
   },
+  'visible-history': {
+    title: 'Visible History',
+    shortDefinition: 'The earlier readable slots the current step is allowed to look back over.',
+    body: [
+      'Visible history means the portion of the sequence that is already available to the current prediction step.',
+      'Attention reads from that visible history instead of from future positions that have not been generated yet.',
+    ],
+    relatedIds: ['context', 'causal-masking', 'attention'],
+  },
   slot: {
     title: 'Slot',
     shortDefinition: 'One position in the running sequence.',
@@ -52,6 +61,15 @@ const glossaryData = {
       'The model uses vectors to represent tokens, positions, attention reads, hidden states, and many other intermediate results.',
     ],
     relatedIds: ['token-embedding', 'position-embedding', 'residual-stream'],
+  },
+  'learned-row': {
+    title: 'Learned Row',
+    shortDefinition: 'One row fetched from a learned table of model parameters.',
+    body: [
+      'A learned row is a stored line of numbers that the model has adjusted during training.',
+      'Lookup steps such as token embeddings and position embeddings work by selecting one learned row from a larger table.',
+    ],
+    relatedIds: ['token-table', 'position-table', 'vector'],
   },
   'token-table': {
     title: 'Token Table',
@@ -124,6 +142,15 @@ const glossaryData = {
       'Instead of replacing the state completely, the model repeatedly adds updates onto this running stream.',
     ],
     relatedIds: ['residual-connection', 'rmsnorm'],
+  },
+  'working-state': {
+    title: 'Working State',
+    shortDefinition: 'The current vector the model is actively transforming for one slot.',
+    body: [
+      'A working state is the in-progress representation of one slot at the current stage of computation.',
+      'As the slot moves through attention, normalization, and MLP updates, the model keeps rewriting that working state.',
+    ],
+    relatedIds: ['residual-stream', 'vector', 'slot'],
   },
   rmsnorm: {
     title: 'RMSNorm',
@@ -205,6 +232,33 @@ const glossaryData = {
       'In attention it turns match scores into read weights, and in the output layer it turns logits into probabilities.',
     ],
     relatedIds: ['attention-score', 'logit', 'temperature'],
+  },
+  'read-weight': {
+    title: 'Read Weight',
+    shortDefinition: 'The normalized amount of attention assigned to one visible slot.',
+    body: [
+      'A read weight says how strongly the model should read from a particular visible slot during attention.',
+      'Larger read weights give a slot more influence over the blended result that comes back.',
+    ],
+    relatedIds: ['softmax', 'attention', 'probability-distribution'],
+  },
+  'focus-pattern': {
+    title: 'Focus Pattern',
+    shortDefinition: 'The overall way one attention head spreads its read weights across visible slots.',
+    body: [
+      'A focus pattern is the shape made by all the read weights in one attention head taken together.',
+      'It shows whether the head is concentrating on one place, spreading out broadly, or splitting attention across several places.',
+    ],
+    relatedIds: ['attention-head', 'read-weight', 'softmax'],
+  },
+  'weight-table': {
+    title: 'Weight Table',
+    shortDefinition: 'A learned table of numbers used to transform one vector into another.',
+    body: [
+      'A weight table is a learned matrix that the model multiplies by an input vector to produce a new representation.',
+      'Query, key, value, MLP, and output projection steps all use weight tables to create new vectors.',
+    ],
+    relatedIds: ['vector', 'output-projection', 'mlp'],
   },
   'model-width': {
     title: 'Model Width',

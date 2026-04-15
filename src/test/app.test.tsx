@@ -77,6 +77,11 @@ function findCodeLine(text: string) {
   })
 }
 
+function expectStoryPanelToContain(text: string) {
+  const lesson = screen.getByLabelText('Step explanation')
+  expect(lesson.textContent).toContain(text)
+}
+
 function mockSourceFetch(sourceText: string, ok = true) {
   return vi.spyOn(globalThis, 'fetch').mockResolvedValue({
     ok,
@@ -198,23 +203,23 @@ describe('App', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Next' }))
     }
     expect(screen.getAllByText('Token Embedding').length).toBeGreaterThan(0)
-    expect(screen.getByText(phaseBeat(3))).toBeInTheDocument()
+    expectStoryPanelToContain(phaseBeat(3))
 
     for (let index = 0; index < 12; index += 1) {
       fireEvent.click(screen.getByRole('button', { name: 'Next' }))
     }
-    expect(screen.getByText(phaseBeat(15))).toBeInTheDocument()
+    expectStoryPanelToContain(phaseBeat(15))
 
     for (let index = 0; index < 13; index += 1) {
       fireEvent.click(screen.getByRole('button', { name: 'Next' }))
     }
-    expect(screen.getByText(phaseBeat(28))).toBeInTheDocument()
+    expectStoryPanelToContain(phaseBeat(28))
 
     for (let index = 0; index < 5; index += 1) {
       fireEvent.click(screen.getByRole('button', { name: 'Next' }))
     }
     expect(screen.getAllByText('Append Or Stop').length).toBeGreaterThan(0)
-    expect(screen.getByText(phaseBeat(33))).toBeInTheDocument()
+    expectStoryPanelToContain(phaseBeat(33))
 
     fireEvent.click(screen.getByRole('tab', { name: 'Scene' }))
     expect(screen.getByRole('tab', { name: 'Scene' })).toHaveAttribute(
