@@ -309,9 +309,9 @@
 
 .story-scene__toolbar-main {
   display: grid;
-  grid-template-columns: minmax(280px, 320px) minmax(0, 1fr);
+  grid-template-columns: minmax(520px, 1.45fr) minmax(220px, 0.85fr);
   align-items: start;
-  gap: 10px;
+  gap: 8px;
 }
 
 .scene-panel__meta {
@@ -330,9 +330,9 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  justify-content: flex-start;
-  gap: 5px;
-  padding-left: 12px;
+  justify-content: center;
+  gap: 4px;
+  padding-left: 10px;
   border-left: 1px solid var(--border);
 }
 
@@ -355,16 +355,19 @@
 
 .story-scene__toolbar-controls {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
+  flex-direction: row;
+  align-items: flex-end;
+  gap: 8px;
   min-width: 0;
 }
 
 .story-panel__field {
+  flex: 1 1 auto;
+  min-width: 0;
   width: auto;
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 2px;
 }
 
 .story-panel__input {
@@ -386,6 +389,8 @@
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 6px;
+  flex: 0 0 360px;
+  max-width: 100%;
 }
 
 .story-scene__toolbar button {
@@ -1018,6 +1023,11 @@ button.annotation-trigger:focus-visible {
   .scene-panel__header {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .story-panel__actions {
+    flex: 0 0 auto;
+    max-width: none;
   }
 
   .story-scene__toolbar-controls {
