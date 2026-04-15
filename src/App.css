@@ -512,19 +512,7 @@ button.annotation-trigger:focus-visible {
 }
 
 .annotation-popup__header {
-  display: flex;
-  align-items: start;
-  justify-content: space-between;
-  gap: 12px;
   margin-bottom: 10px;
-}
-
-.annotation-popup__eyebrow {
-  margin-bottom: 4px;
-  font: 500 0.72rem/1.4 var(--mono);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--text-muted);
 }
 
 .annotation-popup__title {

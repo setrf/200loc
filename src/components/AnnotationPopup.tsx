@@ -14,7 +14,6 @@ interface AnnotationPopupProps {
   mode: 'floating' | 'inline'
   onMouseEnter?: MouseEventHandler<HTMLDivElement>
   onMouseLeave?: MouseEventHandler<HTMLDivElement>
-  pinned: boolean
 }
 
 const VIEWPORT_GUTTER = 12
@@ -25,7 +24,7 @@ function clamp(value: number, min: number, max: number) {
 
 export const AnnotationPopup = forwardRef<HTMLDivElement, AnnotationPopupProps>(
   function AnnotationPopup(
-    { anchorRect, entry, mode, onMouseEnter, onMouseLeave, pinned },
+    { anchorRect, entry, mode, onMouseEnter, onMouseLeave },
     ref,
   ) {
     const [style, setStyle] = useState<{ top: number; left: number } | null>(null)
@@ -87,12 +86,7 @@ export const AnnotationPopup = forwardRef<HTMLDivElement, AnnotationPopupProps>(
         style={mode === 'floating' ? style ?? { visibility: 'hidden' } : undefined}
       >
         <div className="annotation-popup__header">
-          <div>
-            <p className="annotation-popup__eyebrow">
-              {pinned ? 'Pinned explainer' : 'Explainer'}
-            </p>
-            <h3 className="annotation-popup__title">{entry.title}</h3>
-          </div>
+          <h3 className="annotation-popup__title">{entry.title}</h3>
         </div>
         <p className="annotation-popup__summary">{entry.shortDefinition}</p>
         <div className="annotation-popup__body">

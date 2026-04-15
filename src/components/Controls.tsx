@@ -322,7 +322,6 @@ export function Controls({ beats, mobileTab, stepId, trace }: ControlsProps) {
             ref={popupRef}
             entry={openEntry}
             mode="inline"
-            pinned={false}
           />
         ) : null}
       </section>
@@ -333,7 +332,6 @@ export function Controls({ beats, mobileTab, stepId, trace }: ControlsProps) {
           anchorRect={openAnnotation.anchorRect}
           entry={openEntry}
           mode="floating"
-          pinned={openAnnotation.pinned}
           onMouseEnter={clearCloseTimer}
           onMouseLeave={scheduleClose}
         />
