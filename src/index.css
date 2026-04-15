@@ -1,3 +1,21 @@
+@font-face {
+  font-family: 'Geist';
+  src: url('../node_modules/geist/dist/fonts/geist-sans/Geist-Variable.woff2')
+    format('woff2');
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Geist Mono';
+  src: url('../node_modules/geist/dist/fonts/geist-mono/GeistMono-Variable.woff2')
+    format('woff2');
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+}
+
 :root {
   --bg: #101215;
   --panel: #171a1f;
@@ -29,11 +47,10 @@
   --annotation-underline: rgba(154, 175, 196, 0.56);
   --annotation-underline-strong: rgba(212, 221, 231, 0.88);
   --annotation-outline: rgba(212, 221, 231, 0.8);
-  --sans:
-    'IBM Plex Sans', 'Avenir Next', Avenir, 'Segoe UI', sans-serif;
+  --sans: 'Geist', 'Avenir Next', Avenir, 'Segoe UI', sans-serif;
   --mono:
-    ui-monospace, 'SFMono-Regular', SFMono-Regular, Menlo, Consolas,
-    'Liberation Mono', monospace;
+    'Geist Mono', ui-monospace, 'SFMono-Regular', SFMono-Regular, Menlo,
+    Consolas, 'Liberation Mono', monospace;
 
   font: 400 14px/1.5 var(--sans);
   color: var(--text);
