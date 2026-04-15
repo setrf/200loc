@@ -360,16 +360,6 @@ export default function App() {
                   </span>
                 </div>
                 <strong>{phase.groupTitle}</strong>
-                <span>
-                  stage step {phase.stepIndexWithinGroup} / {phase.stepCountWithinGroup} ·{' '}
-                  {phase.codeRanges
-                    .map((range) =>
-                      range.start === range.end
-                        ? `L${range.start}`
-                        : `L${range.start}-${range.end}`,
-                    )
-                    .join(', ')}
-                </span>
               </div>
             </div>
           </div>
