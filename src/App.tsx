@@ -287,63 +287,89 @@ export default function App() {
           }`}
         >
           <div className="story-scene__toolbar">
-            <div className="story-scene__toolbar-controls">
-              <label className="story-panel__field" htmlFor="prefix-input">
-                <span className="eyebrow">Prefix</span>
-                <input
-                  id="prefix-input"
-                  className="story-panel__input"
-                  value={state.prefixInput}
-                  onChange={(event) => handlePrefixChange(event.target.value)}
-                  placeholder="em"
-                  autoComplete="off"
-                  spellCheck={false}
-                />
-              </label>
+            <div className="story-scene__toolbar-main">
+              <div className="story-scene__toolbar-controls">
+                <label className="story-panel__field" htmlFor="prefix-input">
+                  <span className="eyebrow">Prefix</span>
+                  <input
+                    id="prefix-input"
+                    className="story-panel__input"
+                    value={state.prefixInput}
+                    onChange={(event) => handlePrefixChange(event.target.value)}
+                    placeholder="em"
+                    autoComplete="off"
+                    spellCheck={false}
+                  />
+                </label>
 
-              <div className="story-panel__actions">
-                <button
-                  type="button"
-                  onClick={() => {
-                    dispatch({ type: 'setPlaying', playing: false })
-                    void hydrate(state.prefixInput)
-                  }}
-                >
-                  Reset
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    dispatch({ type: 'setPlaying', playing: false })
-                    dispatch({ type: 'phasePrev', phaseCount })
-                  }}
-                  disabled={!canPrev}
-                >
-                  Prev
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    dispatch({ type: 'setPlaying', playing: false })
-                    void advance()
-                  }}
-                  disabled={!canNext}
-                >
-                  Next
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (state.status === 'playing') {
+                <div className="story-panel__actions">
+                  <button
+                    type="button"
+                    onClick={() => {
                       dispatch({ type: 'setPlaying', playing: false })
-                    } else {
-                      dispatch({ type: 'setPlaying', playing: true })
-                    }
-                  }}
-                  disabled={!canNext}
-                >
-                  {state.status === 'playing' ? 'Pause' : 'Play'}
-                </button>
+                      void hydrate(state.prefixInput)
+                    }}
+                  >
+                    Reset
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      dispatch({ type: 'setPlaying', playing: false })
+                      dispatch({ type: 'phasePrev', phaseCount })
+                    }}
+                    disabled={!canPrev}
+                  >
+                    Prev
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      dispatch({ type: 'setPlaying', playing: false })
+                      void advance()
+                    }}
+                    disabled={!canNext}
+                  >
+                    Next
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (state.status === 'playing') {
+                        dispatch({ type: 'setPlaying', playing: false })
+                      } else {
+                        dispatch({ type: 'setPlaying', playing: true })
+                      }
+                    }}
+                    disabled={!canNext}
+                  >
+                    {state.status === 'playing' ? 'Pause' : 'Play'}
+                  </button>
+                </div>
+              </div>
+
+              <div
+                className="scene-panel__stage-chip"
+                onMouseEnter={() => handleFocusRanges(phase.codeRanges)}
+                onMouseLeave={() => handleFocusRanges(null)}
+              >
+                <div className="scene-panel__stage-chip-top">
+                  <span className="eyebrow">Current stage</span>
+                  <span className="scene-panel__stage-step">
+                    step {state.activePhaseIndex + 1} / {phaseCount}
+                  </span>
+                </div>
+                <strong>{phase.groupTitle}</strong>
+                <span>
+                  stage step {phase.stepIndexWithinGroup} / {phase.stepCountWithinGroup} ·{' '}
+                  {phase.codeRanges
+                    .map((range) =>
+                      range.start === range.end
+                        ? `L${range.start}`
+                        : `L${range.start}-${range.end}`,
+                    )
+                    .join(', ')}
+                </span>
               </div>
             </div>
           </div>
@@ -353,29 +379,6 @@ export default function App() {
               state.mobileTab === 'scene' ? 'is-active' : ''
             }`}
           >
-            <div
-              className="scene-panel__stage-chip"
-              onMouseEnter={() => handleFocusRanges(phase.codeRanges)}
-              onMouseLeave={() => handleFocusRanges(null)}
-            >
-              <div className="scene-panel__stage-chip-top">
-                <span className="eyebrow">Current stage</span>
-                <span className="scene-panel__stage-step">
-                  step {state.activePhaseIndex + 1} / {phaseCount}
-                </span>
-              </div>
-              <strong>{phase.groupTitle}</strong>
-              <span>
-                stage step {phase.stepIndexWithinGroup} / {phase.stepCountWithinGroup} ·{' '}
-                {phase.codeRanges
-                  .map((range) =>
-                    range.start === range.end
-                      ? `L${range.start}`
-                      : `L${range.start}-${range.end}`,
-                  )
-                  .join(', ')}
-              </span>
-            </div>
             <ArchitectureScene
               trace={trace}
               phase={phase}
