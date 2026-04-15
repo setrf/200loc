@@ -1,4 +1,13 @@
 const glossaryData = {
+  prefix: {
+    title: 'Prefix',
+    shortDefinition: 'The text that already exists before the model predicts the next token.',
+    body: [
+      'A prefix is the beginning part of a sequence that the model already has in front of it.',
+      'The model uses that existing text as the starting point for the next-token prediction loop.',
+    ],
+    relatedIds: ['context', 'autoregressive-generation'],
+  },
   context: {
     title: 'Context',
     shortDefinition: 'The text the model is allowed to read before making its next guess.',
@@ -25,6 +34,33 @@ const glossaryData = {
       'That id is then used to look up learned vectors and later computations.',
     ],
     relatedIds: ['bos', 'token-embedding'],
+  },
+  vocabulary: {
+    title: 'Vocabulary',
+    shortDefinition: 'The full set of token choices the model knows how to name.',
+    body: [
+      'A model cannot emit arbitrary raw strings directly. It chooses from a fixed vocabulary of tokens it was built to use.',
+      'Each token in that vocabulary has its own numeric id and its own learned parameters.',
+    ],
+    relatedIds: ['token-id', 'bos'],
+  },
+  vector: {
+    title: 'Vector',
+    shortDefinition: 'A list of numbers that the model treats as one representation.',
+    body: [
+      'In this walkthrough, a vector is just a row of numbers handled together as one object.',
+      'The model uses vectors to represent tokens, positions, attention reads, hidden states, and many other intermediate results.',
+    ],
+    relatedIds: ['token-embedding', 'position-embedding', 'residual-stream'],
+  },
+  'token-table': {
+    title: 'Token Table',
+    shortDefinition: 'The learned lookup table whose rows describe tokens.',
+    body: [
+      'A token table is a matrix the model can index by token id to fetch a learned row.',
+      'In this tiny transformer, the WTE table is the token table used to produce token embeddings.',
+    ],
+    relatedIds: ['wte', 'token-embedding', 'token-id'],
   },
   bos: {
     title: 'BOS',
@@ -62,6 +98,15 @@ const glossaryData = {
     ],
     relatedIds: ['wpe', 'slot'],
   },
+  'position-table': {
+    title: 'Position Table',
+    shortDefinition: 'The learned lookup table whose rows describe sequence positions.',
+    body: [
+      'A position table is a matrix the model can index by slot number to fetch a learned row.',
+      'In this walkthrough, the WPE table is the position table that supplies the model with order information.',
+    ],
+    relatedIds: ['wpe', 'position-embedding', 'slot'],
+  },
   wpe: {
     title: 'WPE',
     shortDefinition: 'The learned table that stores position embeddings.',
@@ -88,6 +133,15 @@ const glossaryData = {
       'It adjusts the overall scale of a vector so later layers react to the pattern of values rather than to accidental size differences.',
     ],
     relatedIds: ['residual-stream'],
+  },
+  normalization: {
+    title: 'Normalization',
+    shortDefinition: 'A rescaling step that puts values onto a more stable shared scale.',
+    body: [
+      'Normalization changes numbers so later computations are less sensitive to accidental scale differences.',
+      'Different normalizations do this in different ways, but the common goal is to keep the math more stable and interpretable.',
+    ],
+    relatedIds: ['rmsnorm', 'softmax'],
   },
   attention: {
     title: 'Attention',
@@ -151,6 +205,15 @@ const glossaryData = {
       'In attention it turns match scores into read weights, and in the output layer it turns logits into probabilities.',
     ],
     relatedIds: ['attention-score', 'logit', 'temperature'],
+  },
+  'model-width': {
+    title: 'Model Width',
+    shortDefinition: 'The standard size of the main vectors that flow through the model.',
+    body: [
+      'Model width is the number of components in the transformer’s main slot state.',
+      'When a temporary result becomes wider or narrower than that standard size, the model uses learned projections to change it back.',
+    ],
+    relatedIds: ['residual-stream', 'output-projection', 'vector'],
   },
   'attention-head': {
     title: 'Attention Head',
@@ -233,6 +296,15 @@ const glossaryData = {
     ],
     relatedIds: ['softmax', 'sampling', 'logit'],
   },
+  'probability-distribution': {
+    title: 'Probability Distribution',
+    shortDefinition: 'A full set of probabilities spread across all available choices.',
+    body: [
+      'A probability distribution does not just name the top answer. It assigns some amount of probability to every candidate in the competition.',
+      'Sampling then uses that whole distribution to choose one concrete outcome.',
+    ],
+    relatedIds: ['softmax', 'sampling', 'temperature'],
+  },
   sampling: {
     title: 'Sampling',
     shortDefinition: 'Choosing one concrete token from the model’s predicted probability distribution.',
@@ -259,6 +331,15 @@ const glossaryData = {
       'Each newly chosen token becomes part of the next context, and the whole process repeats.',
     ],
     relatedIds: ['context', 'sampling'],
+  },
+  'stop-marker': {
+    title: 'Stop Marker',
+    shortDefinition: 'A special token that tells the generation loop to end.',
+    body: [
+      'A stop marker is a reserved token with control meaning rather than normal text meaning.',
+      'When sampling returns that marker, the model stops appending tokens and ends the current generation run.',
+    ],
+    relatedIds: ['bos', 'sampling', 'autoregressive-generation'],
   },
 } as const satisfies Record<
   string,

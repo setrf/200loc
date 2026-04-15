@@ -200,7 +200,9 @@ const inferenceGroups: GroupSeed[] = [
             'Look at the highlighted context strip. Every slot inside it is available to the model right now.',
           ),
           code(
-            'These lines build the visible prefix and set up the loop that predicts one new token at a time.',
+            'These lines build the visible ',
+            annotate('prefix', 'prefix'),
+            ' and set up the loop that predicts one new token at a time.',
           ),
         ]),
       },
@@ -240,7 +242,9 @@ const inferenceGroups: GroupSeed[] = [
           term(
             'A ',
             annotate('token-id', 'token id'),
-            ' is the number the model uses to name one text unit inside its vocabulary.',
+            ' is the number the model uses to name one text unit inside its ',
+            annotate('vocabulary', 'vocabulary'),
+            '.',
           ),
           term(
             annotate('bos', 'BOS'),
@@ -289,13 +293,19 @@ const inferenceGroups: GroupSeed[] = [
             'The token id now points into a learned table that stores what different tokens tend to mean.',
           ),
           core(
-            'The model pulls out one row from that table, creating a 16-number description it can actually compare and transform.',
+            'The model pulls out one row from that table, creating a 16-number ',
+            annotate('vector', 'vector'),
+            ' it can actually compare and transform.',
           ),
           scene(
-            'Look at the highlighted row in the lower table and the vector beneath it. That pulled-out row is the token description for this step.',
+            'Look at the highlighted row in the lower table and the ',
+            annotate('vector', 'vector'),
+            ' beneath it. That pulled-out row is the token description for this step.',
           ),
           code(
-            'This highlighted line uses the current token id to fetch one learned row from the token table.',
+            'This highlighted line uses the current token id to fetch one learned row from the ',
+            annotate('token-table', 'token table'),
+            '.',
           ),
         ]),
       },
@@ -312,11 +322,19 @@ const inferenceGroups: GroupSeed[] = [
           term(
             'A ',
             annotate('token-embedding', 'token embedding'),
-            ' is the learned vector pulled from the token table for one token id.',
+            ' is the learned ',
+            annotate('vector', 'vector'),
+            ' pulled from the ',
+            annotate('token-table', 'token table'),
+            ' for one token id.',
           ),
           term(
             annotate('wte', 'WTE'),
-            ' is the name of the token table that stores one embedding row for each token in the vocabulary.',
+            ' is the name of the ',
+            annotate('token-table', 'token table'),
+            ' that stores one embedding row for each token in the ',
+            annotate('vocabulary', 'vocabulary'),
+            '.',
           ),
           scene(
             'Look at the table as shared memory and the extracted row as the one token embedding for the current slot.',
@@ -387,14 +405,20 @@ const inferenceGroups: GroupSeed[] = [
           term(
             'A ',
             annotate('position-embedding', 'position embedding'),
-            ' is the learned vector that marks where one slot sits in the sequence.',
+            ' is the learned ',
+            annotate('vector', 'vector'),
+            ' that marks where one slot sits in the sequence.',
           ),
           term(
             annotate('wpe', 'WPE'),
-            ' is the position table that stores one learned row for each possible slot position.',
+            ' is the ',
+            annotate('position-table', 'position table'),
+            ' that stores one learned row for each possible slot position.',
           ),
           scene(
-            'Look at the extracted vector in the lower window. That is the position signal that will be added next.',
+            'Look at the extracted ',
+            annotate('vector', 'vector'),
+            ' in the lower window. That is the position signal that will be added next.',
           ),
           code(
             'This same lookup line reads from the WPE table and produces the current position embedding.',
@@ -440,7 +464,9 @@ const inferenceGroups: GroupSeed[] = [
             'The model now combines the token meaning signal and the position signal into one shared working state.',
           ),
           core(
-            'It adds the two vectors number by number so later steps can reason about this slot as one object.',
+            'It adds the two ',
+            annotate('vector', 'vectors'),
+            ' number by number so later steps can reason about this slot as one object.',
           ),
           term(
             'The ',
@@ -467,7 +493,11 @@ const inferenceGroups: GroupSeed[] = [
           ),
           term(
             annotate('rmsnorm', 'RMSNorm'),
-            ' is a rescaling step that keeps a vector numerically well-behaved without changing its overall direction too much.',
+            ' is a ',
+            annotate('normalization', 'normalization'),
+            ' step that keeps a ',
+            annotate('vector', 'vector'),
+            ' numerically well-behaved without changing its overall direction too much.',
           ),
           scene(
             'Look at the final vector in the lower window. It is the rescaled version of the slot state that attention will read next.',
@@ -528,7 +558,9 @@ const inferenceGroups: GroupSeed[] = [
             'Attention is easiest to understand as a smart read from earlier visible slots.',
           ),
           core(
-            'The model turns the current slot into helper vectors that let it search the visible history, compare possible matches, and pull back useful information.',
+            'The model turns the current slot into helper ',
+            annotate('vector', 'vectors'),
+            ' that let it search the visible history, compare possible matches, and pull back useful information.',
           ),
           term(
             annotate('attention', 'Attention'),
@@ -555,7 +587,9 @@ const inferenceGroups: GroupSeed[] = [
           term(
             'A ',
             annotate('query', 'query'),
-            ' is the search request vector the current slot uses to ask what it should retrieve.',
+            ' is the search request ',
+            annotate('vector', 'vector'),
+            ' the current slot uses to ask what it should retrieve.',
           ),
           scene(
             'Look at the output labeled as the search request. That is what will be compared against the visible history.',
@@ -581,7 +615,9 @@ const inferenceGroups: GroupSeed[] = [
           term(
             'A ',
             annotate('key', 'key'),
-            ' is the description vector a slot exposes so the model can test whether it matches the current query.',
+            ' is the description ',
+            annotate('vector', 'vector'),
+            ' a slot exposes so the model can test whether it matches the current query.',
           ),
           scene(
             'Look at the key output strip. Those are the slot descriptions that the query will be compared against.',
@@ -607,7 +643,9 @@ const inferenceGroups: GroupSeed[] = [
           term(
             'A ',
             annotate('value', 'value'),
-            ' is the information vector a slot contributes when attention reads from it.',
+            ' is the information ',
+            annotate('vector', 'vector'),
+            ' a slot contributes when attention reads from it.',
           ),
           scene(
             'Look at the value output strip. Those are the pieces of information the model may mix together next.',
@@ -777,7 +815,9 @@ const inferenceGroups: GroupSeed[] = [
             'Compare the rows across heads. Different heads can place their focus on different visible positions at the same time.',
           ),
           code(
-            'These same softmax-related lines produce one normalized read distribution for each attention head.',
+            'These same softmax-related lines produce one normalized read ',
+            annotate('probability-distribution', 'distribution'),
+            ' for each attention head.',
           ),
         ]),
       },
@@ -905,12 +945,20 @@ const inferenceGroups: GroupSeed[] = [
             'The joined head result is too wide to fit back into the model’s normal working state, so it is compressed back down.',
           ),
           core(
-            'A learned map turns the wide attention result into a model-width vector that can rejoin the main flow.',
+            'A learned map turns the wide attention result into a ',
+            annotate('model-width', 'model-width'),
+            ' ',
+            annotate('vector', 'vector'),
+            ' that can rejoin the main flow.',
           ),
           term(
             'The ',
             annotate('output-projection', 'output projection'),
-            ' is the learned map that converts the joined head results back into one model-width vector.',
+            ' is the learned map that converts the joined head results back into one ',
+            annotate('model-width', 'model-width'),
+            ' ',
+            annotate('vector', 'vector'),
+            '.',
           ),
           scene(
             'Look at the weight table and the second vector in the lower window. They show the attention result after it has been projected back down.',
@@ -1049,7 +1097,9 @@ const inferenceGroups: GroupSeed[] = [
         stepTitle: 'Project back down and add another residual update',
         copy: lesson([
           core(
-            'The hidden result is now compressed back to the model’s normal width and written onto the running slot state.',
+            'The hidden result is now compressed back to the model’s normal ',
+            annotate('model-width', 'width'),
+            ' and written onto the running slot state.',
           ),
           core(
             'This returns the local computation to the shared slot format while preserving the earlier state underneath it.',
@@ -1094,10 +1144,16 @@ const inferenceGroups: GroupSeed[] = [
             'The model now compares the finished slot state against every possible next token it knows about.',
           ),
           core(
-            'It produces one raw score per vocabulary item, showing how strongly the current state supports each possible continuation.',
+            'It produces one raw score per ',
+            annotate('vocabulary', 'vocabulary'),
+            ' item, showing how strongly the current state supports each possible continuation.',
           ),
           scene(
-            'Look at the output table, the incoming slot state, and the score vector below it. That vector is the model’s raw preference list over the vocabulary.',
+            'Look at the output table, the incoming slot state, and the score ',
+            annotate('vector', 'vector'),
+            ' below it. That vector is the model’s raw preference list over the ',
+            annotate('vocabulary', 'vocabulary'),
+            '.',
           ),
           code(
             'This highlighted line projects the final slot state through the output weights and produces one raw score per vocabulary item.',
@@ -1159,7 +1215,7 @@ const inferenceGroups: GroupSeed[] = [
       windowSubtitle:
         'The model rescales the logits and turns them into a normalized distribution over the vocabulary.',
       note:
-        'This makes the model’s preferences readable as probabilities while keeping every candidate in the same competition.',
+        "This makes the model's preferences readable as probabilities while keeping every candidate in the same competition.",
     },
     steps: [
       {
@@ -1170,11 +1226,15 @@ const inferenceGroups: GroupSeed[] = [
             'The raw scores are now turned into probabilities over all possible next tokens.',
           ),
           core(
-            'This puts every candidate on one shared scale, making the model’s preference distribution easier to inspect and sample from.',
+            'This puts every candidate on one shared scale, making the model’s preference ',
+            annotate('probability-distribution', 'distribution'),
+            ' easier to inspect and sample from.',
           ),
           term(
             annotate('temperature', 'Temperature'),
-            ' is the knob that makes the distribution sharper or flatter before the final probabilities are computed.',
+            ' is the knob that makes the ',
+            annotate('probability-distribution', 'distribution'),
+            ' sharper or flatter before the final probabilities are computed.',
           ),
           scene(
             'Look at the bars or cells in the probability view. The largest ones mark the strongest next-token candidates.',
@@ -1198,7 +1258,13 @@ const inferenceGroups: GroupSeed[] = [
             'Compare the tallest bar with the rest of the distribution. A large gap means the model is more decisive; a smaller gap means it is less sure.',
           ),
           code(
-            'This same normalization step produces the full distribution over the vocabulary, not just the top candidate.',
+            'This same ',
+            annotate('normalization', 'normalization'),
+            ' step produces the full ',
+            annotate('probability-distribution', 'distribution'),
+            ' over the ',
+            annotate('vocabulary', 'vocabulary'),
+            ', not just the top candidate.',
           ),
         ]),
       },
@@ -1220,10 +1286,8 @@ const inferenceGroups: GroupSeed[] = [
     select: (trace) => trace.sampledTokenId,
     sceneCopy: {
       windowTitle: 'Choose one concrete next token',
-      windowSubtitle:
-        'The probability distribution is turned into one actual token choice that can be fed back into the loop.',
-      note:
-        'A distribution is a set of possibilities. Sampling collapses it into one concrete continuation.',
+      windowSubtitle: "The probability distribution is turned into one actual token choice that can be fed back into the loop.",
+      note: 'A distribution is a set of possibilities. Sampling collapses it into one concrete continuation.',
     },
     steps: [
       {
@@ -1238,7 +1302,9 @@ const inferenceGroups: GroupSeed[] = [
           ),
           term(
             annotate('sampling', 'Sampling'),
-            ' means choosing one token according to the model’s predicted probability distribution.',
+            ' means choosing one token according to the model’s predicted ',
+            annotate('probability-distribution', 'probability distribution'),
+            '.',
           ),
           scene(
             'Look at the highlighted token in the lower window. It is the one chosen from the full probability distribution.',
@@ -1303,7 +1369,9 @@ const inferenceGroups: GroupSeed[] = [
             'The chosen token now decides whether generation continues or ends.',
           ),
           core(
-            'If the sample is the special stop marker, the loop ends. Otherwise the token is appended to the visible sequence.',
+            'If the sample is the special ',
+            annotate('stop-marker', 'stop marker'),
+            ', the loop ends. Otherwise the token is appended to the visible sequence.',
           ),
           scene(
             'Look at the lower window to see whether the chosen token will be appended to the sequence or treated as the stop signal.',
