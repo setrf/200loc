@@ -10,8 +10,10 @@ import {
   uploadMicroVizFrame,
 } from '../viz/microViz/bridge'
 import {
+  resolveDesiredCameraTarget,
   shouldUpdateDesiredCamera,
 } from '../viz/microViz/program'
+import { Vec3 } from '../vendor/llmVizOriginal/utils/vector'
 import { inferencePhases } from '../walkthrough/phases'
 import { loadBundle, makeTrace } from './helpers/fixtures'
 
@@ -492,6 +494,45 @@ describe('micro viz bridge', () => {
     expect(attnOutState.cameraPoseId).toBe(mlpState.cameraPoseId)
     expect(shouldUpdateDesiredCamera(attnOutState, mlpState)).toBe(true)
     expect(shouldUpdateDesiredCamera(scoreState, sampleState)).toBe(true)
+  })
+
+  it('preserves manual zoom when same-pose retargeting updates the guided camera', () => {
+    const trace = makeTrace()
+    const contextTokens = ['BOS', 'e', 'm']
+    const layout = buildMicroVizLayout(bundle)
+    const attnOutState = buildMicroVizPhaseState(
+      phaseById('attn-out'),
+      buildVizFrame(trace, phaseById('attn-out'), bundle, contextTokens, tokenLabel),
+      layout,
+    )
+    const mlpState = buildMicroVizPhaseState(
+      phaseById('mlp'),
+      buildVizFrame(trace, phaseById('mlp'), bundle, contextTokens, tokenLabel),
+      layout,
+    )
+    const manualZoom = attnOutState.cameraTarget.angle.z + 2.5
+
+    expect(shouldUpdateDesiredCamera(attnOutState, mlpState)).toBe(true)
+
+    const nextTarget = resolveDesiredCameraTarget(
+      {
+        angle: new Vec3(
+          attnOutState.cameraTarget.angle.x,
+          attnOutState.cameraTarget.angle.y,
+          manualZoom,
+        ),
+        zoomReference: attnOutState.cameraTarget.angle.z,
+      },
+      attnOutState,
+      mlpState,
+    )
+
+    expect(nextTarget.center.x).toBeCloseTo(mlpState.cameraTarget.center.x, 5)
+    expect(nextTarget.center.y).toBeCloseTo(mlpState.cameraTarget.center.y, 5)
+    expect(nextTarget.center.z).toBeCloseTo(mlpState.cameraTarget.center.z, 5)
+    expect(nextTarget.angle.x).toBeCloseTo(mlpState.cameraTarget.angle.x, 5)
+    expect(nextTarget.angle.y).toBeCloseTo(mlpState.cameraTarget.angle.y, 5)
+    expect(nextTarget.angle.z).toBeCloseTo(manualZoom, 5)
   })
 
   it('anchors the tokenize phase around the full model overview', () => {

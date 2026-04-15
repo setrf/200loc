@@ -92,6 +92,8 @@ export interface MicroVizProgramState {
   }
 }
 
+const MANUAL_ZOOM_EPSILON = 0.2
+
 export function shouldUpdateDesiredCamera(
   previousPhaseState: MicroVizPhaseState | null,
   nextPhaseState: MicroVizPhaseState,
@@ -112,6 +114,32 @@ export function shouldUpdateDesiredCamera(
     centerDelta > 1 ||
     angleDelta > 0.08
   )
+}
+
+export function resolveDesiredCameraTarget(
+  camera: Pick<ICamera, 'angle' | 'zoomReference'>,
+  previousPhaseState: MicroVizPhaseState | null,
+  nextPhaseState: MicroVizPhaseState,
+) {
+  const samePoseBucket =
+    previousPhaseState?.cameraPoseId === nextPhaseState.cameraPoseId
+  const manualZoomActive =
+    samePoseBucket &&
+    camera.zoomReference != null &&
+    Math.abs(camera.angle.z - camera.zoomReference) > MANUAL_ZOOM_EPSILON
+
+  if (!manualZoomActive) {
+    return nextPhaseState.cameraTarget
+  }
+
+  return {
+    center: nextPhaseState.cameraTarget.center.clone(),
+    angle: new Vec3(
+      nextPhaseState.cameraTarget.angle.x,
+      nextPhaseState.cameraTarget.angle.y,
+      camera.angle.z,
+    ),
+  }
 }
 
 export function createCamera(initialCenter: Vec3, initialAngle: Vec3): ICamera {
@@ -256,7 +284,11 @@ export function setMicroVizProgramData(
   const poseChanged = shouldUpdateDesiredCamera(previousPhaseState, phaseState)
 
   if (poseChanged) {
-    state.camera.desiredCamera = phaseState.cameraTarget
+    state.camera.desiredCamera = resolveDesiredCameraTarget(
+      state.camera,
+      previousPhaseState,
+      phaseState,
+    )
   }
 }
 
