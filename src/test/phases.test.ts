@@ -1,10 +1,14 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { buildTensorWindow } from '../viz/llmViz/frame'
 import { inferencePhases, trainingAppendix, vizFocusRanges } from '../walkthrough/phases'
-import { makeTrace } from './helpers/fixtures'
+import { loadBundle, makeTrace } from './helpers/fixtures'
 
 describe('phase line maps', () => {
+  const bundle = loadBundle()
+  const tokenLabel = (tokenId: number) => (tokenId === 26 ? 'BOS' : String(tokenId))
+
   it('stay within the canonical source file', () => {
     const lineCount = readFileSync(
       resolve(process.cwd(), 'public/assets/microgpt.py'),
@@ -39,5 +43,18 @@ describe('phase line maps', () => {
     expect(explanationBodies[0]).toContain('current slot')
     expect(explanationBodies.at(-1)).toContain('Generation ends')
     expect(trainingAppendix.every((section) => section.description.length > 0)).toBe(true)
+  })
+
+  it('falls back to the context window for unknown phases', () => {
+    const window = buildTensorWindow(
+      makeTrace(),
+      { ...inferencePhases[0]!, id: 'unknown-phase' } as typeof inferencePhases[number],
+      bundle,
+      ['BOS', 'e', 'm'],
+      tokenLabel,
+    )
+
+    expect(window.id).toBe('context-window')
+    expect(window.anchorNodeId).toBe('context')
   })
 })

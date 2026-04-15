@@ -52,6 +52,7 @@ export function computeModelCardLayout(
     const preferredParamLabelScale = 4;
     const preferredParamValueScale = 8;
 
+    const titleFillRatio = 0.94;
     const minTitleScale = 9;
     const minParamLabelScale = 3.2;
     const minParamValueScale = 6.4;
@@ -71,12 +72,10 @@ export function computeModelCardLayout(
     );
     const contentWidth = innerWidth - innerPaddingX * 2;
 
-    const titleFontScale = fitTextScale(
-        titleWidthAtUnitScale * preferredTitleScale,
-        preferredTitleScale,
-        contentWidth,
-        minTitleScale,
-    );
+    const titleFontScale =
+        titleWidthAtUnitScale > 0
+            ? clamp((contentWidth * titleFillRatio) / titleWidthAtUnitScale, minTitleScale, preferredTitleScale)
+            : preferredTitleScale;
     const paramLabelScale = fitTextScale(
         paramLabelWidthAtUnitScale * preferredParamLabelScale,
         preferredParamLabelScale,
@@ -150,11 +149,21 @@ export function drawModelCard(state: IProgramState, layout: IGptModelLayout, tit
         return;
     }
 
-    let scale = clamp(dist / 500.0, 1.0, 800.0) * visibility.scale;
-
-    let pinY = -118;
-    let mtx = Mat4f.fromScaleTranslation(new Vec3(scale, scale, scale), new Vec3(0, pinY, 0).add(offset))
-        .mul(Mat4f.fromTranslation(new Vec3(0, -pinY, 0)));
+    let nParamsText = `n_params = `;
+    let weightCountText = numberToCommaSep(layout.weightCount);
+    let cardLayout = computeModelCardLayout(
+        measureTextWidth(render.modelFontBuf, title, 1),
+        measureTextWidth(render.modelFontBuf, nParamsText, 1),
+        measureTextWidth(render.modelFontBuf, weightCountText, 1),
+    );
+    // Keep the card legible, but let it participate in scene zoom instead of
+    // behaving like a fixed-size screen overlay. Scale around the card bottom
+    // so it stays visually anchored above the model as zoom changes.
+    let cameraScale = clamp(dist / 500.0, 1.0, 800.0);
+    let scale = lerp(1.0, cameraScale, 0.35) * visibility.scale;
+    let pivotY = cardLayout.br.y;
+    let mtx = Mat4f.fromScaleTranslation(new Vec3(scale, scale, scale), new Vec3(0, pivotY, 0).add(offset))
+        .mul(Mat4f.fromTranslation(new Vec3(0, -pivotY, 0)));
 
     let thick = 1.0 / 10.0 * scale;
     let borderColor = Vec4.fromHexColor("#555599", 0.8 * visibility.opacity);
@@ -164,13 +173,6 @@ export function drawModelCard(state: IProgramState, layout: IGptModelLayout, tit
 
     let lineOpts: ILineOpts = { color: borderColor, mtx, thick, n };
 
-    let nParamsText = `n_params = `;
-    let weightCountText = numberToCommaSep(layout.weightCount);
-    let cardLayout = computeModelCardLayout(
-        measureTextWidth(render.modelFontBuf, title, 1),
-        measureTextWidth(render.modelFontBuf, nParamsText, 1),
-        measureTextWidth(render.modelFontBuf, weightCountText, 1),
-    );
     let { tl, br } = cardLayout;
     drawLineRect(render, tl, br, lineOpts);
 

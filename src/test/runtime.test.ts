@@ -156,6 +156,31 @@ describe('MicrogptRuntime', () => {
     consoleWarn.mockRestore()
   })
 
+  it('describes device creation and unknown webgpu init failures', () => {
+    const runtime = new MicrogptRuntime(loadBundle()) as unknown as {
+      describeInitFallback: (error: unknown) => string
+    }
+
+    expect(
+      runtime.describeInitFallback(
+        new WebGpuInitError('unavailable', 'WebGPU unavailable'),
+      ),
+    ).toBe('WebGPU is unavailable in this browser.')
+    expect(
+      runtime.describeInitFallback(
+        new WebGpuInitError('device-unavailable', 'device creation failed'),
+      ),
+    ).toBe('WebGPU found an adapter but failed to create a device.')
+    expect(
+      runtime.describeInitFallback(
+        new WebGpuInitError('mystery' as never, 'unknown'),
+      ),
+    ).toBe('WebGPU failed to initialize.')
+    expect(runtime.describeInitFallback(new Error('boom'))).toBe(
+      'WebGPU failed to initialize.',
+    )
+  })
+
   it('resets, advances, and disposes through the active backend', async () => {
     const trace = makeTrace()
     const nextTrace = makeTrace({ positionId: 3, sampledTokenId: 11 })

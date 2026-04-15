@@ -4,6 +4,7 @@ import {
   loadModelBundle,
   MicrogptRuntime,
 } from './model'
+import { normalizePrefixInput } from './prefixNormalization'
 import { ArchitectureScene } from './components/ArchitectureScene'
 import { CodeViewer } from './components/CodeViewer'
 import { Controls } from './components/Controls'
@@ -33,8 +34,9 @@ export default function App() {
   const runtimeRef = useRef<MicrogptRuntime | null>(null)
   const tokenizerRef = useRef<ReturnType<typeof createTokenizer> | null>(null)
   const advancingRef = useRef(false)
+  const hydrateRequestRef = useRef(0)
+  const prefixVersionRef = useRef(0)
   const [reducedMotion, setReducedMotion] = useState(false)
-  const [mobileViewport, setMobileViewport] = useState(false)
 
   useEffect(() => {
     const media = window.matchMedia('(prefers-reduced-motion: reduce)')
@@ -46,25 +48,23 @@ export default function App() {
     }
   }, [])
 
-  useEffect(() => {
-    const media = window.matchMedia('(max-width: 1023px)')
-    const update = () => setMobileViewport(media.matches)
-    update()
-    media.addEventListener('change', update)
-    return () => {
-      media.removeEventListener('change', update)
-    }
-  }, [])
-
   async function hydrate(prefixInput: string) {
     const runtime = runtimeRef.current!
     const tokenizer = tokenizerRef.current!
-    dispatch({ type: 'loading' })
     const normalization = tokenizer.normalizePrefix(prefixInput)
+    const requestId = ++hydrateRequestRef.current
+    const prefixVersion = prefixVersionRef.current
+    dispatch({ type: 'loading' })
     const result = await runtime.reset(normalization.normalized)
+    if (
+      requestId !== hydrateRequestRef.current ||
+      prefixVersion !== prefixVersionRef.current
+    ) {
+      return
+    }
     dispatch({
       type: 'reset',
-      prefixInput,
+      prefixInput: normalization.normalized,
       normalization,
       trace: result.trace,
       sequenceTokenIds: result.session.visibleTokenIds,
@@ -79,15 +79,9 @@ export default function App() {
   }, [])
 
   const handlePrefixChange = useCallback((value: string) => {
-    const normalization = tokenizerRef.current
-      ? tokenizerRef.current.normalizePrefix(value)
-      : {
-          normalized: value.toLowerCase().replace(/[^a-z]/g, '').slice(0, 15),
-          removedUnsupported: /[^a-z]/.test(value.toLowerCase()),
-          truncated:
-            value.toLowerCase().replace(/[^a-z]/g, '').length > 15,
-        }
+    const normalization = normalizePrefixInput(tokenizerRef.current, value)
 
+    prefixVersionRef.current += 1
     dispatch({
       type: 'setPrefixInput',
       prefixInput: normalization.normalized,
@@ -132,6 +126,7 @@ export default function App() {
         })
         setSource(sourceText)
         const normalization = tokenizerRef.current.normalizePrefix('')
+        hydrateRequestRef.current += 1
         const result = await runtime.reset(normalization.normalized)
         dispatch({
           type: 'reset',
@@ -263,8 +258,6 @@ export default function App() {
     state.activeTraceIndex < state.traces.length - 1 ||
     state.status !== 'terminal'
   const transitionLabel = `p${trace.positionId}:${currentTokenLabel} -> p${trace.positionId + 1}:${nextTokenLabel}`
-  const showScene = !mobileViewport || state.mobileTab === 'scene'
-
   return (
     <div className="app-shell">
       <header className="app-header">
@@ -302,6 +295,21 @@ export default function App() {
             state.mobileTab === 'code' ? '' : 'is-active'
           }`}
         >
+          <div
+            className={`story-scene__scene ${
+              state.mobileTab === 'scene' ? 'is-active' : ''
+            }`}
+          >
+            <ArchitectureScene
+              trace={trace}
+              phase={phase}
+              contextTokens={contextTokens}
+              tokenLabel={tokenLabel}
+              sceneModelData={sceneModelData}
+              onFocusRanges={handleFocusRanges}
+            />
+          </div>
+
           <div
             className={`story-scene__story ${
               state.mobileTab === 'story' ? 'is-active' : ''
@@ -348,23 +356,6 @@ export default function App() {
               onToggleAppendix={() => dispatch({ type: 'toggleAppendix' })}
               onFocusRanges={handleFocusRanges}
             />
-          </div>
-
-          <div
-            className={`story-scene__scene ${
-              state.mobileTab === 'scene' ? 'is-active' : ''
-            }`}
-          >
-            {showScene ? (
-              <ArchitectureScene
-                trace={trace}
-                phase={phase}
-                contextTokens={contextTokens}
-                tokenLabel={tokenLabel}
-                sceneModelData={sceneModelData}
-                onFocusRanges={handleFocusRanges}
-              />
-            ) : null}
           </div>
         </section>
       </main>

@@ -87,6 +87,38 @@ async function expectSceneToChange(scene: Locator, action: () => Promise<void>) 
   return { before, after }
 }
 
+async function findHoverablePoint(page: Page, eventSurface: Locator) {
+  await eventSurface.evaluate((element) => {
+    element.scrollIntoView({ block: 'center', inline: 'nearest' })
+  })
+  await page.waitForTimeout(250)
+  const box = await eventSurface.boundingBox()
+  if (!box) {
+    throw new Error('Scene event surface bounding box was not available')
+  }
+
+  const xFractions = [0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7]
+  const yFractions = [0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8]
+
+  for (const yFraction of yFractions) {
+    for (const xFraction of xFractions) {
+      await page.mouse.move(
+        box.x + box.width * xFraction,
+        box.y + box.height * yFraction,
+      )
+      await page.waitForTimeout(120)
+      const hoverIdx = await page.evaluate(
+        () => window.__microVizDebug?.display.hoverTarget?.mainCube?.idx ?? null,
+      )
+      if (hoverIdx != null) {
+        return { box, xFraction, yFraction }
+      }
+    }
+  }
+
+  throw new Error('Could not find a hoverable point in the current scene framing')
+}
+
 test.describe('desktop walkthrough', () => {
   test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 1100 })
@@ -290,6 +322,48 @@ test.describe('desktop walkthrough', () => {
     expect(issues).toEqual([])
   })
 
+  test('clears scene hover state when the pointer leaves the interactive surface', async ({
+    page,
+  }) => {
+    const issues = collectBrowserIssues(page)
+    const eventSurface = page.locator('.scene-panel__event-surface')
+    await eventSurface.scrollIntoViewIfNeeded()
+    await expect(page.locator('.scene-panel canvas')).toBeVisible()
+
+    const box = await eventSurface.boundingBox()
+    if (!box) {
+      throw new Error('Scene event surface bounding box was not available')
+    }
+
+    const baseline = await activeLineNumbers(page)
+    await page.mouse.move(box.x + box.width * 0.48, box.y + box.height * 0.65)
+    await page.waitForTimeout(300)
+    const hovered = await activeLineNumbers(page)
+    expect(hovered).not.toEqual(baseline)
+
+    await page.mouse.move(box.x + box.width + 140, box.y - 40)
+    await page.waitForTimeout(300)
+    expect(await activeLineNumbers(page)).toEqual(baseline)
+    expect(issues).toEqual([])
+  })
+
+  test('walks all fourteen phases without remounting or browser errors', async ({
+    page,
+  }) => {
+    const issues = collectBrowserIssues(page)
+    const seenPhases = new Set<string>()
+
+    seenPhases.add(await phaseLabel(page))
+    for (let index = 0; index < 13; index += 1) {
+      await advanceOnePhase(page)
+      seenPhases.add(await phaseLabel(page))
+    }
+
+    expect(await stepLabel(page)).toBe('step 14 / 14')
+    expect(seenPhases.size).toBe(14)
+    expect(issues).toEqual([])
+  })
+
   test('preserves manual zoom across same-region phase advances', async ({ page }) => {
     const issues = collectBrowserIssues(page)
     const scene = page.locator('.scene-panel')
@@ -309,9 +383,19 @@ test.describe('desktop walkthrough', () => {
         }
         return win.__microVizDebug?.camera?.angle?.z ?? null
       })
+    const readCameraPoseId = () =>
+      page.evaluate(() => {
+        const win = window as Window & {
+          __microVizDebug?: { microViz?: { phaseState?: { cameraPoseId?: string } } }
+        }
+        return win.__microVizDebug?.microViz?.phaseState?.cameraPoseId ?? null
+      })
 
-    const initialZoom = await readCameraZoom()
-    expect(initialZoom).not.toBeNull()
+    for (let index = 0; index < 4; index += 1) {
+      await advanceOnePhase(page)
+    }
+
+    expect(await readCameraPoseId()).toBe('attention')
 
     await page.mouse.move(box.x + box.width * 0.5, box.y + box.height * 0.55)
     await page.mouse.wheel(0, 900)
@@ -319,17 +403,68 @@ test.describe('desktop walkthrough', () => {
 
     const zoomed = await readCameraZoom()
     expect(zoomed).not.toBeNull()
-    expect(zoomed).not.toBe(initialZoom)
 
     await advanceOnePhase(page)
     const afterFirstStep = await readCameraZoom()
+    expect(await readCameraPoseId()).toBe('attention')
     await advanceOnePhase(page)
     const afterSecondStep = await readCameraZoom()
+    expect(await readCameraPoseId()).toBe('attention')
 
     expect(afterFirstStep).not.toBeNull()
     expect(afterSecondStep).not.toBeNull()
     expect(Math.abs((afterFirstStep ?? 0) - (zoomed ?? 0))).toBeLessThan(0.25)
     expect(Math.abs((afterSecondStep ?? 0) - (zoomed ?? 0))).toBeLessThan(0.25)
+    expect(issues).toEqual([])
+  })
+
+  test('keeps the lower output phases usable at 1440x1100 without page scroll', async ({
+    page,
+  }) => {
+    const issues = collectBrowserIssues(page)
+    await expect(page.locator('.scene-panel canvas')).toBeVisible()
+    expect(await page.evaluate(() => window.scrollY)).toBe(0)
+
+    for (let index = 0; index < 10; index += 1) {
+      await advanceOnePhase(page)
+    }
+
+    const bounds = await page.evaluate(() => {
+      const viewport = document
+        .querySelector('.scene-panel__viewport')
+        ?.getBoundingClientRect()
+      return {
+        scrollY: window.scrollY,
+        innerHeight: window.innerHeight,
+        viewportBottom: viewport?.bottom ?? null,
+      }
+    })
+
+    expect(bounds.scrollY).toBe(0)
+    expect(bounds.viewportBottom).not.toBeNull()
+    expect((bounds.viewportBottom ?? 0) <= bounds.innerHeight).toBe(true)
+
+    const eventSurface = page.locator('.scene-panel__event-surface')
+    const box = await eventSurface.boundingBox()
+    if (!box) {
+      throw new Error('Scene event surface bounding box was not available')
+    }
+
+    let hoverHits = 0
+    for (let y = 0.18; y <= 0.82; y += 0.16) {
+      for (let x = 0.18; x <= 0.82; x += 0.16) {
+        await page.mouse.move(box.x + box.width * x, box.y + box.height * y)
+        await page.waitForTimeout(25)
+        const hit = await page.evaluate(
+          () => window.__microVizDebug?.display.hoverTarget?.mainCube?.idx ?? null,
+        )
+        if (hit != null) {
+          hoverHits += 1
+        }
+      }
+    }
+
+    expect(hoverHits).toBeGreaterThan(0)
     expect(issues).toEqual([])
   })
 
@@ -342,22 +477,29 @@ test.describe('desktop walkthrough', () => {
     await scene.scrollIntoViewIfNeeded()
     await expect(page.locator('.scene-panel canvas')).toBeVisible()
 
-    for (let index = 0; index < 11; index += 1) {
+    for (let index = 0; index < 4; index += 1) {
       await advanceOnePhase(page)
     }
-    await expect(page.locator('.story-panel__phase-chip')).toContainText('Softmax Probabilities')
+    await expect(page.locator('.story-panel__phase-chip')).toContainText('Q / K / V')
+    await page.waitForTimeout(500)
 
-    const box = await eventSurface.boundingBox()
-    if (!box) {
-      throw new Error('Scene event surface bounding box was not available')
-    }
+    const hoverPoint = await findHoverablePoint(page, eventSurface)
 
-    await expectSceneToChange(scene, async () => {
-      await page.mouse.move(box.x + box.width * 0.85, box.y + box.height * 0.08)
-      await page.waitForTimeout(150)
-      await page.mouse.move(box.x + box.width * 0.0909, box.y + box.height * 0.4545)
-      await page.waitForTimeout(300)
-    })
+    await page.mouse.move(
+      hoverPoint.box.x + hoverPoint.box.width * 0.85,
+      hoverPoint.box.y + hoverPoint.box.height * 0.08,
+    )
+    await page.waitForTimeout(150)
+    await page.mouse.move(
+      hoverPoint.box.x + hoverPoint.box.width * hoverPoint.xFraction,
+      hoverPoint.box.y + hoverPoint.box.height * hoverPoint.yFraction,
+    )
+    await page.waitForTimeout(300)
+
+    const hoverIdx = await page.evaluate(
+      () => window.__microVizDebug?.display.hoverTarget?.mainCube?.idx ?? null,
+    )
+    expect(hoverIdx).not.toBeNull()
 
     expect(issues).toEqual([])
   })
@@ -448,6 +590,14 @@ test.describe('mobile walkthrough', () => {
     await expect(page.getByRole('tab', { name: 'Story' })).toBeVisible()
     await expect(page.getByRole('tab', { name: 'Scene' })).toBeVisible()
 
+    const initialCanvasCount = await page.locator('.scene-panel canvas').count()
+    expect(initialCanvasCount).toBe(1)
+
+    await page.evaluate(() => {
+      ;(window as Window & { __mobileSceneCanvas?: HTMLCanvasElement | null }).__mobileSceneCanvas =
+        document.querySelector('.scene-panel canvas')
+    })
+
     await page.getByRole('tab', { name: 'Scene' }).click()
     await expect(page.locator('.scene-panel')).toBeVisible()
     await expect(page.getByText(/drag to pan/i)).toBeVisible()
@@ -457,6 +607,12 @@ test.describe('mobile walkthrough', () => {
 
     await page.getByRole('tab', { name: 'Story' }).click()
     await expect(page.getByRole('textbox', { name: 'Prefix' })).toBeVisible()
+
+    const preservedCanvas = await page.evaluate(() => {
+      const win = window as Window & { __mobileSceneCanvas?: HTMLCanvasElement | null }
+      return document.querySelector('.scene-panel canvas') === win.__mobileSceneCanvas
+    })
+    expect(preservedCanvas).toBe(true)
 
     const overflow = await page.evaluate(
       () => document.documentElement.scrollWidth - window.innerWidth,

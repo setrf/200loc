@@ -263,9 +263,13 @@ function makeBinding(kind: MicroVizTextureBinding['kind'], key: string) {
   return { kind, key } satisfies MicroVizTextureBinding
 }
 
-function cameraAnchorBlockIdsForPose(cameraPoseId: PhaseDefinition['viz']['cameraPoseId']) {
-  switch (cameraPoseId) {
-    case 'input':
+function cameraAnchorBlockIdsForPhase(phase: PhaseDefinition) {
+  switch (phase.id) {
+    case 'tokenize':
+      return null
+    case 'token-embedding':
+    case 'position-embedding':
+    case 'embed-add-norm':
       return [
         'context',
         'token-embedding',
@@ -273,7 +277,10 @@ function cameraAnchorBlockIdsForPose(cameraPoseId: PhaseDefinition['viz']['camer
         'residual-stream',
         'norm-1',
       ] satisfies MicroVizBlockId[]
-    case 'attention':
+    case 'qkv':
+    case 'attention-scores':
+    case 'attention-softmax':
+    case 'weighted-values':
       return [
         'q-project',
         'k-project',
@@ -284,22 +291,78 @@ function cameraAnchorBlockIdsForPose(cameraPoseId: PhaseDefinition['viz']['camer
         'attention-head-4',
         'attention-out',
       ] satisfies MicroVizBlockId[]
-    case 'residual':
+    case 'attn-out':
       return ['attention-out', 'residual-add-1', 'norm-2'] satisfies MicroVizBlockId[]
-    case 'readout':
+    case 'mlp':
       return [
         'norm-2',
         'mlp-fc1',
         'mlp-relu',
         'mlp-fc2',
+      ] satisfies MicroVizBlockId[]
+    case 'lm-head':
+      return [
+        'lm-head-weight',
         'logits',
+        'softmax-max',
+        'softmax-exp',
+      ] satisfies MicroVizBlockId[]
+    case 'probabilities':
+      return [
+        'logits',
+        'softmax-max',
+        'softmax-exp',
         'probabilities',
       ] satisfies MicroVizBlockId[]
     case 'sample':
-      return ['logits', 'probabilities', 'sample'] satisfies MicroVizBlockId[]
-    case 'overview':
+    case 'append-or-stop':
+      return [
+        'logits',
+        'softmax-max',
+        'softmax-exp',
+        'probabilities',
+        'sample',
+      ] satisfies MicroVizBlockId[]
     default:
       return null
+  }
+}
+
+function phaseCameraCenterRatio(phase: PhaseDefinition) {
+  if (phase.viz.cameraPoseId === 'overview') {
+    return 0.5
+  }
+
+  if (
+    phase.id === 'token-embedding' ||
+    phase.id === 'position-embedding' ||
+    phase.id === 'embed-add-norm'
+  ) {
+    return 0.52
+  }
+
+  if (phase.id === 'mlp') {
+    return 0.72
+  }
+
+  if (phase.id === 'lm-head') {
+    return 0.88
+  }
+
+  if (phase.id === 'probabilities') {
+    return 0.93
+  }
+
+  if (phase.id === 'sample' || phase.id === 'append-or-stop') {
+    return 0.97
+  }
+
+  switch (phase.viz.cameraPoseId) {
+    case 'readout':
+    case 'sample':
+      return 0.82
+    default:
+      return 0.35
   }
 }
 
@@ -308,7 +371,14 @@ function buildPhaseCameraTarget(
   layout: MicroVizLayout,
   focusBlockIds: MicroVizBlockId[],
 ) {
-  const anchorBlockIds = cameraAnchorBlockIdsForPose(phase.viz.cameraPoseId)
+  if (phase.viz.cameraPoseId === 'overview') {
+    return {
+      center: layout.cameraPoses.overview.center.clone(),
+      angle: layout.cameraPoses.overview.angle.clone(),
+    }
+  }
+
+  const anchorBlockIds = cameraAnchorBlockIdsForPhase(phase)
   const anchorCubes = anchorBlockIds?.flatMap((blockId) => {
     const block = layout.blockMap[blockId]
     return block ? [block.cube] : []
@@ -347,35 +417,71 @@ function buildPhaseCameraTarget(
     },
   )
   const centerX = (bounds.minX + bounds.maxX) * 0.5
-  const centerY = bounds.minY + (bounds.maxY - bounds.minY) * 0.35
+  const centerY =
+    bounds.minY + (bounds.maxY - bounds.minY) * phaseCameraCenterRatio(phase)
   const centerZ = (bounds.minZ + bounds.maxZ) * 0.5
   const spanX = Math.max(1, bounds.maxX - bounds.minX)
   const spanY = Math.max(1, bounds.maxY - bounds.minY)
   const baseAngles = {
-    overview: { x: 288, y: 17, z: 9.6 },
-    input: { x: 288, y: 17, z: 6.9 },
+    overview: { x: 288, y: 17, z: 8.8 },
+    input: { x: 288, y: 17, z: 2.0 },
     attention: { x: 287, y: 18, z: 5.6 },
     residual: { x: 288, y: 17, z: 6.1 },
-    readout: { x: 287, y: 17, z: 5.6 },
-    sample: { x: 287, y: 16, z: 5.2 },
+    readout: { x: 271.3, y: 6.4, z: 9.8 },
+    sample: { x: 271.3, y: 6.4, z: 10.4 },
   } as const
   const base = baseAngles[phase.viz.cameraPoseId]
   const zoomAdjust = Math.min(1.2, Math.max(-1.1, (Math.max(spanX, spanY) - 150) / 180))
-  const yBias =
+  const xBias =
     phase.viz.cameraPoseId === 'input'
-      ? -48
-      : phase.viz.cameraPoseId === 'attention'
-        ? -52
-        : phase.viz.cameraPoseId === 'readout'
-          ? -24
-          : phase.viz.cameraPoseId === 'sample'
-            ? -12
-            : 0
+      ? -18
+      : phase.viz.cameraPoseId === 'readout' || phase.viz.cameraPoseId === 'sample'
+          ? 0
+          : -6
+  const yBias =
+    phase.viz.cameraPoseId === 'readout' || phase.viz.cameraPoseId === 'sample'
+      ? 0
+      : phase.viz.cameraPoseId === 'input'
+        ? 132
+        : phase.viz.cameraPoseId === 'attention'
+          ? -52
+          : 0
+  const minZoom = phase.viz.cameraPoseId === 'input' ? 3.0 : 4.8
 
   return {
-    center: new Vec3(centerX - 6, centerY + yBias, centerZ),
-    angle: new Vec3(base.x, base.y, Math.max(4.8, base.z + zoomAdjust)),
+    center: new Vec3(centerX + xBias, centerY + yBias, centerZ),
+    angle: new Vec3(base.x, base.y, Math.max(minZoom, base.z + zoomAdjust)),
   }
+}
+
+function phaseSceneOffset(cameraPoseId: PhaseDefinition['viz']['cameraPoseId']) {
+  switch (cameraPoseId) {
+    case 'overview':
+      return new Vec3(26, -520, 0)
+    case 'input':
+      return new Vec3(18, -190, 0)
+    case 'attention':
+      return new Vec3(12, -400, 0)
+    case 'residual':
+      return new Vec3(8, -350, 0)
+    case 'readout':
+      return new Vec3(0, -620, 0)
+    case 'sample':
+      return new Vec3(0, -650, 0)
+  }
+}
+
+function phaseCardOffset(
+  cameraPoseId: PhaseDefinition['viz']['cameraPoseId'],
+  sceneOffset: Vec3,
+) {
+  const cardLift =
+    cameraPoseId === 'overview'
+      ? new Vec3(18, -28, 0)
+      : cameraPoseId === 'input' || cameraPoseId === 'attention'
+        ? new Vec3(18, 56, 0)
+        : new Vec3(18, -40, 0)
+  return sceneOffset.add(cardLift)
 }
 
 export function buildMicroVizPhaseState(
@@ -387,6 +493,15 @@ export function buildMicroVizPhaseState(
   const emphasisBlockIds = unique(
     frame.emphasisNodeIds.flatMap((nodeId) => mapNodeToBlocks(nodeId)),
   )
+  if (phase.id === 'lm-head') {
+    emphasisBlockIds.push('lm-head-weight', 'softmax-max', 'softmax-exp')
+  }
+  if (phase.id === 'probabilities') {
+    emphasisBlockIds.push('softmax-max', 'softmax-exp')
+  }
+  if (phase.id === 'sample' || phase.id === 'append-or-stop') {
+    emphasisBlockIds.push('softmax-max', 'softmax-exp', 'sample')
+  }
   const emphasisEdgeIds = unique(
     frame.emphasisEdgeIds.flatMap((edgeId) => mapEdgeToMicro(edgeId)),
   )
@@ -394,6 +509,8 @@ export function buildMicroVizPhaseState(
   const lineTitle = phase.title
   const lineSubtitle = frame.currentSlotLabel
   const lineTransition = frame.transitionLabel
+  const sceneOffset = phaseSceneOffset(phase.viz.cameraPoseId)
+  const cardOffset = phaseCardOffset(phase.viz.cameraPoseId, sceneOffset)
   const opacityByBlockId: MicroVizPhaseState['opacityByBlockId'] = {}
   const highlightByBlockId: MicroVizPhaseState['highlightByBlockId'] = {}
   const hoverBlockIndices = unique(
@@ -416,7 +533,7 @@ export function buildMicroVizPhaseState(
           phase.id === 'position-embedding' ||
           phase.id === 'qkv' ||
           phase.id === 'mlp' ||
-          phase.id === 'logits'
+          phase.id === 'lm-head'
         ? DimStyle.C
         : null
   const cameraTarget = buildPhaseCameraTarget(
@@ -440,7 +557,10 @@ export function buildMicroVizPhaseState(
     'mlp-fc1': makeBinding('static', 'layer0.mlp_fc1'),
     'mlp-relu': makeBinding('dynamic', 'mlp-act-grid'),
     'mlp-fc2': makeBinding('static', 'layer0.mlp_fc2'),
+    'lm-head-weight': makeBinding('static', 'lm_head'),
     logits: makeBinding('dynamic', 'logits-grid'),
+    'softmax-max': makeBinding('dynamic', 'softmax-max'),
+    'softmax-exp': makeBinding('dynamic', 'softmax-exp'),
     probabilities: makeBinding('dynamic', 'probs-grid'),
     sample: makeBinding('dynamic', 'sample-grid'),
   }
@@ -449,8 +569,12 @@ export function buildMicroVizPhaseState(
     const blockId = headBlockIds[headIndex]!
     blockBindings[blockId] = makeBinding(
       'dynamic',
-      phase.id === 'attention-scores'
+      phase.id === 'qkv'
+        ? `${blockId}-q`
+        : phase.id === 'attention-scores'
         ? `${blockId}-scores`
+        : phase.id === 'attention-softmax'
+          ? `${blockId}-weights`
         : phase.id === 'weighted-values'
           ? `${blockId}-vout`
           : `${blockId}-weights`,
@@ -461,6 +585,8 @@ export function buildMicroVizPhaseState(
     phaseId: phase.id,
     cameraPoseId: frame.cameraPoseId,
     cameraTarget,
+    sceneOffset,
+    cardOffset,
     focusBlockIds,
     emphasisBlockIds: unique([...focusBlockIds, ...emphasisBlockIds]),
     emphasisEdgeIds,
@@ -468,7 +594,10 @@ export function buildMicroVizPhaseState(
     dimHover,
     lines: [lineTitle, lineSubtitle, lineTransition],
     topOutputOpacity:
-      phase.id === 'logits' || phase.id === 'probabilities' || phase.id === 'sample'
+      phase.id === 'lm-head' ||
+      phase.id === 'probabilities' ||
+      phase.id === 'sample' ||
+      phase.id === 'append-or-stop'
         ? 1
         : 0.9,
     opacityByBlockId,
@@ -611,7 +740,7 @@ function buildHeadTextures(
   }
 }
 
-function buildCurrentPositionGrid(
+function buildCurrentPositionRowGrid(
   width: number,
   height: number,
   rowIndex: number,
@@ -619,6 +748,17 @@ function buildCurrentPositionGrid(
 ) {
   const grid = makeZeroGrid(width, height)
   setRow(grid, width, Array.from(values), rowIndex)
+  return grid
+}
+
+function buildCurrentPositionColumnGrid(
+  width: number,
+  height: number,
+  columnIndex: number,
+  values: ArrayLike<number>,
+) {
+  const grid = makeZeroGrid(width, height)
+  setColumn(grid, width, values, columnIndex)
   return grid
 }
 
@@ -666,7 +806,7 @@ export function uploadMicroVizFrame(
     gl,
     ctx.textures,
     'attn-out-grid',
-    buildCurrentPositionGrid(T, C, currentPosition, trace.attnOutput),
+    buildCurrentPositionColumnGrid(T, C, currentPosition, trace.attnOutput),
     T,
     C,
   )
@@ -674,7 +814,7 @@ export function uploadMicroVizFrame(
     gl,
     ctx.textures,
     'attn-residual-grid',
-    buildCurrentPositionGrid(T, C, currentPosition, trace.xAfterAttnResidual),
+    buildCurrentPositionColumnGrid(T, C, currentPosition, trace.xAfterAttnResidual),
     T,
     C,
   )
@@ -682,7 +822,7 @@ export function uploadMicroVizFrame(
     gl,
     ctx.textures,
     'norm2-grid',
-    buildCurrentPositionGrid(T, C, currentPosition, rmsnorm(trace.xAfterAttnResidual)),
+    buildCurrentPositionColumnGrid(T, C, currentPosition, rmsnorm(trace.xAfterAttnResidual)),
     T,
     C,
   )
@@ -707,7 +847,7 @@ export function uploadMicroVizFrame(
     gl,
     ctx.textures,
     'mlp-fc-grid',
-    buildCurrentPositionGrid(C * 4, T, currentPosition, trace.mlpHidden),
+    buildCurrentPositionRowGrid(C * 4, T, currentPosition, trace.mlpHidden),
     C * 4,
     T,
     { sequential: true },
@@ -716,7 +856,7 @@ export function uploadMicroVizFrame(
     gl,
     ctx.textures,
     'mlp-act-grid',
-    buildCurrentPositionGrid(
+    buildCurrentPositionRowGrid(
       C * 4,
       T,
       currentPosition,
@@ -730,7 +870,7 @@ export function uploadMicroVizFrame(
     gl,
     ctx.textures,
     'mlp-result-grid',
-    buildCurrentPositionGrid(T, C, currentPosition, trace.mlpOutput),
+    buildCurrentPositionColumnGrid(T, C, currentPosition, trace.mlpOutput),
     T,
     C,
   )
@@ -738,7 +878,7 @@ export function uploadMicroVizFrame(
     gl,
     ctx.textures,
     'mlp-residual-grid',
-    buildCurrentPositionGrid(T, C, currentPosition, trace.xAfterMlpResidual),
+    buildCurrentPositionColumnGrid(T, C, currentPosition, trace.xAfterMlpResidual),
     T,
     C,
   )
@@ -746,7 +886,7 @@ export function uploadMicroVizFrame(
     gl,
     ctx.textures,
     'logits-grid',
-    buildCurrentPositionGrid(T, V, currentPosition, trace.logits),
+    buildCurrentPositionColumnGrid(T, V, currentPosition, trace.logits),
     T,
     V,
   )
@@ -776,7 +916,7 @@ export function uploadMicroVizFrame(
     gl,
     ctx.textures,
     'probs-grid',
-    buildCurrentPositionGrid(T, V, currentPosition, trace.probs),
+    buildCurrentPositionColumnGrid(T, V, currentPosition, trace.probs),
     T,
     V,
     { sequential: true },
@@ -862,6 +1002,14 @@ export function applyMicroVizPhase(
   ctx: MicroVizRenderContext,
   phaseState: MicroVizPhaseState,
 ) {
+  for (let index = 0; index < ctx.layout.cubes.length; index += 1) {
+    const cube = ctx.layout.cubes[index]!
+    const base = ctx.layout.baseCubePositions[index]!
+    cube.x = base.x + ctx.currentSceneOffset.x
+    cube.y = base.y + ctx.currentSceneOffset.y
+    cube.z = base.z + ctx.currentSceneOffset.z
+  }
+
   const focusIds = new Set(
     phaseState.focusBlockIds.map((blockId) => ctx.layout.blockMap[blockId].codeFocusId),
   )
@@ -900,13 +1048,13 @@ export function applyMicroVizPhase(
     transformerBlock.selfAttendLabel.visible =
       phaseState.phaseId === 'qkv' ||
       phaseState.phaseId === 'attention-scores' ||
-      phaseState.phaseId === 'attention-weights' ||
+      phaseState.phaseId === 'attention-softmax' ||
       phaseState.phaseId === 'weighted-values' ||
-      phaseState.phaseId === 'attn-output-residual'
+      phaseState.phaseId === 'attn-out'
         ? 1
         : 0.72
     transformerBlock.projLabel.visible =
-      phaseState.phaseId === 'attn-output-residual' ? 1 : 0.62
+      phaseState.phaseId === 'attn-out' ? 1 : 0.62
     transformerBlock.mlpLabel.visible =
       phaseState.phaseId === 'mlp' ? 1 : 0.72
     transformerBlock.heads.forEach((head, headIndex) => {
@@ -915,18 +1063,20 @@ export function applyMicroVizPhase(
       head.qLabel.visible = phaseState.phaseId === 'qkv' ? 1 : 0.7
       head.kLabel.visible = phaseState.phaseId === 'qkv' ? 1 : 0.7
       head.vLabel.visible = phaseState.phaseId === 'qkv' ? 1 : 0.7
+      head.biasLabel.visible = 0
       head.mtxLabel.visible =
         phaseState.phaseId === 'attention-scores' ||
-        phaseState.phaseId === 'attention-weights'
+        phaseState.phaseId === 'attention-softmax'
           ? 1
           : 0.6
       head.vectorLabel.visible = phaseState.phaseId === 'weighted-values' ? 1 : 0.6
     })
   }
   ctx.layout.outputLabel.visible =
-    phaseState.phaseId === 'logits' ||
+    phaseState.phaseId === 'lm-head' ||
     phaseState.phaseId === 'probabilities' ||
-    phaseState.phaseId === 'sample'
+    phaseState.phaseId === 'sample' ||
+    phaseState.phaseId === 'append-or-stop'
       ? 1
       : 0.84
 }

@@ -178,6 +178,64 @@ function projectToScreen(state: IProgramState, modelPos: Vec3) {
         0);
 }
 
+function projectBlockBoundsToScreen(state: IProgramState, blk: IBlkDef) {
+    let bb = new BoundingBox3d();
+    let x0 = blk.x;
+    let x1 = blk.x + blk.dx;
+    let y0 = blk.y;
+    let y1 = blk.y + blk.dy;
+    let z0 = blk.z;
+    let z1 = blk.z + blk.dz;
+
+    for (let x of [x0, x1]) {
+        for (let y of [y0, y1]) {
+            for (let z of [z0, z1]) {
+                bb.addInPlace(projectToScreen(state, new Vec3(x, y, z)));
+            }
+        }
+    }
+
+    return bb;
+}
+
+function projectCellCenterToScreen(state: IProgramState, blk: IBlkDef, idx: Vec3) {
+    let cellPos = new Vec3(
+        cellPosition(state.layout, blk, Dim.X, idx.x) + state.layout.cell * 0.5,
+        cellPosition(state.layout, blk, Dim.Y, idx.y) + state.layout.cell * 0.5,
+        cellPosition(state.layout, blk, Dim.Z, idx.z) + state.layout.cell * 0.5,
+    );
+    return projectToScreen(state, cellPos);
+}
+
+function intersectScreenBox(origin: Vec3, dir: Vec3, bb: BoundingBox3d, extra: number = 0) {
+    let tVals = [
+        (bb.min.x - origin.x) / dir.x,
+        (bb.max.x - origin.x) / dir.x,
+        (bb.min.y - origin.y) / dir.y,
+        (bb.max.y - origin.y) / dir.y,
+    ];
+
+    let hit: Vec3 | null = null;
+    let minT = Number.POSITIVE_INFINITY;
+    let eps = 0.00001;
+    for (let t of tVals) {
+        let p = origin.mulAdd(dir, t);
+        if (
+            t > 0 &&
+            t < minT &&
+            p.x > bb.min.x - eps &&
+            p.y > bb.min.y - eps &&
+            p.x < bb.max.x + eps &&
+            p.y < bb.max.y + eps
+        ) {
+            minT = t;
+            hit = origin.mulAdd(dir, t + extra);
+        }
+    }
+
+    return hit;
+}
+
 let weightSrcColor = new Vec4(0.4, 0.4, 0.9, 1);
 let workingSrcColor = new Vec4(0.3, 0.7, 0.3, 1);
 
@@ -895,44 +953,21 @@ function drawDepArrows(args: IDataFlowArgs, bb: BoundingBox3d) {
     }
 
     function drawArrow(blk: IBlkDef, idx: Vec3, color: Vec4, reverse?: boolean) {
-        let cellPos = new Vec3(
-            cellPosition(state.layout, blk, Dim.X, idx.x) + state.layout.cell * 0.5,
-            cellPosition(state.layout, blk, Dim.Y, idx.y) + state.layout.cell * 0.5,
-            cellPosition(state.layout, blk, Dim.Z, idx.z) + state.layout.cell * 1.1,
-        );
-
-        // let's just draw a straight line for now
-
-        let lineOpts = makeLineOpts({ n: new Vec3(0,0,1), color, mtx, thick: 0.5, dash: 10 });
-
-        let source = projectToScreen(state, cellPos);
+        let source = projectCellCenterToScreen(state, blk, idx);
+        let sourceBounds = projectBlockBoundsToScreen(state, blk);
 
         let center = bb.center();
         let dir = source.sub(center).normalize();
-        let tVals = [
-            (bb.min.x - center.x) / dir.x,
-            (bb.max.x - center.x) / dir.x,
-            (bb.min.y - center.y) / dir.y,
-            (bb.max.y - center.y) / dir.y,
-        ];
+        let actualTarget = intersectScreenBox(center, dir, bb, 4);
+        let actualSource = intersectScreenBox(source, center.sub(source).normalize(), sourceBounds, 1);
 
-        let actualTarget: Vec3 | null = null;
-        for (let t of tVals) {
-            let p = center.mulAdd(dir, t);
-            let eps = 0.00001;
-            if (t > 0 && p.x > bb.min.x - eps && p.y > bb.min.y - eps && p.x < bb.max.x + eps && p.y < bb.max.y + eps) {
-                actualTarget = center.mulAdd(dir, t + 4);
-                break;
-            }
-        }
-
-        if (actualTarget) {
+        if (actualTarget && actualSource) {
             if (reverse) {
-                let tmp = source;
-                source = actualTarget;
+                let tmp = actualSource;
+                actualSource = actualTarget;
                 actualTarget = tmp;
             }
-            drawArc(state, source, actualTarget, color, mtx, 1.0);
+            drawArc(state, actualSource, actualTarget, color, mtx, 1.0);
             // addLine2(state.render.lineRender, source, actualTarget, lineOpts);
         }
     }

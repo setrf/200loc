@@ -19,5 +19,5 @@ export function useAutoplay(active: boolean, step: () => void, delayMs = 1100) {
     return () => {
       window.clearInterval(timer)
     }
-  }, [active, delayMs, step])
+  }, [active, delayMs])
 }

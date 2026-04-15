@@ -789,7 +789,7 @@ export function buildMicroVizLayout(model: SceneModelData): MicroVizLayout {
   registerCube(mlpFcBias, 'mlp')
   registerCube(mlpFc, 'mlp')
 
-  y += shape.T * cell + margin
+  y += Math.max(mlpFcWeight.dy, mlpFc.dy) + margin
 
   const mlpAct = mk({
     t: 'i',
@@ -810,7 +810,7 @@ export function buildMicroVizLayout(model: SceneModelData): MicroVizLayout {
   })
   registerCube(mlpAct, 'mlp')
 
-  y += shape.T * cell + margin
+  y += Math.max(mlpAct.dy, mlpFc.dy) + margin
 
   const mlpProjWeight = mk({
     t: 'w',
@@ -1101,7 +1101,10 @@ export function buildMicroVizLayout(model: SceneModelData): MicroVizLayout {
     'mlp-fc1': makeBlock('mlp-fc1', mlpFcWeight, 'mlp'),
     'mlp-relu': makeBlock('mlp-relu', mlpAct, 'mlp'),
     'mlp-fc2': makeBlock('mlp-fc2', mlpProjWeight, 'mlp'),
+    'lm-head-weight': makeBlock('lm-head-weight', lmHeadWeight, 'logits'),
     logits: makeBlock('logits', logits, 'logits'),
+    'softmax-max': makeBlock('softmax-max', logitsAgg2, 'probabilities'),
+    'softmax-exp': makeBlock('softmax-exp', logitsAgg1, 'probabilities'),
     probabilities: makeBlock('probabilities', logitsSoftmax, 'probabilities'),
     sample: makeBlock('sample', sampleBlock, 'sample'),
   } satisfies Record<MicroVizBlockId, MicroVizBlock>
@@ -1316,8 +1319,15 @@ export function buildMicroVizLayout(model: SceneModelData): MicroVizLayout {
     },
   }
 
+  const baseCubePositions = cubes.map((cube) => ({
+    x: cube.x,
+    y: cube.y,
+    z: cube.z,
+  }))
+
   return {
     cubes,
+    baseCubePositions,
     labels: [embedLabel, ...transformerBlock.labels, outputLabel],
     blocks: [transformerBlock],
     blockMap,

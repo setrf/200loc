@@ -58,7 +58,7 @@ export const inferencePhases: PhaseDefinition[] = [
     ],
     viz: {
       focusNodeId: 'context',
-      cameraPoseId: 'input',
+      cameraPoseId: 'overview',
       overlayKind: 'context-cache',
       emphasisNodeIds: ['context'],
       emphasisEdgeIds: [

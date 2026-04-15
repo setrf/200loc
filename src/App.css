@@ -72,6 +72,12 @@
   min-height: 0;
 }
 
+.story-scene__story,
+.story-scene__scene {
+  display: flex;
+  flex-direction: column;
+}
+
 .code-column__sticky {
   position: sticky;
   top: 18px;
@@ -80,8 +86,9 @@
 
 .story-scene {
   display: grid;
-  grid-template-rows: auto minmax(560px, 1fr);
+  grid-template-rows: minmax(0, 1fr) minmax(320px, 380px);
   gap: 18px;
+  height: calc(100svh - 118px);
 }
 
 .story-panel,
@@ -173,6 +180,23 @@
   border-bottom: 1px solid var(--border);
 }
 
+.code-viewer__meta-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.code-viewer__language {
+  padding: 5px 9px;
+  border: 1px solid rgba(97, 175, 239, 0.24);
+  border-radius: 999px;
+  background: rgba(97, 175, 239, 0.1);
+  color: var(--accent-strong);
+  font: 600 0.7rem/1 var(--mono);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
 .code-viewer__lines {
   height: calc(100% - 86px);
   margin: 0;
@@ -183,16 +207,28 @@
 
 .code-viewer__line {
   display: grid;
-  grid-template-columns: 54px minmax(0, 1fr);
+  grid-template-columns: 36px minmax(0, 1fr);
   align-items: baseline;
-  gap: 14px;
-  padding: 0 16px;
+  gap: 10px;
+  padding: 0 12px 0 8px;
   min-height: 24px;
   color: var(--code-text);
+  position: relative;
 }
 
 .code-viewer__line.is-active {
   background: var(--highlight);
+}
+
+.code-viewer__line.is-active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 2px;
+  bottom: 2px;
+  width: 3px;
+  border-radius: 0 999px 999px 0;
+  background: var(--accent);
 }
 
 .code-viewer__line-no {
@@ -202,17 +238,71 @@
   font: 500 0.78rem/1.8 var(--mono);
 }
 
-.code-viewer code {
-  white-space: pre-wrap;
-  word-break: break-word;
+.code-viewer__code {
+  position: relative;
+  display: block;
+  white-space: pre;
+  word-break: normal;
+  overflow: visible;
+  tab-size: 4;
   font: 500 0.8rem/1.8 var(--mono);
+  color: var(--code-text);
+}
+
+.code-viewer__code::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 2px;
+  bottom: 2px;
+  width: calc(var(--indent-depth, 0) * 1.3rem);
+  background-image: repeating-linear-gradient(
+    to right,
+    rgba(117, 134, 162, 0.22) 0 1px,
+    transparent 1px 1.3rem
+  );
+  pointer-events: none;
+  opacity: 0.9;
+}
+
+.code-viewer__token--keyword,
+.code-viewer__token--decorator {
+  color: #c792ea;
+}
+
+.code-viewer__token--builtin {
+  color: #82aaff;
+}
+
+.code-viewer__token--string {
+  color: #c3e88d;
+}
+
+.code-viewer__token--comment {
+  color: #6f8195;
+}
+
+.code-viewer__token--number,
+.code-viewer__token--constant {
+  color: #f78c6c;
+}
+
+.code-viewer__token--definition {
+  color: #ffcb6b;
+}
+
+.code-viewer__token--self {
+  color: #89ddff;
 }
 
 .story-panel {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  flex: 1 1 auto;
   padding: 20px;
+  min-height: 0;
+  overflow: auto;
 }
 
 .story-panel__topline,
@@ -239,7 +329,8 @@
 }
 
 .story-panel__phase-chip {
-  min-width: 168px;
+  min-width: 0;
+  width: 100%;
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -392,14 +483,16 @@
 .scene-panel {
   display: flex;
   flex-direction: column;
+  flex: 1 1 auto;
   padding: 8px 10px 12px;
+  min-height: 0;
 }
 
 .scene-panel__viewport {
   position: relative;
-  flex: 1 0 auto;
-  height: clamp(720px, 74vh, 1180px);
-  min-height: 720px;
+  flex: 1 1 auto;
+  height: 100%;
+  min-height: 0;
   overflow: hidden;
   overscroll-behavior: contain;
   touch-action: none;
@@ -792,9 +885,19 @@
   }
 
   .code-column,
-  .story-scene__story,
-  .story-scene__scene {
+  .story-scene__story {
     display: none;
+  }
+
+  .story-scene__scene {
+    display: block;
+    position: fixed;
+    top: 0;
+    left: -200vw;
+    width: min(calc(100vw - 28px), 920px);
+    height: clamp(840px, 82vh, 1280px);
+    visibility: hidden;
+    pointer-events: none;
   }
 
   .code-column.is-active,
@@ -805,9 +908,19 @@
 
   .story-scene {
     display: block;
+    height: auto;
+  }
+
+  .story-scene__scene.is-active {
+    position: static;
+    width: auto;
+    height: auto;
+    visibility: visible;
+    pointer-events: auto;
   }
 
   .scene-panel__viewport {
+    height: clamp(840px, 82vh, 1280px);
     min-height: 540px;
   }
 }

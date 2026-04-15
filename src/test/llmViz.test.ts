@@ -11,6 +11,8 @@ import {
   buildMicrogptLayout,
   getCameraPose,
   getLayoutNodeMap,
+  getNodeFrontLabelPosition,
+  getNodeSubtitlePosition,
   getProjectedScale,
   lerpCameraPose,
   projectScene,
@@ -116,6 +118,21 @@ describe('llm viz helpers', () => {
     expect(getProjectedScale(760, 820, pose)).toBeGreaterThan(0)
   })
 
+  it('computes projected label positions from the front face', () => {
+    const layout = buildMicrogptLayout(modelConfig)
+    const projected = projectScene(layout, getCameraPose('overview'), 760, 820)
+    const node = projected.nodes[0]!
+
+    expect(getNodeFrontLabelPosition(node)).toEqual({
+      x: node.front[0]![0] + 14,
+      y: node.front[0]![1] + 24,
+    })
+    expect(getNodeSubtitlePosition(node)).toEqual({
+      x: node.front[0]![0] + 14,
+      y: node.front[0]![1] + 42,
+    })
+  })
+
   it('builds tensor helpers with exact dimensions and highlights', () => {
     const wte = buildWeightSurface(
       'wte',
@@ -133,10 +150,16 @@ describe('llm viz helpers', () => {
     })
     expect(vector.values).toHaveLength(27)
 
+    const defaultVector = buildVectorSurface('mini', 'mini', [1, 2, 3])
+    expect(defaultVector.itemLabels).toEqual(['d0', 'd1', 'd2'])
+
     const attention = buildAttentionSurface(0, 'weights', [0.1, 0.7, 0.2], ['p0', 'p1', 'p2'], 'sequential')
     expect(attention.surface.rows).toBe(1)
     expect(attention.surface.cols).toBe(3)
     expect(attention.result.highlightedIndices).toEqual([1])
+
+    const emptyAttention = buildAttentionSurface(1, 'weights', [], [], 'sequential')
+    expect(emptyAttention.result.highlightedIndices).toEqual([])
   })
 
   it('builds phase-specific tensor windows and full viz frames', () => {
@@ -199,6 +222,23 @@ describe('llm viz helpers', () => {
     )
     expect(sampleWindow.lookups?.[0].description).toBe('Stop now.')
 
+    const weightedValuesWindow = buildTensorWindow(
+      makeTrace({
+        heads: makeTrace().heads.map((head) => ({
+          ...head,
+          weights: [],
+          vSlices: [],
+        })),
+      }),
+      inferencePhases[7],
+      bundle,
+      contextTokens,
+      tokenLabel,
+    )
+    expect(weightedValuesWindow.attention?.every((item) => item.surface.highlightedRows?.length === 0)).toBe(
+      true,
+    )
+
     const attentionFrame = buildVizFrame(
       trace,
       inferencePhases[5],
@@ -224,6 +264,52 @@ describe('llm viz helpers', () => {
     if (contextFrame.overlay.kind === 'context-cache') {
       expect(contextFrame.overlay.focusWindow.title).toBe('visible cache')
       expect(contextFrame.overlay.slots[0].isCurrent).toBe(true)
+    }
+
+    const probabilitiesWindow = buildTensorWindow(
+      makeTrace({ topCandidates: [], sampledTokenId: 7 }),
+      inferencePhases[11],
+      bundle,
+      contextTokens,
+      tokenLabel,
+    )
+    expect(probabilitiesWindow.note).toContain('h')
+
+    const emptyAttentionFrame = buildVizFrame(
+      makeTrace({ heads: [] }),
+      inferencePhases[5],
+      bundle,
+      [],
+      tokenLabel,
+    )
+    expect(emptyAttentionFrame.emphasisNodeIds).toEqual(
+      inferencePhases[5]!.viz.emphasisNodeIds,
+    )
+
+    const fifthHeadTemplate = makeTrace().heads[0]!
+    const fallbackAttentionFrame = buildVizFrame(
+      makeTrace({
+        heads: Array.from({ length: 5 }, (_, index) => ({
+          ...fifthHeadTemplate,
+          weights: index === 4 ? [] : [0],
+          q: [...fifthHeadTemplate.q],
+          mixedValue: [...fifthHeadTemplate.mixedValue],
+          kSlices: fifthHeadTemplate.kSlices.map((slice) => [...slice]),
+          vSlices: fifthHeadTemplate.vSlices.map((slice) => [...slice]),
+          scores: [...fifthHeadTemplate.scores],
+        })),
+      }),
+      inferencePhases[5],
+      bundle,
+      [],
+      tokenLabel,
+    )
+    expect(fallbackAttentionFrame.emphasisNodeIds).toContain('attention-head-1')
+    if (fallbackAttentionFrame.overlay.kind === 'attention-scores') {
+      expect(fallbackAttentionFrame.overlay.attentionReads[4]).toMatchObject({
+        headId: 'attention-head-1',
+        targetLabel: 'p0',
+      })
     }
   })
 

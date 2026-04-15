@@ -172,6 +172,21 @@ describe('walkthrough reducer', () => {
     expect(noOpPrev).toBe(atBeginning)
   })
 
+  it('treats structurally equal hover ranges as unchanged', () => {
+    const state = {
+      ...initialWalkthroughState,
+      status: 'ready' as const,
+      hoverRanges: [{ start: 1, end: 2 }],
+    }
+
+    const nextState = walkthroughReducer(state, {
+      type: 'setHoverRanges',
+      ranges: [{ start: 1, end: 2 }],
+    })
+
+    expect(nextState).toBe(state)
+  })
+
   it('marks reset and append as terminal when requested', () => {
     const resetTerminal = walkthroughReducer(initialWalkthroughState, {
       type: 'reset',

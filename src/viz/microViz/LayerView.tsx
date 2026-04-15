@@ -101,8 +101,12 @@ class MicroCanvasRender {
   }
 
   resetToCameraPose(cameraPoseId: PhaseDefinition['viz']['cameraPoseId']) {
+    const currentPhaseTarget =
+      this.progState.microViz.phaseState?.cameraPoseId === cameraPoseId
+        ? this.progState.microViz.phaseState.cameraTarget
+        : null
     this.progState.camera.desiredCamera =
-      this.progState.layout.cameraPoses[cameraPoseId]
+      currentPhaseTarget ?? this.progState.layout.cameraPoses[cameraPoseId]
     this.markDirty()
   }
 
@@ -310,6 +314,7 @@ export const MicroLayerView = forwardRef<MicroLayerViewHandle, MicroLayerViewPro
       const supportsWebgl = !!activeCanvas.getContext('webgl2')
 
       if (!supportsWebgl) {
+        onHoverFocusChange(null)
         onRenderModeChange('fallback')
         return
       }
@@ -338,6 +343,7 @@ export const MicroLayerView = forwardRef<MicroLayerViewHandle, MicroLayerViewPro
           onRenderModeChange('webgl')
         } catch {
           if (!stale) {
+            onHoverFocusChange(null)
             onRenderModeChange('fallback')
           }
         }
@@ -347,6 +353,7 @@ export const MicroLayerView = forwardRef<MicroLayerViewHandle, MicroLayerViewPro
 
       return () => {
         stale = true
+        onHoverFocusChange(null)
         onRenderModeChange('loading')
         activeCanvas.removeEventListener('wheel', handleWheel)
         resizeObserver?.disconnect()

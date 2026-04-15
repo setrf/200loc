@@ -131,6 +131,24 @@ describe('WebGpuEngine', () => {
     )
   })
 
+  it('surfaces a device-unavailable init error when requestDevice fails', async () => {
+    const requestDevice = vi.fn().mockRejectedValue(new Error('denied'))
+    Object.defineProperty(globalThis, 'navigator', {
+      value: {
+        gpu: {
+          requestAdapter: vi.fn().mockResolvedValue({ requestDevice }),
+        },
+      },
+      configurable: true,
+    })
+
+    const engine = new WebGpuEngine()
+    await expect(engine.init(loadBundle())).rejects.toMatchObject({
+      code: 'device-unavailable',
+    })
+    expect(requestDevice).toHaveBeenCalled()
+  })
+
   it('initializes resources, runs prefixes, steps, parity checks, and disposes', async () => {
     const bundle = loadBundle()
     const { device } = createMockDevice()

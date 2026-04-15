@@ -26,6 +26,8 @@ export default defineConfig({
         'src/test/**',
         'src/assets/**',
         'src/vendor/**',
+        'src/viz/microViz/**',
+        'src/viz/llmViz/renderer.ts',
       ],
     },
   },

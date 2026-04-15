@@ -62,6 +62,15 @@ function makeTokenizer() {
   }
 }
 
+function findCodeLine(text: string) {
+  return screen.getByText((_, element) => {
+    return (
+      element?.classList.contains('code-viewer__code') === true &&
+      element.textContent === text
+    )
+  })
+}
+
 function mockSourceFetch(sourceText: string, ok = true) {
   return vi.spyOn(globalThis, 'fetch').mockResolvedValue({
     ok,
@@ -164,10 +173,10 @@ describe('App', () => {
     expect(screen.getAllByText('Tokenize Prefix').length).toBeGreaterThan(0)
     expect(await screen.findByTestId('fallback-scene')).toBeInTheDocument()
     expect(screen.getAllByText('p2:12 -> p3:stop').length).toBeGreaterThan(0)
-    expect(screen.getByText('line 117').closest('li')).not.toHaveClass('is-active')
+    expect(findCodeLine('line 117').closest('li')).not.toHaveClass('is-active')
 
     fireEvent.mouseEnter(screen.getAllByText('step 1 / 14')[0])
-    expect(screen.getByText('line 23').closest('li')).toHaveClass('is-active')
+    expect(findCodeLine('line 23').closest('li')).toHaveClass('is-active')
     fireEvent.mouseLeave(screen.getAllByText('step 1 / 14')[0])
     fireEvent.mouseEnter(screen.getByLabelText('Architecture scene'))
     expect(document.querySelectorAll('.code-viewer__line.is-active').length).toBeGreaterThan(0)
@@ -552,5 +561,55 @@ describe('App', () => {
     initDeferred.resolve({ activeBackend: 'cpu' })
     await Promise.resolve()
     expect(runtime.dispose).toHaveBeenCalled()
+  })
+
+  it('ignores stale reset results after the prefix changes again', async () => {
+    const runtime = makeRuntime()
+    const deferredReset = deferred<{
+      trace: ReturnType<typeof makeTrace>
+      session: { visibleTokenIds: number[]; done: boolean }
+      diagnostics: { activeBackend: 'cpu'; fallbackReason?: string }
+    }>()
+
+    runtime.reset
+      .mockResolvedValueOnce({
+        trace: makeTrace({ sampledTokenId: 26 }),
+        session: { visibleTokenIds: [4, 12], done: false },
+        diagnostics: {
+          activeBackend: 'cpu',
+          fallbackReason: 'WebGPU unavailable',
+        },
+      })
+      .mockImplementationOnce(() => deferredReset.promise)
+
+    loadModelBundleMock.mockResolvedValue(bundleStub)
+    createTokenizerMock.mockReturnValue(makeTokenizer())
+    runtimeCtorMock.mockImplementation(function () {
+      return runtime
+    })
+    mockSourceFetch(sourceText)
+
+    const { default: App } = await import('../App')
+    render(<App />)
+
+    const prefix = await screen.findByRole('textbox', { name: 'Prefix' })
+    fireEvent.change(prefix, { target: { value: 'em' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Reset' }))
+    fireEvent.change(prefix, { target: { value: 'emi' } })
+
+    deferredReset.resolve({
+      trace: makeTrace({ positionId: 3, tokenId: 8, sampledTokenId: 8 }),
+      session: { visibleTokenIds: [4, 12, 8], done: false },
+      diagnostics: {
+        activeBackend: 'cpu',
+        fallbackReason: 'WebGPU unavailable',
+      },
+    })
+
+    await waitFor(() => {
+      expect(prefix).toHaveValue('emi')
+    })
+    expect(runtime.reset).toHaveBeenLastCalledWith('em')
+    expect(screen.getAllByText('p2:12 -> p3:stop').length).toBeGreaterThan(0)
   })
 })

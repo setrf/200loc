@@ -11,6 +11,9 @@ describe('model card layout', () => {
     const wide = computeModelCardLayout(12, 14, 8)
 
     expect(wide.br.x - wide.tl.x).toBeGreaterThan(compact.br.x - compact.tl.x)
+    expect(compact.titleFontScale).toBeLessThanOrEqual(13)
+    expect(compact.titleFontScale).toBeGreaterThan(9)
+    expect(wide.titleFontScale).toBeLessThan(compact.titleFontScale)
     expect(wide.titleFontScale).toBeLessThanOrEqual(13)
     expect(wide.paramLabelScale).toBeLessThanOrEqual(4)
     expect(wide.paramValueScale).toBeLessThanOrEqual(8)

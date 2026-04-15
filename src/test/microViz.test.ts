@@ -110,6 +110,9 @@ describe('micro viz bridge', () => {
     expect(layout.blockMap['norm-2'].cube.name).toBe('rmsnorm 2')
     expect(layout.blockMap['q-project'].cube.name).toBe('Q weights')
     expect(layout.blockMap['mlp-fc1'].cube.name).toBe('fc1')
+    expect(layout.blockMap['lm-head-weight'].cube.name).toBe('lm head')
+    expect(layout.blockMap['softmax-max'].cube.name).toBe('softmax max')
+    expect(layout.blockMap['softmax-exp'].cube.name).toBe('softmax exp')
     expect(layout.blockMap.sample.cube.name).toBe('sample / stop')
     expect(layout.blocks).toHaveLength(1)
     expect(layout.outputLabel.cubes).toContain(layout.logitsSoftmax)
@@ -118,6 +121,16 @@ describe('micro viz bridge', () => {
     )
     expect(layout.transformerBlocks).toHaveLength(1)
     expect(layout.model.inputTokens.localBuffer).toHaveLength(16)
+  })
+
+  it('stacks the MLP stages without vertical collisions', () => {
+    const layout = buildMicroVizLayout(bundle)
+    const fc1 = layout.blockMap['mlp-fc1'].cube
+    const relu = layout.blockMap['mlp-relu'].cube
+    const fc2 = layout.blockMap['mlp-fc2'].cube
+
+    expect(relu.y).toBeGreaterThanOrEqual(fc1.y + fc1.dy + 12)
+    expect(fc2.y).toBeGreaterThanOrEqual(relu.y + relu.dy + 12)
   })
 
   it('maps walkthrough phases onto microgpt blocks, edges, and bindings', () => {
@@ -147,6 +160,7 @@ describe('micro viz bridge', () => {
     expect(qkvPhaseState.blockBindings['q-project']?.key).toBe('layer0.attn_wq')
     expect(qkvPhaseState.blockBindings['k-project']?.key).toBe('layer0.attn_wk')
     expect(qkvPhaseState.blockBindings['v-project']?.key).toBe('layer0.attn_wv')
+    expect(qkvPhaseState.blockBindings['attention-head-1']?.key).toBe('attention-head-1-q')
 
     const mlpFrame = buildVizFrame(
       trace,
@@ -196,6 +210,11 @@ describe('micro viz bridge', () => {
       layout: ReturnType<typeof buildMicroVizLayout>
       textures: ReturnType<typeof createMicroVizTextures>
       camera: { desiredCamera: unknown }
+      currentSceneOffset: { dist: (other: unknown) => number }
+      targetSceneOffset: { dist: (other: unknown) => number }
+      currentCardOffset: { dist: (other: unknown) => number }
+      targetCardOffset: { dist: (other: unknown) => number }
+      offsetTransition: null
     } = {
       renderState: {
         gl,
@@ -207,6 +226,11 @@ describe('micro viz bridge', () => {
       camera: {
         desiredCamera: null,
       },
+      currentSceneOffset: { dist: () => 0 },
+      targetSceneOffset: { dist: () => 0 },
+      currentCardOffset: { dist: () => 0 },
+      targetCardOffset: { dist: () => 0 },
+      offsetTransition: null,
     }
 
     uploadMicroVizFrame(
@@ -254,6 +278,19 @@ describe('micro viz bridge', () => {
       ]),
     )
     expect(textures.dynamicTextures['sample-grid'].localBuffer?.[trace.positionId]).toBe(1)
+    expect(textures.dynamicTextures['logits-grid'].localBuffer?.[trace.positionId]).toBeCloseTo(
+      trace.logits[0]!,
+      6,
+    )
+    expect(
+      textures.dynamicTextures['logits-grid'].localBuffer?.[
+        bundle.config.blockSize + trace.positionId
+      ],
+    ).toBeCloseTo(trace.logits[1]!, 6)
+    expect(textures.dynamicTextures['probs-grid'].localBuffer?.[trace.positionId]).toBeCloseTo(
+      trace.probs[0]!,
+      6,
+    )
     expect(layout.blockMap['token-embedding'].cube.access?.src).toBe(textures.staticTextures.wte)
     expect(layout.blockMap['attention-head-1'].cube.access?.src).toBe(
       textures.dynamicTextures['attention-head-1-weights'],
@@ -313,6 +350,11 @@ describe('micro viz bridge', () => {
       renderState: { lineRender: object; sharedRender: object }
       layout: ReturnType<typeof buildMicroVizLayout>
       camera: { desiredCamera?: unknown }
+      currentSceneOffset: typeof phaseState.sceneOffset
+      targetSceneOffset: typeof phaseState.sceneOffset
+      currentCardOffset: typeof phaseState.cardOffset
+      targetCardOffset: typeof phaseState.cardOffset
+      offsetTransition: null
     } = {
       renderState: {
         lineRender: {},
@@ -320,6 +362,11 @@ describe('micro viz bridge', () => {
       },
       layout,
       camera: {},
+      currentSceneOffset: phaseState.sceneOffset.clone(),
+      targetSceneOffset: phaseState.sceneOffset.clone(),
+      currentCardOffset: phaseState.cardOffset.clone(),
+      targetCardOffset: phaseState.cardOffset.clone(),
+      offsetTransition: null,
     }
 
     applyMicroVizPhase(
@@ -336,7 +383,75 @@ describe('micro viz bridge', () => {
     expect(phaseState.hoverBlockIndices.length).toBeGreaterThan(0)
   })
 
-  it('does not re-seed camera transitions when stepping within the same camera pose group', () => {
+  it('uses the live walkthrough phase ids for attention-softmax and attention output emphasis', () => {
+    const layout = buildMicroVizLayout(bundle)
+    const softmaxPhaseState = buildMicroVizPhaseState(
+      inferencePhases[6],
+      buildVizFrame(makeTrace(), inferencePhases[6], bundle, ['BOS', 'e', 'm'], tokenLabel),
+      layout,
+    )
+    const ctx: {
+      renderState: { lineRender: object; sharedRender: object }
+      layout: ReturnType<typeof buildMicroVizLayout>
+      camera: { desiredCamera?: unknown }
+      currentSceneOffset: typeof softmaxPhaseState.sceneOffset
+      targetSceneOffset: typeof softmaxPhaseState.sceneOffset
+      currentCardOffset: typeof softmaxPhaseState.cardOffset
+      targetCardOffset: typeof softmaxPhaseState.cardOffset
+      offsetTransition: null
+    } = {
+      renderState: {
+        lineRender: {},
+        sharedRender: {},
+      },
+      layout,
+      camera: {},
+      currentSceneOffset: softmaxPhaseState.sceneOffset.clone(),
+      targetSceneOffset: softmaxPhaseState.sceneOffset.clone(),
+      currentCardOffset: softmaxPhaseState.cardOffset.clone(),
+      targetCardOffset: softmaxPhaseState.cardOffset.clone(),
+      offsetTransition: null,
+    }
+    applyMicroVizPhase(
+      ctx as unknown as Parameters<typeof applyMicroVizPhase>[0],
+      softmaxPhaseState,
+    )
+    expect(layout.transformerBlocks[0]?.selfAttendLabel.visible).toBe(1)
+    expect(layout.transformerBlocks[0]?.heads[0]?.mtxLabel.visible).toBe(1)
+
+    const attnOutPhaseState = buildMicroVizPhaseState(
+      inferencePhases[8],
+      buildVizFrame(makeTrace(), inferencePhases[8], bundle, ['BOS', 'e', 'm'], tokenLabel),
+      layout,
+    )
+    applyMicroVizPhase(
+      ctx as unknown as Parameters<typeof applyMicroVizPhase>[0],
+      attnOutPhaseState,
+    )
+    expect(layout.transformerBlocks[0]?.selfAttendLabel.visible).toBe(1)
+    expect(layout.transformerBlocks[0]?.projLabel.visible).toBe(1)
+
+    const lmHeadPhaseState = buildMicroVizPhaseState(
+      inferencePhases[10],
+      buildVizFrame(makeTrace(), inferencePhases[10], bundle, ['BOS', 'e', 'm'], tokenLabel),
+      layout,
+    )
+    expect(lmHeadPhaseState.dimHover).toBeDefined()
+    expect(lmHeadPhaseState.topOutputOpacity).toBe(1)
+
+    const head = layout.transformerBlocks[0]?.heads[0]
+    if (!head) {
+      throw new Error('Expected the first attention head to exist')
+    }
+    head.biasLabel.visible = 1
+    applyMicroVizPhase(
+      ctx as unknown as Parameters<typeof applyMicroVizPhase>[0],
+      lmHeadPhaseState,
+    )
+    expect(head.biasLabel.visible).toBe(0)
+  })
+
+  it('only updates desired camera when the phase target materially changes', () => {
     const trace = makeTrace()
     const contextTokens = ['BOS', 'e', 'm']
     const layout = buildMicroVizLayout(bundle)
@@ -348,6 +463,16 @@ describe('micro viz bridge', () => {
     const scoreState = buildMicroVizPhaseState(
       inferencePhases[5],
       buildVizFrame(trace, inferencePhases[5], bundle, contextTokens, tokenLabel),
+      layout,
+    )
+    const attnOutState = buildMicroVizPhaseState(
+      inferencePhases[8],
+      buildVizFrame(trace, inferencePhases[8], bundle, contextTokens, tokenLabel),
+      layout,
+    )
+    const mlpState = buildMicroVizPhaseState(
+      inferencePhases[9],
+      buildVizFrame(trace, inferencePhases[9], bundle, contextTokens, tokenLabel),
       layout,
     )
     const sampleState = buildMicroVizPhaseState(
@@ -362,7 +487,26 @@ describe('micro viz bridge', () => {
     expect(qkvState.cameraTarget.center.y).toBeCloseTo(scoreState.cameraTarget.center.y, 5)
     expect(qkvState.cameraTarget.center.z).toBeCloseTo(scoreState.cameraTarget.center.z, 5)
     expect(qkvState.cameraTarget.angle.z).toBeCloseTo(scoreState.cameraTarget.angle.z, 5)
+    expect(attnOutState.cameraPoseId).toBe(mlpState.cameraPoseId)
+    expect(shouldUpdateDesiredCamera(attnOutState, mlpState)).toBe(true)
     expect(shouldUpdateDesiredCamera(scoreState, sampleState)).toBe(true)
+  })
+
+  it('anchors the tokenize phase around the full model overview', () => {
+    const layout = buildMicroVizLayout(bundle)
+    const tokenizeState = buildMicroVizPhaseState(
+      inferencePhases[0],
+      buildVizFrame(makeTrace(), inferencePhases[0], bundle, ['BOS'], tokenLabel),
+      layout,
+    )
+
+    expect(tokenizeState.cameraPoseId).toBe('overview')
+    expect(tokenizeState.cameraTarget.center.x).toBeCloseTo(layout.cameraPoses.overview.center.x, 5)
+    expect(tokenizeState.cameraTarget.center.y).toBeCloseTo(layout.cameraPoses.overview.center.y, 5)
+    expect(tokenizeState.cameraTarget.center.z).toBeCloseTo(layout.cameraPoses.overview.center.z, 5)
+    expect(tokenizeState.cameraTarget.angle.x).toBeCloseTo(layout.cameraPoses.overview.angle.x, 5)
+    expect(tokenizeState.cameraTarget.angle.y).toBeCloseTo(layout.cameraPoses.overview.angle.y, 5)
+    expect(tokenizeState.cameraTarget.angle.z).toBeCloseTo(layout.cameraPoses.overview.angle.z, 5)
   })
 
   it('keeps nano-gpt assets out of the live app code path', () => {

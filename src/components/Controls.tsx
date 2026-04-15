@@ -93,12 +93,6 @@ export function Controls({
       </div>
 
       <div className="story-panel__header">
-        <div>
-          <h1>microgpt, one token at a time</h1>
-          <p className="story-panel__subtitle">
-            Click through the live inference path or let it autoplay.
-          </p>
-        </div>
         <div
           className="story-panel__phase-chip"
           onMouseEnter={() => onFocusRanges(codeRanges)}

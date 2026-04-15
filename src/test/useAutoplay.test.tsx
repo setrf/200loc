@@ -46,4 +46,21 @@ describe('useAutoplay', () => {
 
     unmount()
   })
+
+  it('does not recreate the interval when only the step callback changes', () => {
+    const step = vi.fn()
+    const nextStep = vi.fn()
+    const setIntervalSpy = vi.spyOn(window, 'setInterval')
+    const { rerender } = render(<Harness active={true} step={step} delayMs={200} />)
+
+    vi.advanceTimersByTime(200)
+    expect(step).toHaveBeenCalledTimes(1)
+    expect(setIntervalSpy).toHaveBeenCalledTimes(1)
+
+    rerender(<Harness active={true} step={nextStep} delayMs={200} />)
+    vi.advanceTimersByTime(200)
+
+    expect(setIntervalSpy).toHaveBeenCalledTimes(1)
+    expect(nextStep).toHaveBeenCalledTimes(1)
+  })
 })

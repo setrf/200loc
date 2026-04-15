@@ -7,9 +7,10 @@ import {
   type RefObject,
 } from 'react'
 import type { TokenStepTrace } from '../model'
+import { getFallbackCameraPoseForPhase } from './architectureSceneFallback'
 import { vizFocusRanges, type LineRange, type PhaseDefinition } from '../walkthrough/phases'
 import { buildVizFrame } from '../viz/llmViz/frame'
-import { buildMicrogptLayout, getCameraPose, projectScene } from '../viz/llmViz/layout'
+import { buildMicrogptLayout, projectScene } from '../viz/llmViz/layout'
 import type { ProjectedScene, SceneModelData } from '../viz/llmViz/types'
 import {
   MicroLayerView,
@@ -37,6 +38,7 @@ function useViewportSize<T extends HTMLElement>(ref: RefObject<T | null>) {
 
   useEffect(() => {
     const element = ref.current
+    /* v8 ignore next -- React only runs this effect after commit, so the ref is set in mounted usage */
     if (!element) {
       return
     }
@@ -164,14 +166,14 @@ export function ArchitectureScene({
 }: ArchitectureSceneProps) {
   const viewportRef = useRef<HTMLDivElement>(null)
   const layerViewRef = useRef<MicroLayerViewHandle | null>(null)
-  const currentPhaseIdRef = useRef(phase.id)
+  const currentPhaseTokenRef = useRef(0)
   const [renderMode, setRenderMode] = useState<'loading' | 'webgl' | 'fallback'>(
     'loading',
   )
   const [hoverFocusId, setHoverFocusId] = useState<{
-    phaseId: string
+    phaseToken: number
     focusId: FocusRangeKey | null
-  }>({ phaseId: phase.id, focusId: null })
+  }>({ phaseToken: 0, focusId: null })
   const viewportSize = useViewportSize(viewportRef)
 
   const vizFrame = useMemo(
@@ -189,26 +191,26 @@ export function ArchitectureScene({
     () =>
       projectScene(
         abstractLayout,
-        getCameraPose(vizFrame.cameraPoseId),
+        getFallbackCameraPoseForPhase(phase),
         viewportSize.width,
         viewportSize.height,
       ),
-    [abstractLayout, viewportSize, vizFrame.cameraPoseId],
+    [abstractLayout, phase, viewportSize],
   )
 
   useEffect(() => {
-    currentPhaseIdRef.current = phase.id
+    currentPhaseTokenRef.current += 1
   }, [phase.id])
 
   const setHoverFocusState = useCallback(
     (focusId: FocusRangeKey | null) => {
       setHoverFocusId((current) => {
-        const phaseId = currentPhaseIdRef.current
-        if (current.phaseId === phaseId && current.focusId === focusId) {
+        const phaseToken = currentPhaseTokenRef.current
+        if (current.phaseToken === phaseToken && current.focusId === focusId) {
           return current
         }
         return {
-          phaseId,
+          phaseToken,
           focusId,
         }
       })
@@ -246,7 +248,9 @@ export function ArchitectureScene({
 
   useEffect(() => {
     const activeFocusId =
-      hoverFocusId.phaseId === phase.id ? hoverFocusId.focusId : null
+      hoverFocusId.phaseToken === currentPhaseTokenRef.current
+        ? hoverFocusId.focusId
+        : null
     if (activeFocusId) {
       onFocusRanges(vizFocusRanges[activeFocusId])
       return

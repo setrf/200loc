@@ -9,6 +9,7 @@ import type {
 import type { DimStyle } from '../../vendor/llmVizOriginal/llm/walkthrough/WalkthroughTools'
 import type { IRenderState } from '../../vendor/llmVizOriginal/llm/render/modelRender'
 import type { IBufferTex } from '../../vendor/llmVizOriginal/utils/renderPhases'
+import { Vec3 } from '../../vendor/llmVizOriginal/utils/vector'
 import type {
   CameraPoseId,
   SceneModelData,
@@ -36,7 +37,10 @@ export type MicroVizBlockId =
   | 'mlp-fc1'
   | 'mlp-relu'
   | 'mlp-fc2'
+  | 'lm-head-weight'
   | 'logits'
+  | 'softmax-max'
+  | 'softmax-exp'
   | 'probabilities'
   | 'sample'
 
@@ -166,6 +170,7 @@ export interface MicroVizCardModel {
 
 export interface MicroVizLayout {
   cubes: IBlkDef[]
+  baseCubePositions: Array<{ x: number; y: number; z: number }>
   labels: IBlkLabel[]
   blocks: MicroVizTransformerBlock[]
   blockMap: Record<MicroVizBlockId, MicroVizBlock>
@@ -212,6 +217,8 @@ export interface MicroVizPhaseState {
   phaseId: PhaseDefinition['id']
   cameraPoseId: CameraPoseId
   cameraTarget: ICameraPos
+  sceneOffset: Vec3
+  cardOffset: Vec3
   focusBlockIds: MicroVizBlockId[]
   emphasisBlockIds: MicroVizBlockId[]
   emphasisEdgeIds: MicroVizEdgeId[]
@@ -236,4 +243,15 @@ export interface MicroVizRenderContext {
   camera: ICamera
   layout: MicroVizLayout
   textures: MicroVizTextureSet
+  currentSceneOffset: Vec3
+  targetSceneOffset: Vec3
+  currentCardOffset: Vec3
+  targetCardOffset: Vec3
+  offsetTransition:
+    | {
+        t: number
+        initialSceneOffset: Vec3
+        initialCardOffset: Vec3
+      }
+    | null
 }
