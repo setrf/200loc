@@ -81,8 +81,9 @@
 
 .story-scene {
   --rhs-stack-gap: 10px;
+  --story-panel-height: 132px;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-rows: auto minmax(0, 1fr) var(--story-panel-height);
   gap: var(--rhs-stack-gap);
   height: calc(100svh - 118px);
 }
@@ -293,9 +294,10 @@
   gap: 8px;
   flex: 0 0 auto;
   padding: 10px;
-  min-height: 0;
-  max-height: min(28svh, 196px);
-  overflow: auto;
+  height: var(--story-panel-height);
+  min-height: var(--story-panel-height);
+  max-height: var(--story-panel-height);
+  overflow: hidden;
 }
 
 .story-scene__toolbar-controls,
@@ -437,8 +439,12 @@
 
 .story-panel__lesson {
   display: block;
+  flex: 1 1 auto;
+  min-height: 0;
   position: relative;
   margin: 0;
+  overflow: auto;
+  scrollbar-gutter: stable;
 }
 
 .story-panel__flow {
@@ -976,8 +982,8 @@ button.annotation-trigger:focus-visible {
     height: auto;
   }
 
-  .story-panel {
-    max-height: none;
+  .story-scene {
+    --story-panel-height: 256px;
   }
 
   .story-scene__scene.is-active {
@@ -995,6 +1001,10 @@ button.annotation-trigger:focus-visible {
 }
 
 @media (max-width: 720px) {
+  .story-scene {
+    --story-panel-height: 256px;
+  }
+
   .app-header {
     flex-direction: column;
     align-items: start;
