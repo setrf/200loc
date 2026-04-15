@@ -18,6 +18,7 @@ vi.mock('../model', () => ({
   loadModelBundle: loadModelBundleMock,
   createTokenizer: createTokenizerMock,
   MicrogptRuntime: runtimeCtorMock,
+  resolveAssetPath: (path: string) => `/${path.replace(/^\/+/, '')}`,
 }))
 
 function deferred<T>() {
@@ -221,14 +222,14 @@ describe('App', () => {
     expect(screen.getAllByText('Append Or Stop').length).toBeGreaterThan(0)
     expectStoryPanelToContain(phaseBeat(33))
 
-    fireEvent.click(screen.getByRole('tab', { name: 'Scene' }))
-    expect(screen.getByRole('tab', { name: 'Scene' })).toHaveAttribute(
-      'aria-selected',
+    fireEvent.click(screen.getByRole('button', { name: 'Scene' }))
+    expect(screen.getByRole('button', { name: 'Scene' })).toHaveAttribute(
+      'aria-pressed',
       'true',
     )
-    fireEvent.click(screen.getByRole('tab', { name: 'Code' }))
-    expect(screen.getByRole('tab', { name: 'Code' })).toHaveAttribute(
-      'aria-selected',
+    fireEvent.click(screen.getByRole('button', { name: 'Code' }))
+    expect(screen.getByRole('button', { name: 'Code' })).toHaveAttribute(
+      'aria-pressed',
       'true',
     )
     },
@@ -603,6 +604,45 @@ describe('App', () => {
     })
     expect(runtime.reset).toHaveBeenLastCalledWith('em')
     expect(screen.getAllByText(`step 1 / ${phaseCount}`).length).toBeGreaterThan(0)
+    expect(screen.queryByText('Loading the model and canonical source…')).not.toBeInTheDocument()
+  })
+
+  it('surfaces reset failures and ignores stale reset failures after the prefix changes', async () => {
+    const runtime = makeRuntime()
+    const staleFailure = deferred<never>()
+
+    runtime.reset
+      .mockResolvedValueOnce({
+        trace: makeTrace({ sampledTokenId: 26 }),
+        session: { visibleTokenIds: [4, 12], done: false },
+        diagnostics: {
+          activeBackend: 'cpu',
+          fallbackReason: 'WebGPU unavailable',
+        },
+      })
+      .mockImplementationOnce(() => staleFailure.promise)
+      .mockRejectedValueOnce(new Error('reset failed'))
+
+    loadModelBundleMock.mockResolvedValue(bundleStub)
+    createTokenizerMock.mockReturnValue(makeTokenizer())
+    runtimeCtorMock.mockImplementation(function () {
+      return runtime
+    })
+    mockSourceFetch(sourceText)
+
+    const { default: App } = await import('../App')
+    render(<App />)
+
+    const prefix = await screen.findByRole('textbox', { name: 'Prefix' })
+    fireEvent.change(prefix, { target: { value: 'em' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Reset' }))
+    fireEvent.change(prefix, { target: { value: 'emi' } })
+    staleFailure.reject(new Error('stale reset failed'))
+    await Promise.resolve()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reset' }))
+    await screen.findByText('Failed to load the walkthrough.')
+    expect(screen.getByText('reset failed')).toBeInTheDocument()
   })
 
   it('closes an open annotation when the phase advances or the walkthrough resets', async () => {
@@ -680,7 +720,7 @@ describe('App', () => {
     fireEvent.click(document.querySelector('.annotation-trigger') as HTMLElement)
     expect(screen.getByRole('dialog')).toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('tab', { name: 'Scene' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Scene' }))
     await waitFor(() => {
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     })

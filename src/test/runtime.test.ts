@@ -103,6 +103,7 @@ describe('MicrogptRuntime', () => {
       activeBackend: 'cpu',
       fallbackReason: 'WebGPU parity check drifted on startup.',
     })
+    expect(parityRuntime.gpu.dispose).toHaveBeenCalled()
 
     const failedRuntime = new MicrogptRuntime(loadBundle()) as any
     failedRuntime.cpu = {
@@ -124,6 +125,7 @@ describe('MicrogptRuntime', () => {
       fallbackReason: 'WebGPU failed to initialize.',
     })
     expect(consoleWarn).toHaveBeenCalled()
+    expect(failedRuntime.gpu.dispose).toHaveBeenCalled()
 
     const adapterlessRuntime = new MicrogptRuntime(loadBundle()) as any
     adapterlessRuntime.cpu = {
@@ -153,6 +155,7 @@ describe('MicrogptRuntime', () => {
         'WebGPU is supported here, but no GPU adapter is available on this device.',
     })
     expect(consoleWarn).toHaveBeenCalledTimes(1)
+    expect(adapterlessRuntime.gpu.dispose).toHaveBeenCalled()
     consoleWarn.mockRestore()
   })
 
@@ -217,6 +220,32 @@ describe('MicrogptRuntime', () => {
     expect(gpu.dispose).toHaveBeenCalled()
   })
 
+  it('keeps existing runtime state if the gpu prefix path fails during reset', async () => {
+    const runtime = new MicrogptRuntime(loadBundle()) as any
+    const previousCpuSession = makeSession({ currentTokenId: 4 })
+    const previousGpuSession = makeSession({ backend: 'webgpu', currentTokenId: 4 })
+    runtime.cpuSession = previousCpuSession
+    runtime.gpuSession = previousGpuSession
+    runtime.backend = 'webgpu'
+    runtime.cpu = {
+      init: vi.fn(),
+      runPrefix: vi.fn().mockResolvedValue(makeSession({ currentTokenId: 12 })),
+      step: vi.fn(),
+      dispose: vi.fn(),
+    }
+    runtime.gpu = {
+      supported: true,
+      init: vi.fn(),
+      runPrefix: vi.fn().mockRejectedValue(new Error('gpu prefix failed')),
+      step: vi.fn(),
+      dispose: vi.fn(),
+    }
+
+    await expect(runtime.reset('em')).rejects.toThrow('gpu prefix failed')
+    expect(runtime.cpuSession).toBe(previousCpuSession)
+    expect(runtime.gpuSession).toBe(previousGpuSession)
+  })
+
   it('throws before reset and falls back when gpu drift or step errors occur', async () => {
     const trace = makeTrace()
     const drifted = makeTrace({
@@ -250,6 +279,7 @@ describe('MicrogptRuntime', () => {
       activeBackend: 'cpu',
       fallbackReason: 'WebGPU parity drifted during inference.',
     })
+    expect(runtime.gpu.dispose).toHaveBeenCalledTimes(1)
 
     runtime.backend = 'webgpu'
     runtime.cpuSession = makeSession()
@@ -259,8 +289,16 @@ describe('MicrogptRuntime', () => {
       activeBackend: 'cpu',
       fallbackReason: 'WebGPU failed during inference.',
     })
+    expect(runtime.gpu.dispose).toHaveBeenCalledTimes(2)
     expect(consoleWarn).toHaveBeenCalled()
     consoleWarn.mockRestore()
+  })
+
+  it('rejects attempts to advance a terminal runtime session', async () => {
+    const runtime = new MicrogptRuntime(loadBundle()) as any
+    runtime.cpuSession = makeSession({ done: true })
+
+    await expect(runtime.advance()).rejects.toThrow('Runtime is terminal')
   })
 
   it('skips dev parity checks when DEV is false', async () => {

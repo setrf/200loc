@@ -34,6 +34,7 @@ export type WalkthroughAction =
       type: 'setPrefixInput'
       prefixInput: string
       normalization?: PrefixNormalization
+      status?: WalkthroughStatus
     }
   | {
       type: 'reset'
@@ -112,6 +113,7 @@ export function walkthroughReducer(
     case 'setPrefixInput':
       return {
         ...state,
+        status: action.status ?? state.status,
         prefixInput: action.prefixInput,
         normalization: action.normalization ?? state.normalization,
       }
@@ -127,6 +129,7 @@ export function walkthroughReducer(
         sequenceTokenIds: action.sequenceTokenIds,
         backend: action.backend,
         fallbackReason: action.fallbackReason,
+        hoverRanges: null,
         error: undefined,
       }
     case 'appendTrace':

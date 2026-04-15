@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { PrefixNormalization } from '../model'
 import { inferencePhases } from '../walkthrough/phases'
@@ -15,6 +15,7 @@ vi.mock('../model', () => ({
   loadModelBundle: loadModelBundleMock,
   createTokenizer: createTokenizerMock,
   MicrogptRuntime: runtimeCtorMock,
+  resolveAssetPath: (path: string) => `/${path.replace(/^\/+/, '')}`,
 }))
 
 vi.mock('../components/Controls', () => ({

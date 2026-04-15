@@ -1,15 +1,10 @@
-import { useEffect, useRef, useState, type MouseEvent } from 'react'
-import type { TokenStepTrace } from '../model'
-import type { MobileTab } from '../walkthrough/reducer'
+import { useCallback, useEffect, useRef, useState, type MouseEvent } from 'react'
 import { getGlossaryEntry, type GlossaryId } from '../walkthrough/glossary'
 import type { StoryBeat } from '../walkthrough/phases'
 import { AnnotationPopup } from './AnnotationPopup'
 
 interface ControlsProps {
   beats: StoryBeat[]
-  mobileTab: MobileTab
-  stepId: string
-  trace: TokenStepTrace
 }
 
 interface OpenAnnotation {
@@ -30,7 +25,7 @@ function isCompactViewport() {
   return window.matchMedia(COMPACT_QUERY).matches
 }
 
-export function Controls({ beats, mobileTab, stepId, trace }: ControlsProps) {
+export function Controls({ beats }: ControlsProps) {
   const [isCompact, setIsCompact] = useState(isCompactViewport)
   const [openAnnotation, setOpenAnnotation] = useState<OpenAnnotation | null>(
     null,
@@ -54,25 +49,25 @@ export function Controls({ beats, mobileTab, stepId, trace }: ControlsProps) {
     }
   }, [])
 
-  function clearHoverTimer() {
+  const clearHoverTimer = useCallback(() => {
     if (hoverTimerRef.current !== null) {
       window.clearTimeout(hoverTimerRef.current)
       hoverTimerRef.current = null
     }
-  }
+  }, [])
 
-  function clearCloseTimer() {
+  const clearCloseTimer = useCallback(() => {
     if (closeTimerRef.current !== null) {
       window.clearTimeout(closeTimerRef.current)
       closeTimerRef.current = null
     }
-  }
+  }, [])
 
-  function closeAnnotation() {
+  const closeAnnotation = useCallback(() => {
     clearHoverTimer()
     clearCloseTimer()
     setOpenAnnotation(null)
-  }
+  }, [clearCloseTimer, clearHoverTimer])
 
   function syncAnnotation(triggerKey: string, glossaryId: GlossaryId, pinned: boolean) {
     const trigger = triggerRefs.current.get(triggerKey)
@@ -115,10 +110,6 @@ export function Controls({ beats, mobileTab, stepId, trace }: ControlsProps) {
       closeTimerRef.current = null
     }, HOVER_CLOSE_DELAY_MS)
   }
-
-  useEffect(() => {
-    closeAnnotation()
-  }, [mobileTab, stepId, trace])
 
   useEffect(() => {
     if (!openAnnotation || isCompact) {
@@ -184,7 +175,7 @@ export function Controls({ beats, mobileTab, stepId, trace }: ControlsProps) {
       document.removeEventListener('mousedown', handlePointerDown)
       document.removeEventListener('keydown', handleKeyDown)
     }
-  }, [openAnnotation])
+  }, [closeAnnotation, openAnnotation])
 
   const openEntry = openAnnotation
     ? getGlossaryEntry(openAnnotation.glossaryId)

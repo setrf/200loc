@@ -52,6 +52,10 @@ export class ReferenceCpuEngine implements InferenceEngine {
   }
 
   async step(session: SessionState): Promise<TokenStepTrace> {
+    if (session.done) {
+      throw new Error('CPU session is terminal')
+    }
+
     const bundle = this.requireBundle()
     const config = bundle.config
     const tokenEmbedding = matrixRow(bundle.weights.wte, session.currentTokenId)

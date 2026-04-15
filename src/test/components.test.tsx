@@ -33,9 +33,6 @@ function makeControlsProps() {
   const firstPhase = inferencePhases[0]
   return {
     beats: firstPhase.copy.beats,
-    mobileTab: 'story' as const,
-    stepId: firstPhase.stepId,
-    trace: makeTrace(),
   }
 }
 
@@ -236,9 +233,6 @@ describe('ui components', () => {
     render(
       <Controls
         beats={beats}
-        mobileTab="story"
-        stepId="custom-step"
-        trace={makeTrace()}
       />,
     )
 
@@ -278,8 +272,27 @@ describe('ui components', () => {
   it('switches mobile tabs through the callback', () => {
     const onChange = vi.fn()
     render(<SegmentTabs activeTab="story" onChange={onChange} />)
-    fireEvent.click(screen.getByRole('tab', { name: 'Scene' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Scene' }))
     expect(onChange).toHaveBeenCalledWith('scene')
+  })
+
+  it('supports keyboard navigation on the mobile section buttons', () => {
+    const onChange = vi.fn()
+    render(<SegmentTabs activeTab="story" onChange={onChange} />)
+
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Story' }), {
+      key: 'ArrowRight',
+    })
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Story' }), {
+      key: 'Home',
+    })
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Story' }), {
+      key: 'End',
+    })
+
+    expect(onChange).toHaveBeenNthCalledWith(1, 'scene')
+    expect(onChange).toHaveBeenNthCalledWith(2, 'code')
+    expect(onChange).toHaveBeenNthCalledWith(3, 'scene')
   })
 
   it('renders the microgpt scene fallback and exposes code-focus affordances', async () => {

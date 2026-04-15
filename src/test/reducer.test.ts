@@ -28,7 +28,12 @@ const phaseCount = inferencePhases.length
 
 describe('walkthrough reducer', () => {
   it('resets into a ready walkthrough session', () => {
-    const state = walkthroughReducer(initialWalkthroughState, {
+    const state = walkthroughReducer(
+      {
+        ...initialWalkthroughState,
+        hoverRanges: [{ start: 1, end: 2 }],
+      },
+      {
       type: 'reset',
       prefixInput: 'em',
       normalization: {
@@ -40,11 +45,13 @@ describe('walkthrough reducer', () => {
       sequenceTokenIds: [4, 5],
       backend: 'cpu',
       terminal: false,
-    })
+      },
+    )
 
     expect(state.status).toBe('ready')
     expect(state.traces).toHaveLength(1)
     expect(state.activePhaseIndex).toBe(0)
+    expect(state.hoverRanges).toBeNull()
   })
 
   it('moves through phases and trace history', () => {
@@ -123,8 +130,10 @@ describe('walkthrough reducer', () => {
     state = walkthroughReducer(state, {
       type: 'setPrefixInput',
       prefixInput: 'em',
+      status: 'ready',
     })
     expect(state.prefixInput).toBe('em')
+    expect(state.status).toBe('ready')
 
     state = walkthroughReducer(state, {
       type: 'setPlaying',

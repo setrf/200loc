@@ -380,7 +380,6 @@ test.describe('desktop walkthrough', () => {
     }
 
     const hoverPoint = await findHoverablePoint(page, eventSurface)
-    const baseline = await activeLineNumbers(page)
     await page.mouse.move(
       hoverPoint.box.x + hoverPoint.box.width * hoverPoint.xFraction,
       hoverPoint.box.y + hoverPoint.box.height * hoverPoint.yFraction,
@@ -639,9 +638,9 @@ test.describe('mobile walkthrough', () => {
     const issues = collectBrowserIssues(page)
     await page.goto('/')
 
-    await expect(page.getByRole('tab', { name: 'Code' })).toBeVisible()
-    await expect(page.getByRole('tab', { name: 'Story' })).toBeVisible()
-    await expect(page.getByRole('tab', { name: 'Scene' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Code', exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Story', exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Scene', exact: true })).toBeVisible()
 
     const initialCanvasCount = await page.locator('.scene-panel canvas').count()
     expect(initialCanvasCount).toBe(1)
@@ -651,14 +650,14 @@ test.describe('mobile walkthrough', () => {
         document.querySelector('.scene-panel canvas')
     })
 
-    await page.getByRole('tab', { name: 'Scene' }).click()
+    await page.getByRole('button', { name: 'Scene', exact: true }).click()
     await expect(page.locator('.scene-panel')).toBeVisible()
     await expect(page.getByText(/drag to pan/i)).toBeVisible()
 
-    await page.getByRole('tab', { name: 'Code' }).click()
+    await page.getByRole('button', { name: 'Code', exact: true }).click()
     await expect(page.locator('.code-viewer')).toBeVisible()
 
-    await page.getByRole('tab', { name: 'Story' }).click()
+    await page.getByRole('button', { name: 'Story', exact: true }).click()
     await expect(page.getByRole('textbox', { name: 'Prefix' })).toBeVisible()
 
     const preservedCanvas = await page.evaluate(() => {
@@ -680,13 +679,13 @@ test.describe('mobile walkthrough', () => {
     const issues = collectBrowserIssues(page)
     await page.goto('/')
 
-    await page.getByRole('tab', { name: 'Story' }).click()
+    await page.getByRole('button', { name: 'Story', exact: true }).click()
     const trigger = firstAnnotationTrigger(page)
     await trigger.click()
     await expect(page.locator('.annotation-popup--inline')).toBeVisible()
     await expect(page.locator('.annotation-popup--floating')).toHaveCount(0)
 
-    await page.getByRole('tab', { name: 'Scene' }).click()
+    await page.getByRole('button', { name: 'Scene', exact: true }).click()
     await expect(page.locator('.annotation-popup--inline')).toHaveCount(0)
     expect(issues).toEqual([])
   })

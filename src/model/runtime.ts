@@ -39,14 +39,13 @@ export class MicrogptRuntime {
       await this.gpu.init(this.bundle)
       const parity = await this.runSmokeParityCheck()
       if (parity.logitsDiff > PARITY_EPSILON || parity.probsDiff > PARITY_EPSILON) {
-        this.backend = 'cpu'
-        this.fallbackReason = 'WebGPU parity check drifted on startup.'
+        this.fallbackToCpu('WebGPU parity check drifted on startup.')
       } else {
         this.backend = 'webgpu'
+        this.fallbackReason = undefined
       }
     } catch (error) {
-      this.backend = 'cpu'
-      this.fallbackReason = this.describeInitFallback(error)
+      this.fallbackToCpu(this.describeInitFallback(error))
 
       if (!this.isExpectedInitFallback(error)) {
         console.warn('WebGPU init failed, falling back to CPU.', error)
@@ -58,10 +57,17 @@ export class MicrogptRuntime {
 
   async reset(prefix: string) {
     const prefixTokenIds = this.tokenizer.encode(prefix)
-    this.cpuSession = await this.cpu.runPrefix(prefixTokenIds)
-    this.gpuSession =
+    const cpuSession = await this.cpu.runPrefix(prefixTokenIds)
+    const gpuSession =
       this.backend === 'webgpu' ? await this.gpu.runPrefix(prefixTokenIds) : null
-    return this.advance()
+    const result = await this.stepSessions(cpuSession, gpuSession)
+    this.cpuSession = cpuSession
+    this.gpuSession = result.gpuSession
+    return {
+      trace: result.trace,
+      diagnostics: result.diagnostics,
+      session: result.session,
+    }
   }
 
   async advance() {
@@ -69,39 +75,10 @@ export class MicrogptRuntime {
       throw new Error('Runtime is not reset')
     }
 
-    const cpuTrace = await this.cpu.step(this.cpuSession)
+    const result = await this.stepSessions(this.cpuSession, this.gpuSession)
+    this.gpuSession = result.gpuSession
 
-    if (this.backend === 'webgpu' && this.gpuSession) {
-      try {
-        const gpuTrace = await this.gpu.step(this.gpuSession)
-        if (import.meta.env.DEV) {
-          const logitsDiff = maxAbsDiff(cpuTrace.logits, gpuTrace.logits)
-          const probsDiff = maxAbsDiff(cpuTrace.probs, gpuTrace.probs)
-          if (logitsDiff > PARITY_EPSILON || probsDiff > PARITY_EPSILON) {
-            console.warn('WebGPU parity drift detected, falling back to CPU.', {
-              logitsDiff,
-              probsDiff,
-            })
-            this.backend = 'cpu'
-            this.fallbackReason = 'WebGPU parity drifted during inference.'
-            this.gpuSession = null
-          }
-        }
-      } catch (error) {
-        console.warn('WebGPU step failed, falling back to CPU.', error)
-        this.backend = 'cpu'
-        this.fallbackReason = 'WebGPU failed during inference.'
-        this.gpuSession = null
-      }
-    }
-
-    this.cpuSession.backend = this.backend
-
-    return {
-      trace: cpuTrace,
-      diagnostics: this.diagnostics,
-      session: this.cpuSession!,
-    }
+    return result
   }
 
   get diagnostics(): EngineDiagnostics {
@@ -126,6 +103,56 @@ export class MicrogptRuntime {
       logitsDiff: maxAbsDiff(cpuTrace.logits, gpuTrace.logits),
       probsDiff: maxAbsDiff(cpuTrace.probs, gpuTrace.probs),
     }
+  }
+
+  private async stepSessions(
+    cpuSession: SessionState,
+    gpuSession: SessionState | null,
+  ) {
+    if (cpuSession.done) {
+      throw new Error('Runtime is terminal')
+    }
+
+    const cpuTrace = await this.cpu.step(cpuSession)
+    let nextGpuSession = gpuSession
+
+    if (this.backend === 'webgpu' && nextGpuSession) {
+      try {
+        const gpuTrace = await this.gpu.step(nextGpuSession)
+        if (import.meta.env.DEV) {
+          const logitsDiff = maxAbsDiff(cpuTrace.logits, gpuTrace.logits)
+          const probsDiff = maxAbsDiff(cpuTrace.probs, gpuTrace.probs)
+          if (logitsDiff > PARITY_EPSILON || probsDiff > PARITY_EPSILON) {
+            console.warn('WebGPU parity drift detected, falling back to CPU.', {
+              logitsDiff,
+              probsDiff,
+            })
+            this.fallbackToCpu('WebGPU parity drifted during inference.')
+            nextGpuSession = null
+          }
+        }
+      } catch (error) {
+        console.warn('WebGPU step failed, falling back to CPU.', error)
+        this.fallbackToCpu('WebGPU failed during inference.')
+        nextGpuSession = null
+      }
+    }
+
+    cpuSession.backend = this.backend
+
+    return {
+      trace: cpuTrace,
+      diagnostics: this.diagnostics,
+      session: cpuSession,
+      gpuSession: nextGpuSession,
+    }
+  }
+
+  private fallbackToCpu(reason: string) {
+    this.backend = 'cpu'
+    this.fallbackReason = reason
+    this.gpuSession = null
+    this.gpu.dispose()
   }
 
   private isExpectedInitFallback(error: unknown) {

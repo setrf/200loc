@@ -129,6 +129,10 @@ export class WebGpuEngine implements InferenceEngine {
   }
 
   async step(session: SessionState): Promise<TokenStepTrace> {
+    if (session.done) {
+      throw new Error('WebGPU session is terminal')
+    }
+
     const result = await this.forward(
       session.currentTokenId,
       session.position,
@@ -430,13 +434,13 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     this.createPipeline(
       'rmsnormEmbed',
       this.rmsnormShader('inA', 'outData', 'x', 'N_EMBD'),
-      [this.buffers.xEmbed, this.buffers.positionEmbedding, this.buffers.xNorm],
+      [this.buffers.xEmbed, this.buffers.xNorm],
     )
 
     this.createPipeline(
       'rmsnormAttnInput',
       this.rmsnormShader('inA', 'outData', 'x', 'N_EMBD'),
-      [this.buffers.xNorm, this.buffers.positionEmbedding, this.buffers.attnInput],
+      [this.buffers.xNorm, this.buffers.attnInput],
     )
 
     this.createLinearPipeline('linearQ', this.requireMatrix('layer0.attn_wq'), this.buffers.attnInput, this.buffers.q, bundle.config.nEmbd)
@@ -545,15 +549,14 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     this.createPipeline(
       'rmsnormMlpInput',
       this.rmsnormShader('inA', 'outData', 'x', 'N_EMBD'),
-      [this.buffers.xAfterAttn, this.buffers.positionEmbedding, this.buffers.attnInput],
+      [this.buffers.xAfterAttn, this.buffers.attnInput],
     )
 
     this.createPipeline(
       'reluMlpHidden',
       `${configDecl}
 @group(0) @binding(0) var<storage, read> inA: array<f32>;
-@group(0) @binding(1) var<storage, read> inB: array<f32>;
-@group(0) @binding(2) var<storage, read_write> outData: array<f32>;
+@group(0) @binding(1) var<storage, read_write> outData: array<f32>;
 @compute @workgroup_size(${WORKGROUP_SIZE})
 fn main(@builtin(global_invocation_id) id: vec3<u32>) {
   let i = id.x;
@@ -561,7 +564,7 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
   outData[i] = max(inA[i], 0.0);
 }
 `,
-      [this.buffers.mlpHidden, this.buffers.positionEmbedding, this.buffers.mlpRelu],
+      [this.buffers.mlpHidden, this.buffers.mlpRelu],
     )
 
     this.createPipeline(
@@ -670,8 +673,7 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     return `${`
 const N_EMBD: u32 = ${this.requireBundle().config.nEmbd}u;
 @group(0) @binding(0) var<storage, read> inA: array<f32>;
-@group(0) @binding(1) var<storage, read> inB: array<f32>;
-@group(0) @binding(2) var<storage, read_write> outData: array<f32>;
+@group(0) @binding(1) var<storage, read_write> outData: array<f32>;
 @compute @workgroup_size(${WORKGROUP_SIZE})
 fn main(@builtin(global_invocation_id) id: vec3<u32>) {
   let i = id.x;

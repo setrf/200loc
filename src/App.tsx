@@ -3,6 +3,7 @@ import {
   createTokenizer,
   loadModelBundle,
   MicrogptRuntime,
+  resolveAssetPath,
 } from './model'
 import { normalizePrefixInput } from './prefixNormalization'
 import { ArchitectureScene } from './components/ArchitectureScene'
@@ -16,6 +17,7 @@ import {
 } from './walkthrough/phases'
 import {
   initialWalkthroughState,
+  type WalkthroughStatus,
   walkthroughReducer,
 } from './walkthrough/reducer'
 import type { SceneModelData } from './viz/llmViz/types'
@@ -35,6 +37,7 @@ export default function App() {
   const advancingRef = useRef(false)
   const hydrateRequestRef = useRef(0)
   const prefixVersionRef = useRef(0)
+  const lastStableStatusRef = useRef<WalkthroughStatus>('idle')
   const [reducedMotion, setReducedMotion] = useState(false)
 
   useEffect(() => {
@@ -47,6 +50,12 @@ export default function App() {
     }
   }, [])
 
+  useEffect(() => {
+    if (state.status !== 'loading' && state.status !== 'error') {
+      lastStableStatusRef.current = state.status
+    }
+  }, [state.status])
+
   async function hydrate(prefixInput: string) {
     const runtime = runtimeRef.current!
     const tokenizer = tokenizerRef.current!
@@ -54,23 +63,36 @@ export default function App() {
     const requestId = ++hydrateRequestRef.current
     const prefixVersion = prefixVersionRef.current
     dispatch({ type: 'loading' })
-    const result = await runtime.reset(normalization.normalized)
-    if (
-      requestId !== hydrateRequestRef.current ||
-      prefixVersion !== prefixVersionRef.current
-    ) {
-      return
+    try {
+      const result = await runtime.reset(normalization.normalized)
+      if (
+        requestId !== hydrateRequestRef.current ||
+        prefixVersion !== prefixVersionRef.current
+      ) {
+        return
+      }
+      dispatch({
+        type: 'reset',
+        prefixInput: normalization.normalized,
+        normalization,
+        trace: result.trace,
+        sequenceTokenIds: result.session.visibleTokenIds,
+        backend: result.diagnostics.activeBackend,
+        fallbackReason: result.diagnostics.fallbackReason,
+        terminal: result.session.done,
+      })
+    } catch (error) {
+      if (
+        requestId !== hydrateRequestRef.current ||
+        prefixVersion !== prefixVersionRef.current
+      ) {
+        return
+      }
+      dispatch({
+        type: 'error',
+        error: error instanceof Error ? error.message : 'Failed to reset walkthrough.',
+      })
     }
-    dispatch({
-      type: 'reset',
-      prefixInput: normalization.normalized,
-      normalization,
-      trace: result.trace,
-      sequenceTokenIds: result.session.visibleTokenIds,
-      backend: result.diagnostics.activeBackend,
-      fallbackReason: result.diagnostics.fallbackReason,
-      terminal: result.session.done,
-    })
   }
 
   const handleFocusRanges = useCallback((ranges: LineRange[] | null) => {
@@ -85,8 +107,12 @@ export default function App() {
       type: 'setPrefixInput',
       prefixInput: normalization.normalized,
       normalization,
+      status:
+        state.status === 'loading' && state.traces.length > 0
+          ? lastStableStatusRef.current
+          : undefined,
     })
-  }, [])
+  }, [state.status, state.traces.length])
 
   useEffect(() => {
     let cancelled = false
@@ -96,7 +122,7 @@ export default function App() {
       try {
         const [bundle, sourceText] = await Promise.all([
           loadModelBundle(),
-          fetch('/assets/microgpt.py').then((response) => {
+          fetch(resolveAssetPath('assets/microgpt.py')).then((response) => {
             if (!response.ok) {
               throw new Error('Failed to load microgpt.py')
             }
@@ -231,7 +257,6 @@ export default function App() {
 
   const tokenLabel = tokenizerRef.current!.tokenLabel
   const currentTokenLabel = tokenLabel(trace.tokenId)
-  const sampledTokenLabel = tokenLabel(trace.sampledTokenId)
   const prefixChars = [...state.normalization.normalized]
   const generatedBeforeCurrent =
     state.activeTraceIndex > 0
@@ -385,10 +410,8 @@ export default function App() {
             }`}
           >
             <Controls
+              key={`${state.mobileTab}-${phase.stepId}-${trace.positionId}-${trace.tokenId}-${trace.sampledTokenId}`}
               beats={phase.copy.beats}
-              mobileTab={state.mobileTab}
-              stepId={phase.stepId}
-              trace={trace}
             />
           </div>
         </section>
