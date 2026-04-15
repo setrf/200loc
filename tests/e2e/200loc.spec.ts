@@ -67,6 +67,10 @@ async function stepTitleLabel(page: Page) {
   return (await page.locator('.story-panel__summary').textContent())?.trim() ?? ''
 }
 
+function firstAnnotationTrigger(page: Page) {
+  return page.locator('.annotation-trigger').first()
+}
+
 async function advanceOnePhase(page: Page) {
   const beforeStep = await stepLabel(page)
   const beforePhase = await phaseLabel(page)
@@ -123,7 +127,9 @@ test.describe('desktop walkthrough', () => {
   test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 1100 })
     await page.goto('/')
-    await expect(page.getByRole('heading', { name: 'microgpt, one token at a time' })).toBeVisible()
+    await expect(
+      page.getByRole('heading', { name: 'How a tiny GPT predicts the next token' }),
+    ).toBeVisible()
   })
 
   test('normalizes prefix input immediately and hydrates the expected deterministic state', async ({
@@ -142,8 +148,48 @@ test.describe('desktop walkthrough', () => {
     await page.getByRole('button', { name: 'Reset' }).click()
 
     await expect(page.locator('.story-panel__summary')).toContainText(
-      'See the readable history',
+      'small piece of text it is allowed to use',
     )
+    expect(issues).toEqual([])
+  })
+
+  test('shows hover previews, supports click-to-pin, and closes cleanly', async ({
+    page,
+  }) => {
+    const issues = collectBrowserIssues(page)
+    const trigger = firstAnnotationTrigger(page)
+
+    await expect(trigger).toHaveAttribute('data-glossary-id', 'context')
+    await trigger.hover()
+    await page.waitForTimeout(320)
+    await expect(page.getByRole('dialog')).toContainText('Context')
+
+    await trigger.click()
+    await page.mouse.move(12, 12)
+    await page.waitForTimeout(220)
+    await expect(page.getByRole('dialog')).toBeVisible()
+
+    await page.getByRole('heading', { name: 'How a tiny GPT predicts the next token' }).click()
+    await expect(page.locator('.annotation-popup--floating')).toHaveCount(0)
+    expect(issues).toEqual([])
+  })
+
+  test('closes annotation previews when the walkthrough state moves', async ({
+    page,
+  }) => {
+    const issues = collectBrowserIssues(page)
+    const trigger = firstAnnotationTrigger(page)
+
+    await trigger.click()
+    await expect(page.getByRole('dialog')).toBeVisible()
+    await page.getByRole('button', { name: 'Next' }).click()
+    await expect(page.locator('.annotation-popup--floating')).toHaveCount(0)
+
+    await firstAnnotationTrigger(page).click()
+    await expect(page.getByRole('dialog')).toBeVisible()
+    await page.getByRole('button', { name: 'Reset' }).click()
+    await expect(page.locator('.annotation-popup--floating')).toHaveCount(0)
+
     expect(issues).toEqual([])
   })
 
@@ -176,7 +222,9 @@ test.describe('desktop walkthrough', () => {
     await advanceOnePhase(page)
     expect(await stepLabel(page)).toBe('step 1 / 34')
     expect(await phaseLabel(page)).toBe('Tokenize Prefix')
-    expect(await stepTitleLabel(page)).toBe('See the readable history')
+    expect(await stepTitleLabel(page)).toBe(
+      'The model starts by checking the small piece of text it is allowed to use for this decision.',
+    )
     expect(issues).toEqual([])
   })
 
@@ -217,11 +265,18 @@ test.describe('desktop walkthrough', () => {
       throw new Error('Scene event surface bounding box was not available')
     }
 
+    const hoverPoint = await findHoverablePoint(page, eventSurface)
     const hoverLinesBefore = await activeLineNumbers(page)
-    await page.mouse.move(box.x + box.width * 0.48, box.y + box.height * 0.65)
+    await page.mouse.move(
+      hoverPoint.box.x + hoverPoint.box.width * hoverPoint.xFraction,
+      hoverPoint.box.y + hoverPoint.box.height * hoverPoint.yFraction,
+    )
     await page.waitForTimeout(300)
-    const hoverLinesAfter = await activeLineNumbers(page)
-    expect(hoverLinesAfter).not.toEqual(hoverLinesBefore)
+    const hoverIdx = await page.evaluate(
+      () => window.__microVizDebug?.display.hoverTarget?.mainCube?.idx ?? null,
+    )
+    expect(hoverIdx).not.toBeNull()
+    expect(await activeLineNumbers(page)).toEqual(hoverLinesBefore)
 
     await expectSceneToChange(scene, async () => {
       await page.mouse.move(box.x + box.width * 0.5, box.y + box.height * 0.55)
@@ -324,15 +379,24 @@ test.describe('desktop walkthrough', () => {
       throw new Error('Scene event surface bounding box was not available')
     }
 
+    const hoverPoint = await findHoverablePoint(page, eventSurface)
     const baseline = await activeLineNumbers(page)
-    await page.mouse.move(box.x + box.width * 0.48, box.y + box.height * 0.65)
+    await page.mouse.move(
+      hoverPoint.box.x + hoverPoint.box.width * hoverPoint.xFraction,
+      hoverPoint.box.y + hoverPoint.box.height * hoverPoint.yFraction,
+    )
     await page.waitForTimeout(300)
-    const hovered = await activeLineNumbers(page)
-    expect(hovered).not.toEqual(baseline)
+    const hovered = await page.evaluate(
+      () => window.__microVizDebug?.display.hoverTarget?.mainCube?.idx ?? null,
+    )
+    expect(hovered).not.toBeNull()
 
     await page.mouse.move(box.x + box.width + 140, box.y - 40)
     await page.waitForTimeout(300)
-    expect(await activeLineNumbers(page)).toEqual(baseline)
+    const clearedHover = await page.evaluate(
+      () => window.__microVizDebug?.display.hoverTarget?.mainCube?.idx ?? null,
+    )
+    expect(clearedHover).toBeNull()
     expect(issues).toEqual([])
   })
 
@@ -607,6 +671,23 @@ test.describe('mobile walkthrough', () => {
       () => document.documentElement.scrollWidth - window.innerWidth,
     )
     expect(overflow).toBeLessThanOrEqual(1)
+    expect(issues).toEqual([])
+  })
+
+  test('opens inline glossary popins on Story and closes them when tabs change', async ({
+    page,
+  }) => {
+    const issues = collectBrowserIssues(page)
+    await page.goto('/')
+
+    await page.getByRole('tab', { name: 'Story' }).click()
+    const trigger = firstAnnotationTrigger(page)
+    await trigger.click()
+    await expect(page.locator('.annotation-popup--inline')).toBeVisible()
+    await expect(page.locator('.annotation-popup--floating')).toHaveCount(0)
+
+    await page.getByRole('tab', { name: 'Scene' }).click()
+    await expect(page.locator('.annotation-popup--inline')).toHaveCount(0)
     expect(issues).toEqual([])
   })
 })
