@@ -7,34 +7,6 @@ class ResizeObserverMock {
   unobserve() {}
 }
 
-class LocalStorageMock implements Storage {
-  private store = new Map<string, string>()
-
-  get length() {
-    return this.store.size
-  }
-
-  clear() {
-    this.store.clear()
-  }
-
-  getItem(key: string) {
-    return this.store.get(key) ?? null
-  }
-
-  key(index: number) {
-    return [...this.store.keys()][index] ?? null
-  }
-
-  removeItem(key: string) {
-    this.store.delete(key)
-  }
-
-  setItem(key: string, value: string) {
-    this.store.set(key, String(value))
-  }
-}
-
 const matchMediaMock = (query: string) => ({
   matches: false,
   media: query,
@@ -48,11 +20,36 @@ const matchMediaMock = (query: string) => ({
   },
 })
 
+function createStorageMock(): Storage {
+  const store = new Map<string, string>()
+
+  return {
+    get length() {
+      return store.size
+    },
+    clear() {
+      store.clear()
+    },
+    getItem(key: string) {
+      return store.has(key) ? store.get(key)! : null
+    },
+    key(index: number) {
+      return [...store.keys()][index] ?? null
+    },
+    removeItem(key: string) {
+      store.delete(key)
+    },
+    setItem(key: string, value: string) {
+      store.set(key, String(value))
+    },
+  }
+}
+
 vi.stubGlobal('ResizeObserver', ResizeObserverMock)
 vi.stubGlobal('matchMedia', matchMediaMock)
 Object.defineProperty(window, 'localStorage', {
   configurable: true,
-  value: new LocalStorageMock(),
+  value: createStorageMock(),
 })
 beforeEach(() => {
   Object.defineProperty(window, 'matchMedia', {

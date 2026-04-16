@@ -1,16 +1,16 @@
 export type IntroVisualKind =
-  | 'hero'
-  | 'llm'
-  | 'timeline'
-  | 'tokens'
-  | 'context'
-  | 'numbers'
-  | 'attention'
-  | 'state'
-  | 'scores'
-  | 'sampling'
-  | 'loop'
-  | 'limits'
+  | 'welcome'
+  | 'layout'
+  | 'stage'
+  | 'input'
+  | 'draft'
+  | 'controls'
+  | 'story'
+  | 'glossary'
+  | 'code'
+  | 'scene'
+  | 'sync'
+  | 'mobile'
   | 'handoff'
 
 export interface IntroStepDefinition {
@@ -26,173 +26,173 @@ export interface IntroStepDefinition {
 
 export const introSteps: IntroStepDefinition[] = [
   {
-    id: 'splash',
-    eyebrow: 'Start Here',
-    title: 'This is not magic. It is a machine predicting text one piece at a time.',
+    id: 'welcome',
+    eyebrow: 'Quick Tour',
+    title: 'Before we talk about the model, let’s get comfortable with the interface.',
     body: [
-      '200loc is built to make large language models feel less mysterious before we zoom into the code.',
-      'You will get the big picture first, then the app will walk you through one tiny prediction step in detail.',
+      'This intro is here to show you what each part of the app does, so the main walkthrough feels guided instead of overwhelming.',
+      'You do not need to understand the code yet. First we will get you oriented, then we will hand you off to step one.',
     ],
-    visualKind: 'hero',
-    visualTitle: 'From prompt to prediction',
+    visualKind: 'welcome',
+    visualTitle: 'A walkthrough with three views',
     visualBody:
-      'A model reads the text it can see, scores many possible next pieces, and chooses one to continue the sentence.',
-    primaryActionLabel: 'Start',
+      'The app explains one tiny model step through code, plain-language story, and a visual scene at the same time.',
+    primaryActionLabel: 'Start tour',
   },
   {
-    id: 'what-is-an-llm',
-    eyebrow: 'Big Idea',
-    title: 'An LLM is a system that continues text, not a person or a hidden database.',
+    id: 'layout',
+    eyebrow: 'Screen Map',
+    title: 'The interface has three main helpers: Code, Story, and Scene.',
     body: [
-      'It has learned patterns from earlier training, then uses those patterns to make a fresh guess about what text should come next now.',
-      'That means its replies can feel fluent and helpful while still being imperfect or wrong.',
+      'Code shows the exact lines running for the current moment. Story explains the same moment in everyday language. Scene turns it into a visual map.',
+      'You do not have to use all three equally. Many people start with Story, then glance at Code or Scene when they want more detail.',
     ],
-    visualKind: 'llm',
-    visualTitle: 'What it is and what it is not',
+    visualKind: 'layout',
+    visualTitle: 'Three synchronized panels',
     visualBody:
-      'It is a prediction engine shaped by training. It is not a mind reading your intent and it does not simply look up one perfect answer.',
+      'Each panel shows the same moment from a different angle, so you can stay grounded even if one view feels unfamiliar.',
   },
   {
-    id: 'training-vs-chat',
-    eyebrow: 'Two Timescales',
-    title: 'Training happened earlier. Chat is what the model does with that earlier learning right now.',
+    id: 'stage',
+    eyebrow: 'Where You Are',
+    title: 'The stage chip at the top tells you exactly where you are in the walkthrough.',
     body: [
-      'During training, the model saw huge amounts of text and slowly adjusted its internal weights so it got better at prediction.',
-      'When you type a prompt, it is not learning your topic from scratch. It is using what training already shaped.',
+      'It shows a short name for the current stage and a step counter so you always know what the app is focusing on right now.',
+      'If the explanation starts to feel dense, this is the quickest place to re-orient yourself.',
     ],
-    visualKind: 'timeline',
-    visualTitle: 'Earlier learning, later use',
+    visualKind: 'stage',
+    visualTitle: 'Stage name plus step count',
     visualBody:
-      'Training is the long preparation phase. Chat is the fast moment-by-moment prediction phase you see in the product.',
+      'Think of this like a chapter heading and page number for the current moment in the model’s decision.',
   },
   {
-    id: 'tokens',
-    eyebrow: 'Text Pieces',
-    title: 'The model does not work on raw text directly. It first breaks text into small pieces.',
+    id: 'starting-text',
+    eyebrow: 'Choose A Prompt',
+    title: 'Starting text is where you choose the tiny prompt the model begins from.',
     body: [
-      'Those pieces are usually called tokens. In this intro, think of them as the chunks of text the model can count, compare, and predict.',
-      'Sometimes a token is a whole word. Sometimes it is only part of a word, punctuation mark, or space pattern.',
+      'This is the short bit of text the walkthrough uses as the starting point for the model’s next decision.',
+      'You can edit it, but the app keeps your draft separate until you explicitly apply it.',
     ],
-    visualKind: 'tokens',
-    visualTitle: 'From sentence to chunks',
+    visualKind: 'input',
+    visualTitle: 'A safe place to try a different starting point',
     visualBody:
-      'Human-readable text gets split into machine-usable pieces before the model starts its internal work.',
+      'Type here when you want a new example. Nothing reruns immediately just because you started typing.',
   },
   {
-    id: 'context',
-    eyebrow: 'Visible Window',
-    title: 'At each moment, the model can only use the text it can already see so far.',
+    id: 'current-text',
+    eyebrow: 'Draft Vs Live',
+    title: 'Current text shows what the model is actually using right now, not just what you typed a second ago.',
     body: [
-      'This visible text is called the context window. The model cannot read words that have not been generated yet.',
-      'That one rule is why generation moves left to right, always guessing the next piece from the earlier ones.',
+      'That matters because the app lets you make edits without throwing away the current run right away.',
+      'If Starting text and Current text differ, you are looking at a draft that still needs Apply text or Reset to restart the walkthrough from it.',
     ],
-    visualKind: 'context',
-    visualTitle: 'Only the left side is visible',
+    visualKind: 'draft',
+    visualTitle: 'Your draft and the live run can briefly differ',
     visualBody:
-      'The future is hidden. The next prediction must be made from the prompt and the earlier generated text only.',
+      'This keeps experimentation safe. You can inspect the current step, then choose when to restart from your new text.',
   },
   {
-    id: 'numbers',
-    eyebrow: 'Number Patterns',
-    title: 'Each text piece becomes a pattern of numbers that carries clues about meaning and position.',
+    id: 'controls',
+    eyebrow: 'Move The Pace',
+    title: 'Prev, Next, and Play let you choose how quickly you want to move.',
     body: [
-      'The model cannot reason over letters the way people do. It works with number patterns that let similar pieces end up near each other in a learned space.',
-      'Another learned pattern tells the model where each piece sits in the sequence, so order still matters.',
+      'Next is the easiest way to learn because it advances one small step at a time. Prev lets you go back if something did not click.',
+      'Play turns the walkthrough into an automatic demo, and Pause gives control back to you whenever you want to slow down.',
     ],
-    visualKind: 'numbers',
-    visualTitle: 'Meaning plus position',
+    visualKind: 'controls',
+    visualTitle: 'Manual or automatic',
     visualBody:
-      'A text piece becomes a numeric description, then gets combined with a separate signal that says where it appears.',
+      'Use the controls like a remote. The app is happy to move slowly, quickly, or one click at a time.',
   },
   {
-    id: 'attention',
-    eyebrow: 'Look Back',
-    title: 'Attention lets the current text piece look back and decide which earlier pieces matter most.',
+    id: 'story',
+    eyebrow: 'Plain Language',
+    title: 'Story is the friendly explanation panel for people who do not want to start from raw code.',
     body: [
-      'Some earlier pieces matter a lot for the next guess. Others barely matter. Attention is the mechanism that decides where to look.',
-      'Different attention heads can notice different relationships at the same time, like names, grammar, or nearby context.',
+      'This is where the app translates each model step into short, human-readable explanations.',
+      'If you are new to the subject, Story is the best default place to stay while the rest of the interface supports you around it.',
     ],
-    visualKind: 'attention',
-    visualTitle: 'Looking backward with purpose',
+    visualKind: 'story',
+    visualTitle: 'Read the idea in plain language first',
     visualBody:
-      'The current piece sends out multiple read paths and gives stronger weight to the earlier pieces that seem most useful.',
+      'Story keeps the meaning of the step front and center, even when the code and visuals are more detailed.',
   },
   {
-    id: 'working-state',
-    eyebrow: 'Internal Note',
-    title: 'As the model looks back, it keeps rewriting an internal working state for the current position.',
+    id: 'glossary',
+    eyebrow: 'Tap For Help',
+    title: 'Underlined terms in Story open quick definitions when you hover or tap them.',
     body: [
-      'You can think of this as the model building a richer private note about what is happening in the text right now.',
-      'That note is not stored as words. It is another evolving number pattern that gets refined layer by layer.',
+      'This is how the app introduces small technical ideas without forcing you into a giant glossary first.',
+      'On larger screens you can hover for a preview. On smaller screens you can tap to open the definition inline.',
     ],
-    visualKind: 'state',
-    visualTitle: 'A note that keeps changing',
+    visualKind: 'glossary',
+    visualTitle: 'Definitions are right where you need them',
     visualBody:
-      'The model starts with a rough numeric description and repeatedly revises it as more signals get mixed in.',
+      'You can grab a quick explanation of one term, then return to the main flow without losing your place.',
   },
   {
-    id: 'scores',
-    eyebrow: 'Possible Next Pieces',
-    title: 'Near the end of the step, the model scores many possible next text pieces at once.',
+    id: 'code',
+    eyebrow: 'See The Source',
+    title: 'Code shows the exact lines responsible for the current step.',
     body: [
-      'These scores are like a rough ranking of how well each possible next piece fits the current context.',
-      'The model is not writing a sentence all at once. It is deciding one next piece from a large menu of options.',
+      'You do not need to read every line. The highlight is there to show which parts matter for this moment and ignore the rest.',
+      'As you move through the walkthrough, the highlighted lines change to stay matched with the story and the scene.',
     ],
-    visualKind: 'scores',
-    visualTitle: 'A ranked menu of next moves',
+    visualKind: 'code',
+    visualTitle: 'Only the relevant lines are emphasized',
     visualBody:
-      'Every possible next piece gets a score, then the model turns those scores into chances.',
+      'The code panel is meant to feel like a guided spotlight, not a wall of text you must decode all at once.',
   },
   {
-    id: 'sampling',
-    eyebrow: 'One Choice',
-    title: 'The model then picks one next piece from those chances, not always the single top option.',
+    id: 'scene',
+    eyebrow: 'See The Shape',
+    title: 'Scene turns the same step into a visual map you can pan, zoom, and inspect.',
     body: [
-      'Higher-scoring options are more likely, but the final choice can still vary depending on the sampling settings.',
-      'That is why model output can feel flexible or creative, but also why it can drift, surprise you, or occasionally choose a weaker option.',
+      'Some people understand systems better when they can see the parts moving together. That is what Scene is for.',
+      'It is the same step, just shown spatially. You can explore it without breaking the walkthrough.',
     ],
-    visualKind: 'sampling',
-    visualTitle: 'Likely is not guaranteed',
+    visualKind: 'scene',
+    visualTitle: 'A picture of the current computation',
     visualBody:
-      'Strong candidates are favored, but the model still makes a sampled choice rather than following a fixed script every time.',
+      'The scene helps you see where information is flowing, especially when the code feels too abstract at first.',
   },
   {
-    id: 'loop',
-    eyebrow: 'Repeat',
-    title: 'The chosen piece gets fed back in, and the whole process repeats until the answer grows word by word.',
+    id: 'sync',
+    eyebrow: 'Everything Stays Together',
+    title: 'Code, Story, and Scene stay synchronized so you are never comparing different moments by accident.',
     body: [
-      'That looping pattern is the heart of autoregressive generation. One guess becomes part of the visible text for the next guess.',
-      'A full paragraph is really a long chain of tiny next-piece decisions.',
+      'When you move to the next step, all three views update together. That is one of the main teaching tricks of this app.',
+      'You can use whichever view makes sense first, then trust the others to stay aligned with it.',
     ],
-    visualKind: 'loop',
-    visualTitle: 'Prediction becomes new context',
+    visualKind: 'sync',
+    visualTitle: 'One step, three angles',
     visualBody:
-      'Each chosen piece is appended to the visible text, which means the next step starts from a slightly larger context window.',
+      'The interface is designed to reduce context-switching fatigue by keeping every explanation locked to the same step.',
   },
   {
-    id: 'limits',
-    eyebrow: 'Why It Still Fails',
-    title: 'Even when it sounds confident, the model can still be wrong, outdated, or pulled off course by weak patterns.',
+    id: 'mobile',
+    eyebrow: 'Smaller Screens',
+    title: 'On smaller screens, the same walkthrough is available through Code, Story, and Scene tabs.',
     body: [
-      'It does not guarantee truth. It predicts what text fits, and sometimes that looks convincing even when the answer is false.',
-      'That is why good product design around LLMs includes checking, grounding, and careful user expectations.',
+      'Nothing important disappears on mobile. The app simply gives one view more space at a time so it stays readable.',
+      'If you are on a phone, Story is usually the easiest place to begin, then you can switch tabs whenever you want more detail.',
     ],
-    visualKind: 'limits',
-    visualTitle: 'Fluent does not always mean correct',
+    visualKind: 'mobile',
+    visualTitle: 'The same tour, just stacked',
     visualBody:
-      'A strong writing style can hide stale knowledge, made-up details, or overconfident guesses when the evidence is weak.',
+      'Tabs keep the experience usable on compact screens while preserving the same synchronized walkthrough underneath.',
   },
   {
     id: 'handoff',
-    eyebrow: 'Deep Dive',
-    title: 'Next, we will slow one tiny prediction step down and show its code, story, and architecture together.',
+    eyebrow: 'Ready',
+    title: 'If you ever get lost, Replay intro brings you back here. For now, start with Story and use Next one step at a time.',
     body: [
-      'You will see the same moment from three angles at once so the explanation stays concrete.',
-      'Once you are ready, the walkthrough will open on the first inference step.',
+      'That is the whole interface tour. You now know what the important parts of the app are for before the technical explanation begins.',
+      'When you continue, the walkthrough will open on its first step and the three panels will stay in sync as you explore.',
     ],
     visualKind: 'handoff',
-    visualTitle: 'Three synchronized views',
+    visualTitle: 'You know where to look now',
     visualBody:
-      'Code shows the implementation, story explains the idea in plain language, and the scene shows where the computation is happening.',
+      'Start with the plain-language story, glance at code and scene when you are curious, and come back to this intro any time.',
   },
 ]

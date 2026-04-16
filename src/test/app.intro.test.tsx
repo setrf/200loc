@@ -80,7 +80,7 @@ async function advanceIntroToFinalStep() {
   for (let index = 0; index < 12; index += 1) {
     fireEvent.click(
       screen.getByRole('button', {
-        name: index === 0 ? 'Start' : 'Next',
+        name: index === 0 ? 'Start tour' : 'Next',
       }),
     )
   }
@@ -141,6 +141,19 @@ describe('App intro gate', () => {
     render(<App />)
 
     expect(await screen.findByTestId('intro-shell')).toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', {
+        name: 'Before we talk about the model, let’s get comfortable with the interface.',
+      }),
+    ).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Start tour' }))
+    expect(
+      await screen.findByRole('heading', {
+        name: 'The interface has three main helpers: Code, Story, and Scene.',
+      }),
+    ).toBeInTheDocument()
+
     fireEvent.click(screen.getByRole('button', { name: 'Skip intro' }))
 
     await screen.findByText('How LLM systems actually work')

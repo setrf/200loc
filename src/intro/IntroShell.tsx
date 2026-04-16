@@ -30,181 +30,211 @@ function useReducedMotionPreference() {
 
 function renderVisual(step: IntroStepDefinition) {
   switch (step.visualKind) {
-    case 'hero':
+    case 'welcome':
       return (
-        <div className="intro-visual intro-visual--hero" aria-hidden="true">
-          <div className="intro-visual__chip">Prompt</div>
-          <div className="intro-visual__flow-line" />
-          <div className="intro-visual__stack">
-            <span>visible text</span>
-            <span>many guesses</span>
-            <span>one next piece</span>
-          </div>
-          <div className="intro-visual__beam" />
-        </div>
-      )
-    case 'llm':
-      return (
-        <div className="intro-visual intro-visual--contrast" aria-hidden="true">
-          <div className="intro-visual__card intro-visual__card--good">
-            <strong>Prediction engine</strong>
-            <span>trained on patterns</span>
-          </div>
-          <div className="intro-visual__divider">not</div>
-          <div className="intro-visual__card intro-visual__card--muted">
-            <strong>Person or lookup table</strong>
-            <span>no guaranteed truth</span>
-          </div>
-        </div>
-      )
-    case 'timeline':
-      return (
-        <div className="intro-visual intro-visual--timeline" aria-hidden="true">
-          <div className="intro-visual__timeline-card">
-            <strong>Training</strong>
-            <span>many examples</span>
-            <span>slow weight updates</span>
-          </div>
-          <div className="intro-visual__timeline-line" />
-          <div className="intro-visual__timeline-card intro-visual__timeline-card--active">
-            <strong>Chat time</strong>
-            <span>one prompt</span>
-            <span>fast next-step prediction</span>
+        <div className="intro-tour intro-tour--welcome" aria-hidden="true">
+          <div className="intro-tour__window">
+            <div className="intro-tour__window-bar">
+              <span />
+              <span />
+              <span />
+            </div>
+            <div className="intro-tour__layout-strip">
+              <div className="intro-tour__layout-card">
+                <strong>Code</strong>
+                <small>source lines</small>
+              </div>
+              <div className="intro-tour__layout-card">
+                <strong>Story</strong>
+                <small>plain language</small>
+              </div>
+              <div className="intro-tour__layout-card">
+                <strong>Scene</strong>
+                <small>visual map</small>
+              </div>
+            </div>
           </div>
         </div>
       )
-    case 'tokens':
+    case 'layout':
       return (
-        <div className="intro-visual intro-visual--tokens" aria-hidden="true">
-          <div className="intro-visual__sentence">San Francisco feels foggy today</div>
-          <div className="intro-visual__token-row">
-            {['San', 'Franc', 'isco', ' feels', ' foggy', ' today'].map((token) => (
-              <span key={token} className="intro-visual__token-pill">{token}</span>
-            ))}
+        <div className="intro-tour intro-tour--layout" aria-hidden="true">
+          <div className="intro-tour__panel intro-tour__panel--code">
+            <strong>Code</strong>
+            <span>what runs</span>
+          </div>
+          <div className="intro-tour__panel intro-tour__panel--story">
+            <strong>Story</strong>
+            <span>what it means</span>
+          </div>
+          <div className="intro-tour__panel intro-tour__panel--scene">
+            <strong>Scene</strong>
+            <span>where it happens</span>
           </div>
         </div>
       )
-    case 'context':
+    case 'stage':
       return (
-        <div className="intro-visual intro-visual--context" aria-hidden="true">
-          <div className="intro-visual__window">
-            {['The', ' model', ' can', ' only', ' see', ' this', ' far', ' ', '????'].map((token, index) => (
-              <span
-                key={`${token}-${index}`}
-                className={`intro-visual__window-token${index < 8 ? ' is-visible' : ' is-hidden'}`}
+        <div className="intro-tour intro-tour--stage" aria-hidden="true">
+          <div className="intro-tour__stage-chip">
+            <div className="intro-tour__stage-top">
+              <span>Current stage</span>
+              <span>step 8 / 34</span>
+            </div>
+            <strong>Attention Scores</strong>
+          </div>
+        </div>
+      )
+    case 'input':
+      return (
+        <div className="intro-tour intro-tour--input" aria-hidden="true">
+          <div className="intro-tour__field-card">
+            <span>Starting text</span>
+            <strong>em</strong>
+          </div>
+          <div className="intro-tour__cursor-line" />
+          <div className="intro-tour__field-card intro-tour__field-card--soft">
+            <span>Try a short prompt</span>
+            <small>The walkthrough will restart only when you ask it to.</small>
+          </div>
+        </div>
+      )
+    case 'draft':
+      return (
+        <div className="intro-tour intro-tour--draft" aria-hidden="true">
+          <div className="intro-tour__compare-card">
+            <span>Starting text</span>
+            <strong>emi</strong>
+            <small>draft</small>
+          </div>
+          <div className="intro-tour__compare-arrow">Apply text</div>
+          <div className="intro-tour__compare-card intro-tour__compare-card--live">
+            <span>Current text</span>
+            <strong>em</strong>
+            <small>live run</small>
+          </div>
+        </div>
+      )
+    case 'controls':
+      return (
+        <div className="intro-tour intro-tour--controls" aria-hidden="true">
+          {['Prev', 'Next', 'Play', 'Pause'].map((label, index) => (
+            <button
+              key={label}
+              type="button"
+              className={`intro-tour__button-pill${index === 1 ? ' is-primary' : ''}`}
+              tabIndex={-1}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )
+    case 'story':
+      return (
+        <div className="intro-tour intro-tour--story" aria-hidden="true">
+          <div className="intro-tour__story-card">
+            <span>Story</span>
+            <strong>The model checks the small piece of text it is allowed to use.</strong>
+            <p>Short explanation first. Technical detail second.</p>
+          </div>
+        </div>
+      )
+    case 'glossary':
+      return (
+        <div className="intro-tour intro-tour--glossary" aria-hidden="true">
+          <div className="intro-tour__story-line">
+            The model uses <span className="intro-tour__glossary-term">context</span> to make this choice.
+          </div>
+          <div className="intro-tour__popup-card">
+            <strong>Context</strong>
+            <p>The text the model can already see while making this step.</p>
+          </div>
+        </div>
+      )
+    case 'code':
+      return (
+        <div className="intro-tour intro-tour--code" aria-hidden="true">
+          <div className="intro-tour__code-window">
+            {[
+              ['108', 'for token in visible_text:'],
+              ['109', '    embed(token)'],
+              ['110', '    add_position()'],
+              ['111', '    run_attention()'],
+            ].map(([line, text], index) => (
+              <div
+                key={line}
+                className={`intro-tour__code-line${index === 1 || index === 2 ? ' is-active' : ''}`}
               >
-                {token}
-              </span>
+                <span>{line}</span>
+                <code>{text}</code>
+              </div>
             ))}
-          </div>
-          <div className="intro-visual__caption">future text stays hidden</div>
-        </div>
-      )
-    case 'numbers':
-      return (
-        <div className="intro-visual intro-visual--numbers" aria-hidden="true">
-          <div className="intro-visual__token-pill intro-visual__token-pill--large">harbor</div>
-          <div className="intro-visual__vector">
-            {[72, 35, 91, 18, 64, 42, 80, 27].map((value) => (
-              <span key={value} style={{ height: `${Math.max(18, value)}px` }} />
-            ))}
-          </div>
-          <div className="intro-visual__mini-labels">
-            <span>meaning</span>
-            <span>position</span>
           </div>
         </div>
       )
-    case 'attention':
+    case 'scene':
       return (
-        <div className="intro-visual intro-visual--attention" aria-hidden="true">
-          <div className="intro-visual__attention-row">
-            {['My', ' favorite', ' city', ' is', ' San', ' Francisco'].map((token) => (
-              <span key={token} className="intro-visual__token-pill">{token}</span>
-            ))}
+        <div className="intro-tour intro-tour--scene" aria-hidden="true">
+          <div className="intro-tour__scene-surface">
+            <div className="intro-tour__node intro-tour__node--left">input</div>
+            <div className="intro-tour__node intro-tour__node--center">attention</div>
+            <div className="intro-tour__node intro-tour__node--right">output</div>
+            <svg viewBox="0 0 320 140" className="intro-tour__scene-lines">
+              <path d="M70 72 C112 68 132 68 160 70" />
+              <path d="M160 70 C190 72 220 72 252 72" />
+            </svg>
           </div>
-          <div className="intro-visual__attention-focus">current piece</div>
-          <svg viewBox="0 0 300 140" className="intro-visual__arrows">
-            <path d="M150 18 C110 52 82 70 48 106" />
-            <path d="M150 18 C140 52 144 76 148 110" />
-            <path d="M150 18 C182 52 222 70 258 106" />
+        </div>
+      )
+    case 'sync':
+      return (
+        <div className="intro-tour intro-tour--sync" aria-hidden="true">
+          <div className="intro-tour__sync-card">Code</div>
+          <div className="intro-tour__sync-card">Story</div>
+          <div className="intro-tour__sync-card">Scene</div>
+          <svg viewBox="0 0 320 120" className="intro-tour__sync-lines">
+            <path d="M54 82 C98 34 122 34 160 58" />
+            <path d="M160 58 C198 34 222 34 266 82" />
           </svg>
         </div>
       )
-    case 'state':
+    case 'mobile':
       return (
-        <div className="intro-visual intro-visual--state" aria-hidden="true">
-          <div className="intro-visual__note-card">rough clue</div>
-          <div className="intro-visual__note-card intro-visual__note-card--offset">updated clue</div>
-          <div className="intro-visual__note-card intro-visual__note-card--final">richer working state</div>
-        </div>
-      )
-    case 'scores':
-      return (
-        <div className="intro-visual intro-visual--scores" aria-hidden="true">
-          {[
-            ['the', 86],
-            ['a', 72],
-            ['San', 55],
-            ['and', 31],
-          ].map(([label, width]) => (
-            <div key={label} className="intro-visual__score-row">
-              <span>{label}</span>
-              <div><i style={{ width: `${width}%` }} /></div>
+        <div className="intro-tour intro-tour--mobile" aria-hidden="true">
+          <div className="intro-tour__phone">
+            <div className="intro-tour__phone-tabs">
+              <span>Code</span>
+              <span className="is-active">Story</span>
+              <span>Scene</span>
             </div>
-          ))}
-        </div>
-      )
-    case 'sampling':
-      return (
-        <div className="intro-visual intro-visual--sampling" aria-hidden="true">
-          <div className="intro-visual__sample-wheel">
-            <span className="is-strong">0.48</span>
-            <span>0.28</span>
-            <span>0.16</span>
-            <span>0.08</span>
-          </div>
-          <div className="intro-visual__token-pill intro-visual__token-pill--selected">chosen next piece</div>
-        </div>
-      )
-    case 'loop':
-      return (
-        <div className="intro-visual intro-visual--loop" aria-hidden="true">
-          <div className="intro-visual__loop-ring" />
-          <div className="intro-visual__loop-steps">
-            <span>read</span>
-            <span>score</span>
-            <span>choose</span>
-            <span>append</span>
-          </div>
-        </div>
-      )
-    case 'limits':
-      return (
-        <div className="intro-visual intro-visual--limits" aria-hidden="true">
-          {[
-            ['Confidently wrong', 'sounds certain'],
-            ['Outdated', 'training has limits'],
-            ['Pattern drift', 'weak clues can mislead'],
-          ].map(([title, copy]) => (
-            <div key={title} className="intro-visual__card intro-visual__card--limit">
-              <strong>{title}</strong>
-              <span>{copy}</span>
+            <div className="intro-tour__phone-screen">
+              <strong>Story stays readable first</strong>
+              <p>Switch tabs whenever you want the other views.</p>
             </div>
-          ))}
+          </div>
         </div>
       )
     case 'handoff':
       return (
-        <div className="intro-visual intro-visual--handoff" aria-hidden="true">
-          <div className="intro-visual__panel">
-            <span>Code</span>
+        <div className="intro-tour intro-tour--handoff" aria-hidden="true">
+          <div className="intro-tour__handoff-header">
+            <span>200loc</span>
+            <button type="button" tabIndex={-1}>Replay intro</button>
           </div>
-          <div className="intro-visual__panel">
-            <span>Story</span>
-          </div>
-          <div className="intro-visual__panel">
-            <span>Scene</span>
+          <div className="intro-tour__handoff-steps">
+            <div>
+              <strong>1</strong>
+              <span>Read Story first</span>
+            </div>
+            <div>
+              <strong>2</strong>
+              <span>Use Next to move slowly</span>
+            </div>
+            <div>
+              <strong>3</strong>
+              <span>Peek at Code and Scene when curious</span>
+            </div>
           </div>
         </div>
       )
@@ -273,7 +303,7 @@ export function IntroShell({
       <header className="intro-shell__header">
         <div>
           <p className="eyebrow">200loc</p>
-          <p className="intro-shell__subtitle">A guided introduction before the deep walkthrough</p>
+          <p className="intro-shell__subtitle">A quick tour of the interface before the walkthrough starts</p>
         </div>
         <button
           type="button"
@@ -325,7 +355,7 @@ export function IntroShell({
 
           <div className="intro-step-card__visual-panel">
             <div className="intro-step-card__visual-copy">
-              <p className="eyebrow">Visual cue</p>
+              <p className="eyebrow">What to notice</p>
               <strong>{step.visualTitle}</strong>
               <p>{step.visualBody}</p>
             </div>

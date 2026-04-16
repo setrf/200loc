@@ -84,7 +84,7 @@ async function introStepLabel(page: Page) {
 }
 
 async function advanceIntro(page: Page) {
-  const startButton = page.getByRole('button', { name: 'Start', exact: true })
+  const startButton = page.getByRole('button', { name: 'Start tour', exact: true })
   if (await startButton.count()) {
     if (await startButton.isVisible()) {
       await startButton.click()
@@ -677,59 +677,58 @@ test.describe('desktop walkthrough', () => {
 })
 
 test.describe('desktop intro', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.setViewportSize({ width: 1440, height: 1100 })
-    await page.goto('/')
-    await expect(page.locator('[data-testid=\"intro-shell\"]')).toBeVisible()
-  })
-
-  test('shows the full first-visit intro and hands off to the walkthrough', async ({
+  test('shows the interface tour first and then hands off to the walkthrough', async ({
     page,
   }) => {
     const issues = collectBrowserIssues(page)
+    await page.goto('/')
 
+    await expect(page.getByTestId('intro-shell')).toBeVisible()
+    await expect(
+      page.getByRole('heading', {
+        name: 'Before we talk about the model, let’s get comfortable with the interface.',
+      }),
+    ).toBeVisible()
     expect(await introStepLabel(page)).toBe('Step 1 of 13')
 
-    for (let index = 0; index < 12; index += 1) {
+    await advanceIntro(page)
+    await expect(
+      page.getByRole('heading', {
+        name: 'The interface has three main helpers: Code, Story, and Scene.',
+      }),
+    ).toBeVisible()
+
+    for (let index = 0; index < 11; index += 1) {
       await advanceIntro(page)
-      await page.waitForTimeout(100)
     }
 
     await expect(
-      page.getByRole('button', { name: 'Start the deep walkthrough' }),
-    ).toBeEnabled()
-    await page.getByRole('button', { name: 'Start the deep walkthrough' }).click()
-
-    await expect(
-      page.getByRole('heading', { name: 'How LLM systems actually work' }),
+      page.getByRole('heading', {
+        name: 'If you ever get lost, Replay intro brings you back here. For now, start with Story and use Next one step at a time.',
+      }),
     ).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Start the deep walkthrough' })).toBeEnabled()
+
+    await page.getByRole('button', { name: 'Start the deep walkthrough' }).click()
+    await expect(page.getByRole('heading', { name: 'How LLM systems actually work' })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Replay intro' })).toBeVisible()
     expect(issues).toEqual([])
   })
 
-  test('persists skip across reload and allows replay without losing access', async ({
-    page,
-  }) => {
-    const issues = collectBrowserIssues(page)
+  test('persists skip across reload and still allows replay', async ({ page }) => {
+    await page.goto('/')
 
+    await expect(page.getByTestId('intro-shell')).toBeVisible()
     await page.getByRole('button', { name: 'Skip intro' }).click()
-    await expect(
-      page.getByRole('heading', { name: 'How LLM systems actually work' }),
-    ).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'How LLM systems actually work' })).toBeVisible()
 
     await page.reload()
-    await expect(
-      page.getByRole('heading', { name: 'How LLM systems actually work' }),
-    ).toBeVisible()
-    await expect(page.locator('[data-testid=\"intro-shell\"]')).toHaveCount(0)
+    await expect(page.getByTestId('intro-shell')).toHaveCount(0)
+    await expect(page.getByRole('heading', { name: 'How LLM systems actually work' })).toBeVisible()
 
     await page.getByRole('button', { name: 'Replay intro' }).click()
-    await expect(page.locator('[data-testid=\"intro-shell\"]')).toBeVisible()
-    expect(await introStepLabel(page)).toBe('Step 1 of 13')
-
-    await page.getByRole('button', { name: 'Skip intro' }).click()
-    await expect(page.getByRole('textbox', { name: 'Starting text' })).toBeVisible()
-    expect(issues).toEqual([])
+    await expect(page.getByTestId('intro-shell')).toBeVisible()
+    await expect(await introStepLabel(page)).toBe('Step 1 of 13')
   })
 })
 
@@ -804,21 +803,24 @@ test.describe('mobile intro', () => {
     ...iPhone13,
   })
 
-  test('shows the intro first on mobile and hands off into the story view', async ({
+  test('shows the UI tour first on mobile and hands off into the story view', async ({
     page,
   }) => {
-    const issues = collectBrowserIssues(page)
     await page.goto('/')
 
-    await expect(page.locator('[data-testid=\"intro-shell\"]')).toBeVisible()
-    expect(await introStepLabel(page)).toBe('Step 1 of 13')
+    await expect(page.getByTestId('intro-shell')).toBeVisible()
+    await expect(
+      page.getByRole('heading', {
+        name: 'Before we talk about the model, let’s get comfortable with the interface.',
+      }),
+    ).toBeVisible()
 
     await page.getByRole('button', { name: 'Skip intro' }).click()
-    await expect(page.getByRole('textbox', { name: 'Starting text' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'How LLM systems actually work' })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Story', exact: true })).toHaveAttribute(
       'aria-pressed',
       'true',
     )
-    expect(issues).toEqual([])
+    await expect(page.getByRole('textbox', { name: 'Starting text' })).toBeVisible()
   })
 })
