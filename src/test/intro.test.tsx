@@ -28,9 +28,6 @@ describe('intro walkthrough', () => {
     )
 
     expect(
-      screen.getByText('Step 3 of 10 · Tokens become numbers'),
-    ).toBeInTheDocument()
-    expect(
       screen.getByText('Each token is turned into numbers.'),
     ).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Back' })).toBeEnabled()

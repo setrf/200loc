@@ -664,12 +664,14 @@ test.describe('intro walkthrough', () => {
     await page.setViewportSize({ width: 1280, height: 920 })
     await page.goto('/')
 
-    await expect(page.getByText('Step 1 of 10')).toBeVisible()
-    await expect(page.getByText('What this is')).toBeVisible()
+    await expect(
+      page.getByText('A language model keeps guessing what should come next.'),
+    ).toBeVisible()
 
     await page.getByRole('button', { name: 'Next' }).click()
-    await expect(page.getByText('Step 2 of 10')).toBeVisible()
-    await expect(page.getByText('Text becomes tokens')).toBeVisible()
+    await expect(
+      page.getByText('The model cannot work with raw text directly.'),
+    ).toBeVisible()
 
     await page.getByRole('button', { name: 'Skip' }).click()
     await expect(
@@ -688,7 +690,9 @@ test.describe('intro walkthrough', () => {
       await page.getByRole('button', { name: 'Next' }).click()
     }
 
-    await expect(page.getByText('Step 10 of 10')).toBeVisible()
+    await expect(
+      page.getByText('Next you can open the live walkthrough.'),
+    ).toBeVisible()
     await page.getByRole('button', { name: 'Open live walkthrough' }).click()
     await expect(
       page.getByRole('heading', { name: 'How LLM systems actually work' }),
@@ -701,7 +705,9 @@ test.describe('intro walkthrough', () => {
     ).toBeVisible()
 
     await page.getByRole('button', { name: 'Start intro again' }).click()
-    await expect(page.getByText('Step 1 of 10')).toBeVisible()
+    await expect(
+      page.getByText('A language model keeps guessing what should come next.'),
+    ).toBeVisible()
     expect(issues).toEqual([])
   })
 })
@@ -727,7 +733,9 @@ test.describe('mobile walkthrough', () => {
     const issues = collectBrowserIssues(page)
 
     await page.goto('/')
-    await expect(page.getByText('Step 1 of 10')).toBeVisible()
+    await expect(
+      page.getByText('A language model keeps guessing what should come next.'),
+    ).toBeVisible()
     await expect(page.getByRole('button', { name: 'Skip' })).toBeVisible()
 
     const overflow = await page.evaluate(

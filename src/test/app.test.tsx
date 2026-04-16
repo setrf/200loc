@@ -164,7 +164,7 @@ describe('App', () => {
     const { default: App } = await import('../App')
     render(<App />)
 
-    await screen.findByText('Step 1 of 10 · What this is')
+    await screen.findByText('A language model keeps guessing what should come next.')
     fireEvent.click(screen.getByRole('button', { name: 'Skip' }))
 
     await screen.findByRole('button', { name: 'Start intro again' })
@@ -194,7 +194,7 @@ describe('App', () => {
     const { default: App } = await import('../App')
     render(<App />)
 
-    await screen.findByText('Step 1 of 10 · What this is')
+    await screen.findByText('A language model keeps guessing what should come next.')
     for (let index = 0; index < 9; index += 1) {
       fireEvent.click(screen.getByRole('button', { name: 'Next' }))
     }
@@ -208,7 +208,7 @@ describe('App', () => {
     expect(window.localStorage.getItem(INTRO_SEEN_STORAGE_KEY)).toBe('true')
 
     fireEvent.click(screen.getByRole('button', { name: 'Start intro again' }))
-    await screen.findByText('Step 1 of 10 · What this is')
+    await screen.findByText('A language model keeps guessing what should come next.')
   })
 
   it(

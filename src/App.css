@@ -85,15 +85,8 @@
   justify-content: center;
   align-items: center;
   text-align: center;
-  gap: 20px;
+  gap: 14px;
   flex: 1;
-}
-
-.intro-step__meta {
-  color: var(--text-muted);
-  font: 500 clamp(1rem, 0.95rem + 0.18vw, 1.08rem) / 1.45 var(--sans);
-  letter-spacing: 0.01em;
-  margin: 0;
 }
 
 .intro-step__lines {
@@ -116,7 +109,9 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding-bottom: 0;
+  padding: 0;
+  border-top: 0;
+  min-height: 120px;
 }
 
 .intro-actions__spacer {

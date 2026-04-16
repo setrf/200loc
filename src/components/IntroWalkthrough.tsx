@@ -39,9 +39,6 @@ export function IntroWalkthrough({
 
       <main className="intro-stack">
         <section className="intro-step" aria-label="Intro step">
-          <p className="intro-step__meta">
-            Step {activeStepIndex + 1} of {steps.length} · {step.title}
-          </p>
           <div className="intro-step__lines">
             {step.lines.map((line) => (
               <p className="intro-step__line" key={`${step.id}-${line}`}>
