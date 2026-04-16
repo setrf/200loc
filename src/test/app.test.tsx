@@ -62,7 +62,12 @@ function makeTokenizer() {
         .split('')
         .map((char) => char.charCodeAt(0) - 97),
     ),
-    decode: vi.fn(),
+    decode: vi.fn((tokenIds: readonly number[]) =>
+      tokenIds
+        .filter((tokenId) => tokenId !== 26)
+        .map((tokenId) => String.fromCharCode(tokenId + 97))
+        .join(''),
+    ),
     tokenLabel: vi.fn((tokenId: number) =>
       tokenId === 26 ? 'BOS' : String(tokenId),
     ),
@@ -190,9 +195,11 @@ describe('App', () => {
       screen.getByText('Loading the model and canonical source…'),
     ).toBeInTheDocument()
 
-    await screen.findByText('How a tiny GPT predicts the next token')
+    await screen.findByText('How LLM systems actually work')
     expect(screen.getAllByText('microgpt').length).toBeGreaterThan(0)
     expect(screen.getAllByText('Tokenize Prefix').length).toBeGreaterThan(0)
+    expect(screen.getByLabelText('Current text')).toHaveTextContent('em')
+    expect(screen.getByText('Ready')).toBeInTheDocument()
     expect(await screen.findByTestId('fallback-scene')).toBeInTheDocument()
     expect(findCodeLine('line 117').closest('li')).not.toHaveClass('is-active')
 
@@ -203,10 +210,10 @@ describe('App', () => {
     expect(document.querySelectorAll('.code-viewer__line.is-active').length).toBeGreaterThan(0)
     fireEvent.mouseLeave(screen.getByLabelText('Architecture scene'))
 
-    fireEvent.change(screen.getByLabelText('Prefix'), {
+    fireEvent.change(screen.getByLabelText('Starting text'), {
       target: { value: 'Em!42' },
     })
-    fireEvent.click(screen.getByRole('button', { name: 'Reset' }))
+    fireEvent.click(screen.getByRole('button', { name: /Reset|Apply text/ }))
     await waitFor(() => {
       expect(runtime.reset).toHaveBeenLastCalledWith('em')
     })
@@ -271,7 +278,7 @@ describe('App', () => {
 
     const { default: App } = await import('../App')
     render(<App />)
-    await screen.findByText('How a tiny GPT predicts the next token')
+    await screen.findByText('How LLM systems actually work')
 
     for (let index = 0; index < phaseCount; index += 1) {
       fireEvent.click(screen.getByRole('button', { name: 'Next' }))
@@ -301,7 +308,7 @@ describe('App', () => {
     const { default: App } = await import('../App')
     render(<App />)
 
-    await screen.findByText('How a tiny GPT predicts the next token')
+    await screen.findByText('How LLM systems actually work')
     expect(screen.getByText(phaseBeat(0))).toBeInTheDocument()
   })
 
@@ -323,7 +330,7 @@ describe('App', () => {
 
     const { default: App } = await import('../App')
     render(<App />)
-    await screen.findByText('How a tiny GPT predicts the next token')
+    await screen.findByText('How LLM systems actually work')
 
     for (let index = 0; index < phaseCount; index += 1) {
       fireEvent.click(screen.getByRole('button', { name: 'Next' }))
@@ -419,10 +426,10 @@ describe('App', () => {
     const { default: App } = await import('../App')
     render(<App />)
 
-    await screen.findByText('How a tiny GPT predicts the next token')
+    await screen.findByText('How LLM systems actually work')
     expect(screen.getByText(`step 1 / ${phaseCount}`)).toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Reset' }))
+    fireEvent.click(screen.getByRole('button', { name: /Reset|Apply text/ }))
     await waitFor(() => {
       expect(runtime.reset).toHaveBeenCalledTimes(2)
     })
@@ -474,7 +481,7 @@ describe('App', () => {
 
     const { default: App } = await import('../App')
     render(<App />)
-    await screen.findByText('How a tiny GPT predicts the next token')
+    await screen.findByText('How LLM systems actually work')
 
     for (let index = 0; index < phaseCount - 1; index += 1) {
       fireEvent.click(screen.getByRole('button', { name: 'Next' }))
@@ -600,9 +607,9 @@ describe('App', () => {
     const { default: App } = await import('../App')
     render(<App />)
 
-    const prefix = await screen.findByRole('textbox', { name: 'Prefix' })
+    const prefix = await screen.findByRole('textbox', { name: 'Starting text' })
     fireEvent.change(prefix, { target: { value: 'em' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Reset' }))
+    fireEvent.click(screen.getByRole('button', { name: /Reset|Apply text/ }))
     fireEvent.change(prefix, { target: { value: 'emi' } })
 
     deferredReset.resolve({
@@ -620,6 +627,58 @@ describe('App', () => {
     expect(runtime.reset).toHaveBeenLastCalledWith('em')
     expect(screen.getAllByText(`step 1 / ${phaseCount}`).length).toBeGreaterThan(0)
     expect(screen.queryByText('Loading the model and canonical source…')).not.toBeInTheDocument()
+  })
+
+  it('treats starting-text edits as a draft and pauses the active run until applied', async () => {
+    const runtime = makeRuntime()
+    runtime.reset.mockResolvedValue({
+      trace: makeTrace({ sampledTokenId: 26 }),
+      session: { visibleTokenIds: [4, 12], done: false },
+      diagnostics: {
+        activeBackend: 'cpu',
+        fallbackReason: 'WebGPU unavailable',
+      },
+    })
+
+    loadModelBundleMock.mockResolvedValue(bundleStub)
+    createTokenizerMock.mockReturnValue(makeTokenizer())
+    runtimeCtorMock.mockImplementation(function () {
+      return runtime
+    })
+    mockSourceFetch(sourceText)
+
+    const { default: App } = await import('../App')
+    render(<App />)
+
+    await screen.findByText('How LLM systems actually work')
+    const prefix = await screen.findByRole('textbox', { name: 'Starting text' })
+    fireEvent.change(prefix, { target: { value: 'em' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Apply text' }))
+    await waitFor(() => {
+      expect(runtime.reset).toHaveBeenLastCalledWith('em')
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Play' }))
+    expect(screen.getByRole('button', { name: 'Pause' })).toBeInTheDocument()
+
+    fireEvent.change(prefix, { target: { value: 'emi' } })
+
+    expect(screen.getByRole('button', { name: 'Apply text' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Play' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled()
+    expect(screen.getByLabelText('Current text')).toHaveTextContent('em')
+    expect(screen.getByText('Reset required')).toBeInTheDocument()
+    expect(
+      screen.getByText(
+        'Current run still uses the previous starting text. Apply text to restart from your draft.',
+      ),
+    ).toBeInTheDocument()
+
+    fireEvent.change(prefix, { target: { value: 'em' } })
+
+    expect(screen.getByRole('button', { name: 'Reset' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Play' })).toBeEnabled()
+    expect(screen.queryByText('Reset required')).not.toBeInTheDocument()
   })
 
   it('surfaces reset failures and ignores stale reset failures after the prefix changes', async () => {
@@ -648,14 +707,14 @@ describe('App', () => {
     const { default: App } = await import('../App')
     render(<App />)
 
-    const prefix = await screen.findByRole('textbox', { name: 'Prefix' })
+    const prefix = await screen.findByRole('textbox', { name: 'Starting text' })
     fireEvent.change(prefix, { target: { value: 'em' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Reset' }))
+    fireEvent.click(screen.getByRole('button', { name: /Reset|Apply text/ }))
     fireEvent.change(prefix, { target: { value: 'emi' } })
     staleFailure.reject(new Error('stale reset failed'))
     await Promise.resolve()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Reset' }))
+    fireEvent.click(screen.getByRole('button', { name: /Reset|Apply text/ }))
     await screen.findByText('Failed to load the walkthrough.')
     expect(screen.getByText('reset failed')).toBeInTheDocument()
   })
@@ -684,9 +743,9 @@ describe('App', () => {
     const { default: App } = await import('../App')
     render(<App />)
 
-    const prefix = await screen.findByRole('textbox', { name: 'Prefix' })
+    const prefix = await screen.findByRole('textbox', { name: 'Starting text' })
     fireEvent.change(prefix, { target: { value: 'em' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Reset' }))
+    fireEvent.click(screen.getByRole('button', { name: /Reset|Apply text/ }))
 
     await screen.findByText('Failed to load the walkthrough.')
     expect(screen.getByText('Failed to reset walkthrough.')).toBeInTheDocument()
@@ -713,7 +772,7 @@ describe('App', () => {
     const { default: App } = await import('../App')
     render(<App />)
 
-    await screen.findByText('How a tiny GPT predicts the next token')
+    await screen.findByText('How LLM systems actually work')
 
     fireEvent.click(document.querySelector('.annotation-trigger') as HTMLElement)
     expect(screen.getByRole('dialog', { hidden: true })).toHaveTextContent('Context')
@@ -726,7 +785,7 @@ describe('App', () => {
     fireEvent.click(document.querySelector('.annotation-trigger') as HTMLElement)
     expect(screen.getByRole('dialog', { hidden: true })).toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Reset' }))
+    fireEvent.click(screen.getByRole('button', { name: /Reset|Apply text/ }))
     await waitFor(() => {
       expect(screen.queryByRole('dialog', { hidden: true })).not.toBeInTheDocument()
     })
@@ -762,7 +821,7 @@ describe('App', () => {
     const { default: App } = await import('../App')
     render(<App />)
 
-    await screen.findByText('How a tiny GPT predicts the next token')
+    await screen.findByText('How LLM systems actually work')
 
     fireEvent.click(document.querySelector('.annotation-trigger') as HTMLElement)
     expect(screen.getByRole('dialog', { hidden: true })).toBeInTheDocument()

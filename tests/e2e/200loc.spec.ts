@@ -128,7 +128,7 @@ test.describe('desktop walkthrough', () => {
     await page.setViewportSize({ width: 1440, height: 1100 })
     await page.goto('/')
     await expect(
-      page.getByRole('heading', { name: 'How a tiny GPT predicts the next token' }),
+      page.getByRole('heading', { name: 'How LLM systems actually work' }),
     ).toBeVisible()
   })
 
@@ -136,7 +136,7 @@ test.describe('desktop walkthrough', () => {
     page,
   }) => {
     const issues = collectBrowserIssues(page)
-    const prefix = page.getByRole('textbox', { name: 'Prefix' })
+    const prefix = page.getByRole('textbox', { name: 'Starting text' })
 
     await prefix.fill('Em-12??')
     await expect(prefix).toHaveValue('em')
@@ -145,7 +145,7 @@ test.describe('desktop walkthrough', () => {
     await expect(prefix).toHaveValue('abcdefghijklmno')
 
     await prefix.fill('em')
-    await page.getByRole('button', { name: 'Reset' }).click()
+    await page.getByRole('button', { name: /Reset|Apply text/ }).click()
 
     await expect(page.locator('.story-panel__summary')).toContainText(
       'small piece of text it is allowed to use',
@@ -169,7 +169,7 @@ test.describe('desktop walkthrough', () => {
     await page.waitForTimeout(220)
     await expect(page.getByRole('dialog')).toBeVisible()
 
-    await page.getByRole('heading', { name: 'How a tiny GPT predicts the next token' }).click()
+    await page.getByRole('heading', { name: 'How LLM systems actually work' }).click()
     await expect(page.locator('.annotation-popup--floating')).toHaveCount(0)
     expect(issues).toEqual([])
   })
@@ -187,7 +187,7 @@ test.describe('desktop walkthrough', () => {
 
     await firstAnnotationTrigger(page).click()
     await expect(page.getByRole('dialog')).toBeVisible()
-    await page.getByRole('button', { name: 'Reset' }).click()
+    await page.getByRole('button', { name: /Reset|Apply text/ }).click()
     await expect(page.locator('.annotation-popup--floating')).toHaveCount(0)
 
     expect(issues).toEqual([])
@@ -208,8 +208,8 @@ test.describe('desktop walkthrough', () => {
 
   test('crosses the token boundary cleanly after the thirty-fourth step', async ({ page }) => {
     const issues = collectBrowserIssues(page)
-    await page.getByRole('textbox', { name: 'Prefix' }).fill('em')
-    await page.getByRole('button', { name: 'Reset' }).click()
+    await page.getByRole('textbox', { name: 'Starting text' }).fill('em')
+    await page.getByRole('button', { name: /Reset|Apply text/ }).click()
     await expect(page.locator('.scene-panel__stage-chip')).toContainText('Tokenize Prefix')
 
     for (let index = 0; index < 33; index += 1) {
@@ -242,6 +242,30 @@ test.describe('desktop walkthrough', () => {
     await page.waitForTimeout(1_400)
     expect(await stepLabel(page)).toBe(pausedStep)
     expect(await phaseLabel(page)).toBe(pausedPhase)
+    expect(issues).toEqual([])
+  })
+
+  test('treats edited starting text as a draft until the user applies it', async ({ page }) => {
+    const issues = collectBrowserIssues(page)
+    const prefix = page.getByRole('textbox', { name: 'Starting text' })
+    const currentText = page.getByLabel('Current text')
+
+    await prefix.fill('em')
+    await page.getByRole('button', { name: /Reset|Apply text/ }).click()
+    await expect(currentText).toContainText('em')
+
+    await page.getByRole('button', { name: 'Play' }).click()
+    await expect(page.getByRole('button', { name: 'Pause' })).toBeVisible()
+
+    await prefix.fill('emi')
+
+    await expect(page.getByRole('button', { name: 'Apply text' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Play' })).toBeDisabled()
+    await expect(page.getByRole('button', { name: 'Next' })).toBeDisabled()
+    await expect(currentText).toContainText('em')
+    await expect(page.locator('.story-panel__field-note')).toContainText(
+      'Apply text to restart from your draft',
+    )
     expect(issues).toEqual([])
   })
 
@@ -658,7 +682,7 @@ test.describe('mobile walkthrough', () => {
     await expect(page.locator('.code-viewer')).toBeVisible()
 
     await page.getByRole('button', { name: 'Story', exact: true }).click()
-    await expect(page.getByRole('textbox', { name: 'Prefix' })).toBeVisible()
+    await expect(page.getByRole('textbox', { name: 'Starting text' })).toBeVisible()
 
     const preservedCanvas = await page.evaluate(() => {
       const win = window as Window & { __mobileSceneCanvas?: HTMLCanvasElement | null }

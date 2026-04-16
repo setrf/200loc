@@ -34,21 +34,22 @@ describe('walkthrough reducer', () => {
         hoverRanges: [{ start: 1, end: 2 }],
       },
       {
-      type: 'reset',
-      prefixInput: 'em',
-      normalization: {
-        normalized: 'em',
-        removedUnsupported: false,
-        truncated: false,
-      },
-      trace,
-      sequenceTokenIds: [4, 5],
-      backend: 'cpu',
-      terminal: false,
+        type: 'reset',
+        prefixInput: 'em',
+        normalization: {
+          normalized: 'em',
+          removedUnsupported: false,
+          truncated: false,
+        },
+        trace,
+        sequenceTokenIds: [4, 5],
+        backend: 'cpu',
+        terminal: false,
       },
     )
 
     expect(state.status).toBe('ready')
+    expect(state.appliedPrefixInput).toBe('em')
     expect(state.traces).toHaveLength(1)
     expect(state.activePhaseIndex).toBe(0)
     expect(state.hoverRanges).toBeNull()
@@ -130,9 +131,16 @@ describe('walkthrough reducer', () => {
     state = walkthroughReducer(state, {
       type: 'setPrefixInput',
       prefixInput: 'em',
+      draftNormalization: {
+        normalized: 'em',
+        removedUnsupported: false,
+        truncated: false,
+      },
       status: 'ready',
     })
     expect(state.prefixInput).toBe('em')
+    expect(state.draftNormalization.normalized).toBe('em')
+    expect(state.appliedPrefixInput).toBe('')
     expect(state.status).toBe('ready')
 
     state = walkthroughReducer(state, {
@@ -160,8 +168,8 @@ describe('walkthrough reducer', () => {
     const noOpNext = walkthroughReducer(
       atEnd,
       {
-      type: 'phaseNext',
-      phaseCount,
+        type: 'phaseNext',
+        phaseCount,
       },
     )
     expect(noOpNext).toBe(atEnd)
@@ -174,8 +182,8 @@ describe('walkthrough reducer', () => {
     const noOpPrev = walkthroughReducer(
       atBeginning,
       {
-      type: 'phasePrev',
-      phaseCount,
+        type: 'phasePrev',
+        phaseCount,
       },
     )
     expect(noOpPrev).toBe(atBeginning)
@@ -194,6 +202,37 @@ describe('walkthrough reducer', () => {
     })
 
     expect(nextState).toBe(state)
+  })
+
+  it('keeps the applied prefix state separate from draft edits', () => {
+    const resetState = walkthroughReducer(initialWalkthroughState, {
+      type: 'reset',
+      prefixInput: 'em',
+      normalization: {
+        normalized: 'em',
+        removedUnsupported: false,
+        truncated: false,
+      },
+      trace,
+      sequenceTokenIds: [4, 12],
+      backend: 'cpu',
+      terminal: false,
+    })
+
+    const editedState = walkthroughReducer(resetState, {
+      type: 'setPrefixInput',
+      prefixInput: 'emi',
+      draftNormalization: {
+        normalized: 'emi',
+        removedUnsupported: false,
+        truncated: false,
+      },
+    })
+
+    expect(editedState.prefixInput).toBe('emi')
+    expect(editedState.appliedPrefixInput).toBe('em')
+    expect(editedState.draftNormalization.normalized).toBe('emi')
+    expect(editedState.appliedNormalization.normalized).toBe('em')
   })
 
   it('marks reset and append as terminal when requested', () => {

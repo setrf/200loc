@@ -80,6 +80,7 @@ export default function App() {
         backend: result.diagnostics.activeBackend,
         fallbackReason: result.diagnostics.fallbackReason,
         terminal: result.session.done,
+        doneReason: result.session.doneReason,
       })
     } catch (error) {
       if (
@@ -100,17 +101,22 @@ export default function App() {
   }, [])
 
   const handlePrefixChange = useCallback((value: string) => {
-    const normalization = normalizePrefixInput(tokenizerRef.current, value)
+    const draftNormalization = normalizePrefixInput(tokenizerRef.current, value)
+    const nextStatus =
+      state.status === 'playing'
+        ? 'paused'
+        : state.status === 'loading' && state.traces.length > 0
+          ? lastStableStatusRef.current === 'playing'
+            ? 'paused'
+            : lastStableStatusRef.current
+          : undefined
 
     prefixVersionRef.current += 1
     dispatch({
       type: 'setPrefixInput',
-      prefixInput: normalization.normalized,
-      normalization,
-      status:
-        state.status === 'loading' && state.traces.length > 0
-          ? lastStableStatusRef.current
-          : undefined,
+      prefixInput: draftNormalization.normalized,
+      draftNormalization,
+      status: nextStatus,
     })
   }, [state.status, state.traces.length])
 
@@ -162,6 +168,7 @@ export default function App() {
           backend: result.diagnostics.activeBackend,
           fallbackReason: result.diagnostics.fallbackReason,
           terminal: result.session.done,
+          doneReason: result.session.doneReason,
         })
       } catch (error) {
         if (!cancelled) {
@@ -206,6 +213,7 @@ export default function App() {
         backend: result.diagnostics.activeBackend,
         fallbackReason: result.diagnostics.fallbackReason,
         terminal: result.session.done,
+        doneReason: result.session.doneReason,
       })
     } catch (error) {
       dispatch({
@@ -256,8 +264,10 @@ export default function App() {
   }
 
   const tokenLabel = tokenizerRef.current!.tokenLabel
+  const currentText = tokenizerRef.current!.decode(state.sequenceTokenIds)
   const currentTokenLabel = tokenLabel(trace.tokenId)
-  const prefixChars = [...state.normalization.normalized]
+  const hasPendingPrefixChange = state.prefixInput !== state.appliedPrefixInput
+  const prefixChars = [...state.appliedNormalization.normalized]
   const generatedBeforeCurrent =
     state.activeTraceIndex > 0
       ? state.traces
@@ -279,12 +289,28 @@ export default function App() {
     state.activePhaseIndex < phaseCount - 1 ||
     state.activeTraceIndex < state.traces.length - 1 ||
     state.status !== 'terminal'
+  const controlsLocked = state.status === 'loading'
+  const navigationBlocked = controlsLocked || hasPendingPrefixChange
+  const currentTextStatus =
+    hasPendingPrefixChange
+      ? 'Reset required'
+      : state.status === 'loading'
+      ? 'Resetting'
+      : state.status === 'playing'
+        ? 'Generating'
+        : state.status === 'paused'
+          ? 'Paused'
+          : state.status === 'terminal'
+            ? state.stopReason === 'context'
+              ? 'Context full'
+              : 'Stopped at BOS'
+            : 'Ready'
   return (
     <div className="app-shell">
       <header className="app-header">
         <div>
           <p className="eyebrow">200loc</p>
-          <h2 className="app-header__title">How a tiny GPT predicts the next token</h2>
+          <h2 className="app-header__title">How LLM systems actually work</h2>
         </div>
       </header>
 
@@ -313,66 +339,6 @@ export default function App() {
         >
           <div className="story-scene__toolbar">
             <div className="story-scene__toolbar-main">
-              <div className="story-scene__toolbar-controls">
-                <label className="story-panel__field" htmlFor="prefix-input">
-                  <span className="eyebrow">Prefix</span>
-                  <input
-                    id="prefix-input"
-                    className="story-panel__input"
-                    value={state.prefixInput}
-                    onChange={(event) => handlePrefixChange(event.target.value)}
-                    placeholder="em"
-                    autoComplete="off"
-                    spellCheck={false}
-                  />
-                </label>
-
-                <div className="story-panel__actions">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      dispatch({ type: 'setPlaying', playing: false })
-                      void hydrate(state.prefixInput)
-                    }}
-                  >
-                    Reset
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      dispatch({ type: 'setPlaying', playing: false })
-                      dispatch({ type: 'phasePrev', phaseCount })
-                    }}
-                    disabled={!canPrev}
-                  >
-                    Prev
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      dispatch({ type: 'setPlaying', playing: false })
-                      void advance()
-                    }}
-                    disabled={!canNext}
-                  >
-                    Next
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (state.status === 'playing') {
-                        dispatch({ type: 'setPlaying', playing: false })
-                      } else {
-                        dispatch({ type: 'setPlaying', playing: true })
-                      }
-                    }}
-                    disabled={!canNext}
-                  >
-                    {state.status === 'playing' ? 'Pause' : 'Play'}
-                  </button>
-                </div>
-              </div>
-
               <div
                 className="scene-panel__stage-chip"
                 onMouseEnter={() => handleFocusRanges(phase.codeRanges)}
@@ -385,6 +351,104 @@ export default function App() {
                   </span>
                 </div>
                 <strong>{phase.groupTitle}</strong>
+              </div>
+
+              <div className="story-scene__toolbar-panel">
+                <div className="story-scene__toolbar-inputs">
+                  <label className="story-panel__field" htmlFor="prefix-input">
+                    <div className="story-panel__field-head">
+                      <span className="eyebrow">Starting text</span>
+                    </div>
+                    <input
+                      id="prefix-input"
+                      className="story-panel__input"
+                      aria-label="Starting text"
+                      value={state.prefixInput}
+                      onChange={(event) => handlePrefixChange(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' && !controlsLocked) {
+                          dispatch({ type: 'setPlaying', playing: false })
+                          void hydrate(state.prefixInput)
+                        }
+                      }}
+                      placeholder="em"
+                      autoComplete="off"
+                      spellCheck={false}
+                    />
+                  </label>
+
+                  <div
+                    className={`story-panel__field story-panel__field--readonly${
+                      hasPendingPrefixChange ? ' is-stale' : ''
+                    }`}
+                  >
+                    <div className="story-panel__field-head">
+                      <span className="eyebrow">Current text</span>
+                      <span className="story-panel__field-status">{currentTextStatus}</span>
+                    </div>
+                    <output
+                      className={`story-panel__readout${currentText ? '' : ' is-empty'}`}
+                      aria-label="Current text"
+                      aria-live="polite"
+                    >
+                      {currentText || 'Nothing generated yet'}
+                    </output>
+                  </div>
+                </div>
+
+                <div className="story-scene__toolbar-footer">
+                  <p className="story-panel__field-note">
+                    {hasPendingPrefixChange
+                      ? 'Current run still uses the previous starting text. Apply text to restart from your draft.'
+                      : 'Edit the starting text, then reset when you want the model to restart from it.'}
+                  </p>
+
+                  <div className="story-panel__actions">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        dispatch({ type: 'setPlaying', playing: false })
+                        void hydrate(state.prefixInput)
+                      }}
+                      disabled={controlsLocked}
+                    >
+                      {hasPendingPrefixChange ? 'Apply text' : 'Reset'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        dispatch({ type: 'setPlaying', playing: false })
+                        dispatch({ type: 'phasePrev', phaseCount })
+                      }}
+                      disabled={!canPrev || navigationBlocked}
+                    >
+                      Prev
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        dispatch({ type: 'setPlaying', playing: false })
+                        void advance()
+                      }}
+                      disabled={!canNext || navigationBlocked}
+                    >
+                      Next
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (state.status === 'playing') {
+                          dispatch({ type: 'setPlaying', playing: false })
+                        } else {
+                          dispatch({ type: 'setPlaying', playing: true })
+                        }
+                      }}
+                      disabled={!canNext || navigationBlocked}
+                    >
+                      {state.status === 'playing' ? 'Pause' : 'Play'}
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

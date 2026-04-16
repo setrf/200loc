@@ -15,13 +15,16 @@ export type MobileTab = 'story' | 'scene' | 'code'
 export interface WalkthroughState {
   status: WalkthroughStatus
   prefixInput: string
-  normalization: PrefixNormalization
+  draftNormalization: PrefixNormalization
+  appliedPrefixInput: string
+  appliedNormalization: PrefixNormalization
   traces: TokenStepTrace[]
   activeTraceIndex: number
   activePhaseIndex: number
   sequenceTokenIds: number[]
   backend: BackendName
   fallbackReason?: string
+  stopReason?: 'bos' | 'context'
   hoverRanges: LineRange[] | null
   mobileTab: MobileTab
   error?: string
@@ -33,7 +36,7 @@ export type WalkthroughAction =
   | {
       type: 'setPrefixInput'
       prefixInput: string
-      normalization?: PrefixNormalization
+      draftNormalization?: PrefixNormalization
       status?: WalkthroughStatus
     }
   | {
@@ -45,6 +48,7 @@ export type WalkthroughAction =
       backend: BackendName
       fallbackReason?: string
       terminal: boolean
+      doneReason?: 'bos' | 'context'
     }
   | {
       type: 'appendTrace'
@@ -53,6 +57,7 @@ export type WalkthroughAction =
       backend: BackendName
       fallbackReason?: string
       terminal: boolean
+      doneReason?: 'bos' | 'context'
     }
   | { type: 'phaseNext'; phaseCount: number }
   | { type: 'phasePrev'; phaseCount: number }
@@ -63,7 +68,13 @@ export type WalkthroughAction =
 export const initialWalkthroughState: WalkthroughState = {
   status: 'idle',
   prefixInput: '',
-  normalization: {
+  draftNormalization: {
+    normalized: '',
+    removedUnsupported: false,
+    truncated: false,
+  },
+  appliedPrefixInput: '',
+  appliedNormalization: {
     normalized: '',
     removedUnsupported: false,
     truncated: false,
@@ -115,20 +126,23 @@ export function walkthroughReducer(
         ...state,
         status: action.status ?? state.status,
         prefixInput: action.prefixInput,
-        normalization: action.normalization ?? state.normalization,
+        draftNormalization: action.draftNormalization ?? state.draftNormalization,
       }
     case 'reset':
       return {
         ...state,
         status: action.terminal ? 'terminal' : 'ready',
         prefixInput: action.prefixInput,
-        normalization: action.normalization,
+        draftNormalization: action.normalization,
+        appliedPrefixInput: action.prefixInput,
+        appliedNormalization: action.normalization,
         traces: [action.trace],
         activeTraceIndex: 0,
         activePhaseIndex: 0,
         sequenceTokenIds: action.sequenceTokenIds,
         backend: action.backend,
         fallbackReason: action.fallbackReason,
+        stopReason: action.terminal ? action.doneReason : undefined,
         hoverRanges: null,
         error: undefined,
       }
@@ -142,6 +156,7 @@ export function walkthroughReducer(
         sequenceTokenIds: action.sequenceTokenIds,
         backend: action.backend,
         fallbackReason: action.fallbackReason,
+        stopReason: action.terminal ? action.doneReason : undefined,
       }
     case 'phaseNext': {
       if (state.activePhaseIndex < action.phaseCount - 1) {
