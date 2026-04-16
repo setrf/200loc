@@ -7,7 +7,6 @@ interface IntroWalkthroughProps {
   onNext: () => void
   onSkip: () => void
   onOpenLab: () => void
-  labStatusLabel: string
 }
 
 export function IntroWalkthrough({
@@ -17,7 +16,6 @@ export function IntroWalkthrough({
   onNext,
   onSkip,
   onOpenLab,
-  labStatusLabel,
 }: IntroWalkthroughProps) {
   const step = steps[activeStepIndex]!
   const isFirst = activeStepIndex === 0
@@ -29,38 +27,54 @@ export function IntroWalkthrough({
         <div>
           <p className="eyebrow">200loc</p>
           <h1>How LLM systems actually work</h1>
+          <p className="intro-shell__lede">
+            A plain walk through of what a language model is doing when it writes the next token.
+          </p>
         </div>
         <button
           type="button"
-          className="ghost-button"
+          className="ghost-button ghost-button--quiet"
           onClick={onSkip}
         >
           Skip
         </button>
       </header>
 
-      <main className="intro-layout">
-        <section className="intro-panel intro-panel--copy" aria-label="Intro step">
-          <p className="eyebrow">
-            Step {activeStepIndex + 1} of {steps.length}
-          </p>
+      <main className="intro-stack">
+        <section className="intro-step" aria-label="Intro step">
+          <div className="intro-step__progress">
+            <p className="eyebrow">
+              Step {activeStepIndex + 1} of {steps.length}
+            </p>
+            <div
+              className="intro-step__progress-bar"
+              aria-hidden="true"
+            >
+              <span
+                style={{
+                  width: `${((activeStepIndex + 1) / steps.length) * 100}%`,
+                }}
+              />
+            </div>
+          </div>
+          <p className="intro-step__kicker">One idea at a time</p>
           <h2>{step.title}</h2>
-          <p className="intro-panel__body">{step.body}</p>
-          {step.note ? <p className="intro-panel__note">{step.note}</p> : null}
+          <p className="intro-step__body">{step.body}</p>
+          {step.note ? <p className="intro-step__note">{step.note}</p> : null}
         </section>
 
-        <section className="intro-panel intro-panel--visual" aria-label="Intro example">
-          <div className="intro-visual">
-            <h3>{step.visualTitle}</h3>
+        <section className="intro-example" aria-label="Intro example">
+          <h3>{step.visualTitle}</h3>
+          <div className="intro-example__rows">
             {step.visualRows.map((row) => (
-              <div className="intro-visual__row" key={`${step.id}-${row.label}`}>
-                <span className="intro-visual__label">{row.label}</span>
-                <div className="intro-visual__values">
+              <div className="intro-example__row" key={`${step.id}-${row.label}`}>
+                <span className="intro-example__label">{row.label}</span>
+                <div className="intro-example__values">
                   {row.values.map((value, index) => {
                     const emphasized = row.emphasisIndexes?.includes(index) ?? false
                     return (
                       <span
-                        className={`intro-visual__chip${emphasized ? ' is-emphasis' : ''}`}
+                        className={`intro-example__value${emphasized ? ' is-emphasis' : ''}`}
                         key={`${row.label}-${value}-${index}`}
                       >
                         {value}
@@ -71,25 +85,24 @@ export function IntroWalkthrough({
               </div>
             ))}
           </div>
-          <p className="intro-panel__status">Live walkthrough status: {labStatusLabel}</p>
+        </section>
+
+        <section className="intro-actions" aria-label="Intro navigation">
+          <button type="button" onClick={onBack} disabled={isFirst}>
+            Back
+          </button>
+          <div className="intro-actions__spacer" />
+          {isLast ? (
+            <button type="button" onClick={onOpenLab}>
+              Open live walkthrough
+            </button>
+          ) : (
+            <button type="button" onClick={onNext}>
+              Next
+            </button>
+          )}
         </section>
       </main>
-
-      <footer className="intro-actions">
-        <button type="button" onClick={onBack} disabled={isFirst}>
-          Back
-        </button>
-        <div className="intro-actions__spacer" />
-        {isLast ? (
-          <button type="button" onClick={onOpenLab}>
-            Open live walkthrough
-          </button>
-        ) : (
-          <button type="button" onClick={onNext}>
-            Next
-          </button>
-        )}
-      </footer>
     </div>
   )
 }

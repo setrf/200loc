@@ -254,13 +254,6 @@ export default function App() {
     setAppMode('intro')
   }
 
-  const labStatusLabel =
-    state.status === 'error'
-      ? 'Unavailable right now'
-      : !trace || !phase || !source || !sceneModelData
-        ? 'Loading'
-        : 'Ready'
-
   if (appMode === 'intro') {
     return (
       <div className="app-shell app-shell--intro">
@@ -277,7 +270,6 @@ export default function App() {
           }}
           onSkip={openLab}
           onOpenLab={openLab}
-          labStatusLabel={labStatusLabel}
         />
       </div>
     )

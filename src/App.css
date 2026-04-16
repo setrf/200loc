@@ -7,7 +7,7 @@
 }
 
 .app-shell--intro {
-  padding: 24px;
+  padding: 32px 20px;
 }
 
 .app-shell--centered {
@@ -35,7 +35,7 @@
 .ghost-button {
   padding: 8px 12px;
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 999px;
   background: transparent;
   color: var(--text-muted);
 }
@@ -45,22 +45,17 @@
   color: var(--text);
 }
 
-.intro-shell {
-  width: min(980px, 100%);
-  margin: 0 auto;
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
-  gap: 16px;
-  min-height: calc(100svh - 48px);
+.ghost-button--quiet {
+  border-color: transparent;
 }
 
-.intro-shell__header,
-.intro-panel,
-.intro-actions {
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  background: var(--panel);
-  box-shadow: var(--shadow);
+.intro-shell {
+  width: min(760px, 100%);
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-height: calc(100svh - 64px);
 }
 
 .intro-shell__header {
@@ -68,88 +63,132 @@
   align-items: start;
   justify-content: space-between;
   gap: 16px;
-  padding: 18px 20px;
+  padding: 4px 0 0;
 }
 
-.intro-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
-  gap: 16px;
-}
-
-.intro-panel {
-  padding: 20px;
-}
-
-.intro-panel--copy {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  justify-content: center;
-}
-
-.intro-panel--copy h2,
-.intro-panel--visual h3 {
-  font: 600 clamp(1.15rem, 1rem + 0.6vw, 1.45rem) / 1.2 var(--sans);
-}
-
-.intro-panel__body,
-.intro-panel__note,
-.intro-panel__status {
+.intro-shell__lede {
+  max-width: 42rem;
+  margin-top: 10px;
   color: var(--text-muted);
 }
 
-.intro-panel__body {
-  font-size: 1rem;
+.intro-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
 }
 
-.intro-panel__note {
-  font-size: 0.92rem;
+.intro-step,
+.intro-example,
+.intro-actions {
+  padding: 22px 0;
+  border-top: 1px solid var(--border);
 }
 
-.intro-visual {
+.intro-step {
   display: flex;
   flex-direction: column;
   gap: 14px;
 }
 
-.intro-visual__row {
+.intro-step__progress {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
 }
 
-.intro-visual__label {
+.intro-step__progress-bar {
+  width: 100%;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.intro-step__progress-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent-strong);
+}
+
+.intro-step__kicker {
+  font: 500 0.78rem/1.3 var(--mono);
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.intro-step h2,
+.intro-example h3 {
+  font: 600 clamp(1.15rem, 1rem + 0.6vw, 1.5rem) / 1.2 var(--sans);
+}
+
+.intro-step__body,
+.intro-step__note {
+  max-width: 44rem;
+  color: var(--text-muted);
+}
+
+.intro-step__body {
+  font-size: 1rem;
+}
+
+.intro-step__note {
+  font-size: 0.92rem;
+}
+
+.intro-example {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.intro-example__rows {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.intro-example__row {
+  display: grid;
+  grid-template-columns: minmax(120px, 150px) minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.intro-example__label {
+  padding-top: 10px;
   font: 500 0.78rem/1.3 var(--mono);
   color: var(--text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.05em;
 }
 
-.intro-visual__values {
+.intro-example__values {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
 }
 
-.intro-visual__chip {
+.intro-example__value {
   padding: 10px 12px;
   border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--panel-deep);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
   color: var(--text);
 }
 
-.intro-visual__chip.is-emphasis {
-  border-color: rgba(212, 221, 231, 0.35);
-  background: rgba(154, 175, 196, 0.14);
+.intro-example__value.is-emphasis {
+  border-color: rgba(212, 221, 231, 0.4);
+  background: rgba(154, 175, 196, 0.1);
 }
 
 .intro-actions {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 14px 16px;
+  padding-bottom: 0;
 }
 
 .intro-actions__spacer {
@@ -1125,11 +1164,7 @@ button.annotation-trigger:focus-visible {
 
 @media (max-width: 1023px) {
   .app-shell--intro {
-    padding: 12px;
-  }
-
-  .intro-layout {
-    grid-template-columns: 1fr;
+    padding: 20px 14px;
   }
 
   .mobile-only {
@@ -1209,8 +1244,9 @@ button.annotation-trigger:focus-visible {
     align-items: stretch;
   }
 
-  .intro-panel {
-    padding: 16px;
+  .intro-example__row {
+    grid-template-columns: 1fr;
+    gap: 8px;
   }
 
   .intro-actions__spacer {

@@ -24,7 +24,6 @@ describe('intro walkthrough', () => {
         onNext={vi.fn()}
         onSkip={vi.fn()}
         onOpenLab={vi.fn()}
-        labStatusLabel="Ready"
       />,
     )
 
@@ -32,7 +31,6 @@ describe('intro walkthrough', () => {
     expect(
       screen.getByRole('heading', { name: 'Tokens become numbers' }),
     ).toBeInTheDocument()
-    expect(screen.getByText('Live walkthrough status: Ready')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Back' })).toBeEnabled()
     expect(screen.getByRole('button', { name: 'Next' })).toBeEnabled()
   })
@@ -46,14 +44,13 @@ describe('intro walkthrough', () => {
         onNext={vi.fn()}
         onSkip={vi.fn()}
         onOpenLab={vi.fn()}
-        labStatusLabel="Loading"
       />,
     )
 
     expect(
       screen.getByRole('button', { name: 'Open live walkthrough' }),
     ).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Next' })).not.toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: 'Back' })).toHaveLength(1)
   })
 
   it('persists the intro completion flag safely', () => {
@@ -100,7 +97,6 @@ describe('intro walkthrough', () => {
         onNext={onNext}
         onSkip={onSkip}
         onOpenLab={vi.fn()}
-        labStatusLabel="Ready"
       />,
     )
 
