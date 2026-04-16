@@ -9,8 +9,11 @@ import { normalizePrefixInput } from './prefixNormalization'
 import { ArchitectureScene } from './components/ArchitectureScene'
 import { CodeViewer } from './components/CodeViewer'
 import { Controls } from './components/Controls'
+import { IntroWalkthrough } from './components/IntroWalkthrough'
 import { SegmentTabs } from './components/SegmentTabs'
 import { useAutoplay } from './hooks/useAutoplay'
+import { introSteps } from './intro/steps'
+import { readHasSeenIntro, writeHasSeenIntro } from './intro/storage'
 import {
   inferencePhases,
   type LineRange,
@@ -24,8 +27,13 @@ import type { SceneModelData } from './viz/llmViz/types'
 import './App.css'
 
 const phaseCount = inferencePhases.length
+type AppMode = 'intro' | 'lab'
 
 export default function App() {
+  const [appMode, setAppMode] = useState<AppMode>(() =>
+    readHasSeenIntro() ? 'lab' : 'intro',
+  )
+  const [introStepIndex, setIntroStepIndex] = useState(0)
   const [state, dispatch] = useReducer(
     walkthroughReducer,
     initialWalkthroughState,
@@ -236,6 +244,45 @@ export default function App() {
   const trace = state.traces[state.activeTraceIndex]
   const phase = inferencePhases[state.activePhaseIndex]
 
+  function openLab() {
+    writeHasSeenIntro(true)
+    setAppMode('lab')
+  }
+
+  function reopenIntro() {
+    setIntroStepIndex(0)
+    setAppMode('intro')
+  }
+
+  const labStatusLabel =
+    state.status === 'error'
+      ? 'Unavailable right now'
+      : !trace || !phase || !source || !sceneModelData
+        ? 'Loading'
+        : 'Ready'
+
+  if (appMode === 'intro') {
+    return (
+      <div className="app-shell app-shell--intro">
+        <IntroWalkthrough
+          activeStepIndex={introStepIndex}
+          steps={introSteps}
+          onBack={() => {
+            setIntroStepIndex((currentIndex) => Math.max(0, currentIndex - 1))
+          }}
+          onNext={() => {
+            setIntroStepIndex((currentIndex) =>
+              Math.min(introSteps.length - 1, currentIndex + 1),
+            )
+          }}
+          onSkip={openLab}
+          onOpenLab={openLab}
+          labStatusLabel={labStatusLabel}
+        />
+      </div>
+    )
+  }
+
   if (state.status === 'error') {
     return (
       <div className="app-shell app-shell--centered">
@@ -312,6 +359,13 @@ export default function App() {
           <p className="eyebrow">200loc</p>
           <h2 className="app-header__title">How LLM systems actually work</h2>
         </div>
+        <button
+          type="button"
+          className="ghost-button"
+          onClick={reopenIntro}
+        >
+          Start intro again
+        </button>
       </header>
 
       <div className="mobile-only">

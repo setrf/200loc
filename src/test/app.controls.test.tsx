@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { INTRO_SEEN_STORAGE_KEY } from '../intro/storage'
 import type { PrefixNormalization } from '../model'
 import { inferencePhases } from '../walkthrough/phases'
 import { loadBundle, makeTrace } from './helpers/fixtures'
@@ -70,6 +71,7 @@ describe('App forced control branches', () => {
   beforeEach(() => {
     vi.resetModules()
     vi.clearAllMocks()
+    window.localStorage.setItem(INTRO_SEEN_STORAGE_KEY, 'true')
     Object.defineProperty(window, 'matchMedia', {
       writable: true,
       value: vi.fn().mockReturnValue({
@@ -82,6 +84,7 @@ describe('App forced control branches', () => {
 
   afterEach(() => {
     vi.restoreAllMocks()
+    window.localStorage.clear()
   })
 
   it('covers the prev callback wiring', async () => {

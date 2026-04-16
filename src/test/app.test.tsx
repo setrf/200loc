@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { useEffect, useRef } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { INTRO_SEEN_STORAGE_KEY } from '../intro/storage'
 import type { PrefixNormalization } from '../model'
 import { inferencePhases } from '../walkthrough/phases'
 import { loadBundle, makeTrace } from './helpers/fixtures'
@@ -106,6 +107,7 @@ describe('App', () => {
   beforeEach(() => {
     vi.resetModules()
     vi.clearAllMocks()
+    window.localStorage.setItem(INTRO_SEEN_STORAGE_KEY, 'true')
     Object.defineProperty(window, 'requestAnimationFrame', {
       writable: true,
       value: vi.fn((callback: FrameRequestCallback) => {
@@ -136,6 +138,79 @@ describe('App', () => {
   afterEach(() => {
     vi.doUnmock('../hooks/useAutoplay')
     vi.restoreAllMocks()
+    window.localStorage.clear()
+  })
+
+  it('shows the intro on first visit, then skips into the live walkthrough', async () => {
+    window.localStorage.removeItem(INTRO_SEEN_STORAGE_KEY)
+
+    const runtime = makeRuntime()
+    runtime.reset.mockResolvedValue({
+      trace: makeTrace({ sampledTokenId: 26 }),
+      session: { visibleTokenIds: [4, 12], done: false },
+      diagnostics: {
+        activeBackend: 'cpu',
+        fallbackReason: 'WebGPU unavailable',
+      },
+    })
+
+    loadModelBundleMock.mockResolvedValue(bundleStub)
+    createTokenizerMock.mockReturnValue(makeTokenizer())
+    runtimeCtorMock.mockImplementation(function () {
+      return runtime
+    })
+    mockSourceFetch(sourceText)
+
+    const { default: App } = await import('../App')
+    render(<App />)
+
+    await screen.findByText('Step 1 of 10')
+    expect(screen.getByRole('heading', { name: 'What this is' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Skip' }))
+
+    await screen.findByRole('button', { name: 'Start intro again' })
+    expect(window.localStorage.getItem(INTRO_SEEN_STORAGE_KEY)).toBe('true')
+  })
+
+  it('finishes the intro, remembers it, and can reopen it from the lab', async () => {
+    window.localStorage.removeItem(INTRO_SEEN_STORAGE_KEY)
+
+    const runtime = makeRuntime()
+    runtime.reset.mockResolvedValue({
+      trace: makeTrace({ sampledTokenId: 26 }),
+      session: { visibleTokenIds: [4, 12], done: false },
+      diagnostics: {
+        activeBackend: 'cpu',
+        fallbackReason: 'WebGPU unavailable',
+      },
+    })
+
+    loadModelBundleMock.mockResolvedValue(bundleStub)
+    createTokenizerMock.mockReturnValue(makeTokenizer())
+    runtimeCtorMock.mockImplementation(function () {
+      return runtime
+    })
+    mockSourceFetch(sourceText)
+
+    const { default: App } = await import('../App')
+    render(<App />)
+
+    await screen.findByText('Step 1 of 10')
+    for (let index = 0; index < 9; index += 1) {
+      fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+    }
+
+    expect(
+      screen.getByRole('button', { name: 'Open live walkthrough' }),
+    ).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Open live walkthrough' }))
+
+    await screen.findByRole('button', { name: 'Start intro again' })
+    expect(window.localStorage.getItem(INTRO_SEEN_STORAGE_KEY)).toBe('true')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Start intro again' }))
+    await screen.findByText('Step 1 of 10')
+    expect(screen.getByRole('heading', { name: 'What this is' })).toBeInTheDocument()
   })
 
   it(
