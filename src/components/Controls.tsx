@@ -16,7 +16,7 @@ interface OpenAnnotation {
 
 const HOVER_OPEN_DELAY_MS = 280
 const HOVER_CLOSE_DELAY_MS = 140
-const COMPACT_QUERY = '(hover: none), (pointer: coarse), (max-width: 960px)'
+const COMPACT_QUERY = '(hover: none), (pointer: coarse), (max-width: 1023px)'
 
 function isCompactViewport() {
   if (typeof window === 'undefined' || !window.matchMedia) {

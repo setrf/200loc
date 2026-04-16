@@ -210,6 +210,14 @@ describe('ui components', () => {
     expect(screen.queryByRole('dialog', { hidden: true })).not.toBeInTheDocument()
   })
 
+  it('uses the same compact breakpoint as the mobile layout', () => {
+    render(<Controls {...makeControlsProps()} />)
+
+    expect(window.matchMedia).toHaveBeenCalledWith(
+      '(hover: none), (pointer: coarse), (max-width: 1023px)',
+    )
+  })
+
   it('shows a desktop annotation popup on hover and keeps it open when pinned', async () => {
     vi.useFakeTimers()
     const props = makeControlsProps()

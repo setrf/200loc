@@ -2,28 +2,31 @@
 
 `200loc` is a single-page walkthrough of Karpathy's `microgpt.py`.
 
-It keeps one promise: show how a tiny GPT performs next-token inference, step by step, in the browser, without hiding the model behind a framework-heavy stack or a backend service.
+The app shows one tiny GPT inference step at a time in the browser, with the
+canonical Python source, explanatory copy, and a synchronized architecture
+scene all moving together.
 
 ## What It Does
 
-- Shows the canonical `microgpt.py` source beside a synchronized walkthrough.
+- Shows the shipped `microgpt.py` source beside the active walkthrough step.
 - Explains inference across 34 guided steps grouped into 14 stages.
-- Runs a tiny char-level names model client-side.
-- Uses native WebGPU when available, with a CPU reference path for fallback and correctness.
-- Highlights the exact Python lines that correspond to the active visualization state.
+- Runs a tiny char-level names model entirely client-side.
+- Prefers WebGPU when it initializes cleanly and falls back to the CPU reference
+  path otherwise.
+- Maps code, story, and scene focus back to the same inference moment.
 
 ## Product Constraints
 
 - Single page only.
 - No router.
 - No backend.
-- No training simulation in the browser.
+- No in-browser training controls.
 - No model picker or arbitrary checkpoint loader.
-- One guided scene, not a dashboard of separate panels.
+- One guided scene, not a dashboard of disconnected panels.
 
 ## Stack
 
-- Vite
+- Vite 8
 - React 19
 - TypeScript
 - Plain CSS
@@ -31,24 +34,28 @@ It keeps one promise: show how a tiny GPT performs next-token inference, step by
 - Vitest + Testing Library
 - Playwright
 
-## Project Layout
+## Repository Layout
 
-- `src/App.tsx`: app shell, bootstrap, walkthrough orchestration
-- `src/model/`: tokenizer, CPU engine, WebGPU engine, runtime coordination
-- `src/walkthrough/`: phase definitions and reducer-driven UI state
-- `src/components/`: code viewer, controls, tabs, and the architecture scene shell
-- `src/viz/microViz/`: microgpt scene layout, bridge, and program logic
-- `src/vendor/llmVizOriginal/`: Brendan Bycroft render, camera, and interaction code reused by the scene
-- `public/assets/microgpt.py`: canonical reference source shown in the UI
-- `public/assets/microgpt-model.json`: exported tiny checkpoint used in the browser
-- `scripts/export_microgpt_bundle.py`: offline export path for rebuilding the model bundle
+- `src/App.tsx`: bootstrap, runtime hydration, phase/trace orchestration, top-level layout
+- `src/components/`: code viewer, glossary controls, tabs, and scene host
+- `src/hooks/useAutoplay.ts`: walkthrough autoplay timer
+- `src/model/`: bundle loading, tokenizer, CPU engine, WebGPU engine, runtime coordination
+- `src/walkthrough/`: glossary, reducer, and the 34-step walkthrough spec
+- `src/viz/llmViz/`: frame building, abstract layout, and fallback projection helpers
+- `src/viz/microViz/`: WebGL bridge, scene layout, textures, and renderer program glue
+- `src/vendor/llmVizOriginal/`: vendored renderer/camera/interaction code reused by the scene
+- `src/test/`: unit and integration tests
+- `tests/e2e/`: Playwright browser coverage
+- `public/assets/microgpt.py`: canonical source shown in the UI
+- `public/assets/microgpt-model.json`: exported browser bundle
+- `scripts/export_microgpt_bundle.py`: training/export script for the browser bundle and trace fixture
 
 ## Local Development
 
 Requirements:
 
 - Node 20+
-- Python 3 for the export script
+- Python 3
 
 Install dependencies:
 
@@ -62,43 +69,47 @@ Start the app:
 npm run dev
 ```
 
-React Grab is enabled in development. Once the app is running, hover any element and press:
+React Grab is enabled in development. Once the app is running, hover an element
+and press:
 
 - `Cmd+C` on macOS
 - `Ctrl+C` on Windows/Linux
 
 to copy the grabbed UI context from the page.
 
-Rebuild the exported model bundle:
+## Regenerating the Model Bundle
+
+Rebuild the exported model bundle and the reference trace fixture:
 
 ```bash
 npm run generate:model
 ```
 
-Run checks:
+Notes:
 
-```bash
-npm test
-npx vitest run --coverage
-npm run lint
-npm run build
-```
-
-## Model Notes
-
-- The runtime uses the tiny char-level names setup from `microgpt.py`.
-- `input.txt` is the local names corpus snapshot used by the export script and by the canonical Python source.
-- Training is offline only. The shipped site performs inference and walkthrough rendering in the browser.
+- The script writes `public/assets/microgpt-model.json`.
+- The script also rewrites `src/test/fixtures/expected-step-em.json`.
+- If `input.txt` is missing, the script fetches the names corpus snapshot from
+  Karpathy's `makemore` repository.
 
 ## Verification
 
-Use the standard checks to verify the current tree:
+Run the standard checks:
 
 ```bash
 npm test
 npx vitest run --coverage
 npm run lint
 npm run build
+npm run test:e2e
 ```
 
-That suite covers tokenizer behavior, math helpers, CPU inference, WebGPU runtime behavior, reducer transitions, component rendering, the single-page app flow, and the Playwright browser checks.
+For a headed browser pass:
+
+```bash
+npm run test:e2e:headed
+```
+
+The automated suite covers tokenizer behavior, bundle validation, CPU and
+WebGPU runtime behavior, walkthrough reducer transitions, component rendering,
+scene bridging, and full browser flows across desktop and mobile layouts.
