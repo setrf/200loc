@@ -43,7 +43,7 @@ function renderVisual(step: IntroStepDefinition) {
           <div className="intro-visual__beam" />
         </div>
       )
-    case 'contrast':
+    case 'llm':
       return (
         <div className="intro-visual intro-visual--contrast" aria-hidden="true">
           <div className="intro-visual__card intro-visual__card--good">
@@ -55,6 +55,143 @@ function renderVisual(step: IntroStepDefinition) {
             <strong>Person or lookup table</strong>
             <span>no guaranteed truth</span>
           </div>
+        </div>
+      )
+    case 'timeline':
+      return (
+        <div className="intro-visual intro-visual--timeline" aria-hidden="true">
+          <div className="intro-visual__timeline-card">
+            <strong>Training</strong>
+            <span>many examples</span>
+            <span>slow weight updates</span>
+          </div>
+          <div className="intro-visual__timeline-line" />
+          <div className="intro-visual__timeline-card intro-visual__timeline-card--active">
+            <strong>Chat time</strong>
+            <span>one prompt</span>
+            <span>fast next-step prediction</span>
+          </div>
+        </div>
+      )
+    case 'tokens':
+      return (
+        <div className="intro-visual intro-visual--tokens" aria-hidden="true">
+          <div className="intro-visual__sentence">San Francisco feels foggy today</div>
+          <div className="intro-visual__token-row">
+            {['San', 'Franc', 'isco', ' feels', ' foggy', ' today'].map((token) => (
+              <span key={token} className="intro-visual__token-pill">{token}</span>
+            ))}
+          </div>
+        </div>
+      )
+    case 'context':
+      return (
+        <div className="intro-visual intro-visual--context" aria-hidden="true">
+          <div className="intro-visual__window">
+            {['The', ' model', ' can', ' only', ' see', ' this', ' far', ' ', '????'].map((token, index) => (
+              <span
+                key={`${token}-${index}`}
+                className={`intro-visual__window-token${index < 8 ? ' is-visible' : ' is-hidden'}`}
+              >
+                {token}
+              </span>
+            ))}
+          </div>
+          <div className="intro-visual__caption">future text stays hidden</div>
+        </div>
+      )
+    case 'numbers':
+      return (
+        <div className="intro-visual intro-visual--numbers" aria-hidden="true">
+          <div className="intro-visual__token-pill intro-visual__token-pill--large">harbor</div>
+          <div className="intro-visual__vector">
+            {[72, 35, 91, 18, 64, 42, 80, 27].map((value) => (
+              <span key={value} style={{ height: `${Math.max(18, value)}px` }} />
+            ))}
+          </div>
+          <div className="intro-visual__mini-labels">
+            <span>meaning</span>
+            <span>position</span>
+          </div>
+        </div>
+      )
+    case 'attention':
+      return (
+        <div className="intro-visual intro-visual--attention" aria-hidden="true">
+          <div className="intro-visual__attention-row">
+            {['My', ' favorite', ' city', ' is', ' San', ' Francisco'].map((token) => (
+              <span key={token} className="intro-visual__token-pill">{token}</span>
+            ))}
+          </div>
+          <div className="intro-visual__attention-focus">current piece</div>
+          <svg viewBox="0 0 300 140" className="intro-visual__arrows">
+            <path d="M150 18 C110 52 82 70 48 106" />
+            <path d="M150 18 C140 52 144 76 148 110" />
+            <path d="M150 18 C182 52 222 70 258 106" />
+          </svg>
+        </div>
+      )
+    case 'state':
+      return (
+        <div className="intro-visual intro-visual--state" aria-hidden="true">
+          <div className="intro-visual__note-card">rough clue</div>
+          <div className="intro-visual__note-card intro-visual__note-card--offset">updated clue</div>
+          <div className="intro-visual__note-card intro-visual__note-card--final">richer working state</div>
+        </div>
+      )
+    case 'scores':
+      return (
+        <div className="intro-visual intro-visual--scores" aria-hidden="true">
+          {[
+            ['the', 86],
+            ['a', 72],
+            ['San', 55],
+            ['and', 31],
+          ].map(([label, width]) => (
+            <div key={label} className="intro-visual__score-row">
+              <span>{label}</span>
+              <div><i style={{ width: `${width}%` }} /></div>
+            </div>
+          ))}
+        </div>
+      )
+    case 'sampling':
+      return (
+        <div className="intro-visual intro-visual--sampling" aria-hidden="true">
+          <div className="intro-visual__sample-wheel">
+            <span className="is-strong">0.48</span>
+            <span>0.28</span>
+            <span>0.16</span>
+            <span>0.08</span>
+          </div>
+          <div className="intro-visual__token-pill intro-visual__token-pill--selected">chosen next piece</div>
+        </div>
+      )
+    case 'loop':
+      return (
+        <div className="intro-visual intro-visual--loop" aria-hidden="true">
+          <div className="intro-visual__loop-ring" />
+          <div className="intro-visual__loop-steps">
+            <span>read</span>
+            <span>score</span>
+            <span>choose</span>
+            <span>append</span>
+          </div>
+        </div>
+      )
+    case 'limits':
+      return (
+        <div className="intro-visual intro-visual--limits" aria-hidden="true">
+          {[
+            ['Confidently wrong', 'sounds certain'],
+            ['Outdated', 'training has limits'],
+            ['Pattern drift', 'weak clues can mislead'],
+          ].map(([title, copy]) => (
+            <div key={title} className="intro-visual__card intro-visual__card--limit">
+              <strong>{title}</strong>
+              <span>{copy}</span>
+            </div>
+          ))}
         </div>
       )
     case 'handoff':
