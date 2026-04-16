@@ -45,6 +45,14 @@ describe('code viewer syntax highlighting', () => {
     expect(lines[2]?.tokens[0]).toEqual({ text: '"""', kind: 'string' })
   })
 
+  it('supports single-quoted triple strings', () => {
+    const lines = highlightPythonSource("'''\nhello\n'''")
+
+    expect(lines[0]?.tokens[0]).toEqual({ text: "'''", kind: 'string' })
+    expect(lines[1]?.tokens[0]).toEqual({ text: 'hello', kind: 'string' })
+    expect(lines[2]?.tokens[0]).toEqual({ text: "'''", kind: 'string' })
+  })
+
   it('classifies constants and self references', () => {
     const lines = highlightPythonSource('self.ready = True')
 
@@ -73,5 +81,15 @@ describe('code viewer syntax highlighting', () => {
     expect(
       lines[0]?.tokens.some((token) => token.kind === 'string' && token.text === '"a\\"b"'),
     ).toBe(true)
+  })
+
+  it('handles bare decorators, decimal literals, and blank lines', () => {
+    const lines = highlightPythonSource(['@', 'value = 3.14', ''].join('\n'))
+
+    expect(lines[0]?.tokens).toEqual([{ text: '@', kind: 'decorator' }])
+    expect(
+      lines[1]?.tokens.some((token) => token.kind === 'number' && token.text === '3.14'),
+    ).toBe(true)
+    expect(lines[2]?.tokens).toEqual([{ text: ' ', kind: 'plain' }])
   })
 })

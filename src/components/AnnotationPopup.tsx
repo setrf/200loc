@@ -31,11 +31,11 @@ export const AnnotationPopup = forwardRef<HTMLDivElement, AnnotationPopupProps>(
     const popupId = useId()
 
     useLayoutEffect(() => {
-      if (mode !== 'floating' || !anchorRect || !(ref && 'current' in ref)) {
+      if (mode !== 'floating' || !anchorRect) {
         return
       }
 
-      const element = ref.current
+      const element = ref && 'current' in ref ? ref.current : null
       if (!element) {
         return
       }
@@ -67,9 +67,15 @@ export const AnnotationPopup = forwardRef<HTMLDivElement, AnnotationPopupProps>(
         )
       }
 
-      setStyle((previous) =>
-        previous?.top === top && previous.left === left ? previous : { top, left },
-      )
+      const frame = window.requestAnimationFrame(() => {
+        setStyle((previous) =>
+          previous?.top === top && previous.left === left ? previous : { top, left },
+        )
+      })
+
+      return () => {
+        window.cancelAnimationFrame(frame)
+      }
     }, [anchorRect, mode, ref, entry.id])
 
     const card = (

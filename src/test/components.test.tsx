@@ -1,11 +1,14 @@
 import { act, fireEvent, render, screen } from '@testing-library/react'
+import { createRef } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { AnnotationPopup } from '../components/AnnotationPopup'
 import { ArchitectureScene } from '../components/ArchitectureScene'
 import { getFallbackCameraPoseForPhase } from '../components/architectureSceneFallback'
 import { CodeViewer } from '../components/CodeViewer'
 import { Controls } from '../components/Controls'
 import { SegmentTabs } from '../components/SegmentTabs'
 import { getCameraPose } from '../viz/llmViz/layout'
+import { getGlossaryEntry } from '../walkthrough/glossary'
 import type { StoryBeat } from '../walkthrough/phases'
 import { inferencePhases } from '../walkthrough/phases'
 import { loadBundle, makeTrace } from './helpers/fixtures'
@@ -36,9 +39,43 @@ function makeControlsProps() {
   }
 }
 
+function makePlainBeats(): StoryBeat[] {
+  return [
+    {
+      kind: 'core',
+      segments: [{ kind: 'text', text: 'Plain text only.' }],
+    },
+  ]
+}
+
+function makeRect(top: number, height: number, left = 100, width = 120) {
+  return {
+    x: left,
+    y: top,
+    top,
+    bottom: top + height,
+    left,
+    right: left + width,
+    width,
+    height,
+    toJSON: () => ({}),
+  } as DOMRect
+}
+
 describe('ui components', () => {
   beforeEach(() => {
     setMatchMedia(false)
+    Object.defineProperty(window, 'requestAnimationFrame', {
+      writable: true,
+      value: vi.fn((callback: FrameRequestCallback) => {
+        callback(0)
+        return 1
+      }),
+    })
+    Object.defineProperty(window, 'cancelAnimationFrame', {
+      writable: true,
+      value: vi.fn(),
+    })
   })
 
   afterEach(() => {
@@ -161,6 +198,18 @@ describe('ui components', () => {
     )
   })
 
+  it('renders safely when matchMedia is unavailable', () => {
+    Object.defineProperty(window, 'matchMedia', {
+      writable: true,
+      value: undefined,
+    })
+
+    render(<Controls {...makeControlsProps()} />)
+
+    expect(screen.getByLabelText('Step explanation')).toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { hidden: true })).not.toBeInTheDocument()
+  })
+
   it('shows a desktop annotation popup on hover and keeps it open when pinned', async () => {
     vi.useFakeTimers()
     const props = makeControlsProps()
@@ -168,26 +217,41 @@ describe('ui components', () => {
 
     const trigger = screen.getByRole('button', { name: 'Context' })
     fireEvent.mouseEnter(trigger)
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { hidden: true })).not.toBeInTheDocument()
 
     await act(async () => {
       vi.advanceTimersByTime(280)
     })
 
-    expect(screen.getByRole('dialog')).toHaveTextContent('Context')
+    expect(screen.getByRole('dialog', { hidden: true })).toHaveTextContent('Context')
 
     fireEvent.click(trigger)
     fireEvent.mouseLeave(trigger)
-    fireEvent.mouseLeave(screen.getByRole('dialog'))
+    fireEvent.mouseLeave(screen.getByRole('dialog', { hidden: true }))
 
     await act(async () => {
       vi.advanceTimersByTime(160)
     })
 
-    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { hidden: true })).toBeInTheDocument()
 
     fireEvent.mouseDown(document.body)
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { hidden: true })).not.toBeInTheDocument()
+  })
+
+  it('clears pending hover timers before the popup opens', async () => {
+    vi.useFakeTimers()
+    render(<Controls {...makeControlsProps()} />)
+
+    const trigger = screen.getByRole('button', { name: 'Context' })
+    fireEvent.mouseEnter(trigger)
+    fireEvent.mouseLeave(trigger)
+
+    await act(async () => {
+      vi.advanceTimersByTime(400)
+    })
+
+    expect(screen.queryByRole('dialog', { hidden: true })).not.toBeInTheDocument()
   })
 
   it('keeps the hover popup alive when moving from the trigger into the popup', async () => {
@@ -202,7 +266,7 @@ describe('ui components', () => {
       vi.advanceTimersByTime(280)
     })
 
-    const popup = screen.getByRole('dialog')
+    const popup = screen.getByRole('dialog', { hidden: true })
     fireEvent.mouseLeave(trigger)
     fireEvent.mouseEnter(popup)
 
@@ -210,10 +274,28 @@ describe('ui components', () => {
       vi.advanceTimersByTime(160)
     })
 
-    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { hidden: true })).toBeInTheDocument()
 
     fireEvent.keyDown(document, { key: 'Escape' })
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { hidden: true })).not.toBeInTheDocument()
+  })
+
+  it('keeps the popup open for pointer-downs inside the popup and on its trigger', async () => {
+    vi.useFakeTimers()
+    render(<Controls {...makeControlsProps()} />)
+
+    const trigger = screen.getByRole('button', { name: 'Context' })
+    fireEvent.click(trigger)
+
+    const popup = screen.getByRole('dialog', { hidden: true })
+    fireEvent.mouseDown(popup)
+    expect(screen.getByRole('dialog', { hidden: true })).toBeInTheDocument()
+
+    fireEvent.mouseDown(trigger)
+    expect(screen.getByRole('dialog', { hidden: true })).toBeInTheDocument()
+
+    fireEvent.keyDown(document, { key: 'Enter' })
+    expect(screen.getByRole('dialog', { hidden: true })).toBeInTheDocument()
   })
 
   it('allows only one desktop popup at a time', async () => {
@@ -243,15 +325,56 @@ describe('ui components', () => {
     await act(async () => {
       vi.advanceTimersByTime(280)
     })
-    expect(screen.getByRole('dialog')).toHaveTextContent('Context')
+    expect(screen.getByRole('dialog', { hidden: true })).toHaveTextContent('Context')
 
     fireEvent.mouseEnter(slotTrigger)
     await act(async () => {
       vi.advanceTimersByTime(280)
     })
 
-    expect(screen.getAllByRole('dialog')).toHaveLength(1)
-    expect(screen.getByRole('dialog')).toHaveTextContent('Slot')
+    expect(screen.getAllByRole('dialog', { hidden: true })).toHaveLength(1)
+    expect(screen.getByRole('dialog', { hidden: true })).toHaveTextContent('Slot')
+  })
+
+  it('ignores stale hover opens after the trigger unmounts', async () => {
+    vi.useFakeTimers()
+    const { rerender } = render(<Controls {...makeControlsProps()} />)
+
+    fireEvent.mouseEnter(screen.getByRole('button', { name: 'Context' }))
+    rerender(<Controls beats={makePlainBeats()} />)
+
+    await act(async () => {
+      vi.advanceTimersByTime(280)
+    })
+
+    expect(screen.queryByRole('dialog', { hidden: true })).not.toBeInTheDocument()
+  })
+
+  it('re-syncs an open popup for the same trigger and preserves pinned state', async () => {
+    vi.useFakeTimers()
+    render(<Controls {...makeControlsProps()} />)
+
+    const trigger = screen.getByRole('button', { name: 'Context' })
+    fireEvent.mouseEnter(trigger)
+    await act(async () => {
+      vi.advanceTimersByTime(280)
+    })
+    expect(screen.getByRole('dialog', { hidden: true })).toBeInTheDocument()
+
+    fireEvent.mouseEnter(trigger)
+    await act(async () => {
+      vi.advanceTimersByTime(280)
+    })
+    expect(screen.getByRole('dialog', { hidden: true })).toBeInTheDocument()
+
+    fireEvent.click(trigger)
+    fireEvent.mouseEnter(trigger)
+    await act(async () => {
+      vi.advanceTimersByTime(280)
+    })
+
+    expect(trigger).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByRole('dialog', { hidden: true })).toBeInTheDocument()
   })
 
   it('renders an inline popin instead of a floating popup on compact viewports', () => {
@@ -267,6 +390,98 @@ describe('ui components', () => {
 
     fireEvent.click(trigger)
     expect(container.querySelector('.annotation-popup--inline')).not.toBeInTheDocument()
+  })
+
+  it('ignores hover open and close on compact viewports', async () => {
+    vi.useFakeTimers()
+    setMatchMedia(true)
+    render(<Controls {...makeControlsProps()} />)
+
+    const trigger = screen.getByRole('button', { name: 'Context' })
+    fireEvent.mouseEnter(trigger)
+    fireEvent.mouseLeave(trigger)
+
+    await act(async () => {
+      vi.advanceTimersByTime(400)
+    })
+
+    expect(screen.queryByRole('dialog', { hidden: true })).not.toBeInTheDocument()
+  })
+
+  it('closes a pinned desktop annotation when the same trigger is clicked again', async () => {
+    vi.useFakeTimers()
+    render(<Controls {...makeControlsProps()} />)
+
+    const trigger = screen.getByRole('button', { name: 'Context' })
+    fireEvent.click(trigger)
+    expect(screen.getByRole('dialog', { hidden: true })).toBeInTheDocument()
+
+    fireEvent.click(trigger)
+    expect(screen.queryByRole('dialog', { hidden: true })).not.toBeInTheDocument()
+  })
+
+  it('updates popup anchors on resize and drops stale listeners safely after close', () => {
+    const listeners = new Map<string, EventListener>()
+    const addEventListenerSpy = vi
+      .spyOn(window, 'addEventListener')
+      .mockImplementation(((type: string, listener: EventListenerOrEventListenerObject) => {
+        if (typeof listener === 'function') {
+          listeners.set(type, listener)
+        }
+      }) as typeof window.addEventListener)
+    const removeEventListenerSpy = vi
+      .spyOn(window, 'removeEventListener')
+      .mockImplementation(((type: string) => {
+        listeners.delete(type)
+      }) as typeof window.removeEventListener)
+
+    render(<Controls {...makeControlsProps()} />)
+
+    const trigger = screen.getByRole('button', { name: 'Context' })
+    fireEvent.click(trigger)
+
+    const resizeListener = listeners.get('resize')
+    expect(resizeListener).toBeTypeOf('function')
+
+    resizeListener!(new Event('resize'))
+    expect(screen.getByRole('dialog', { hidden: true })).toBeInTheDocument()
+
+    act(() => {
+      fireEvent.mouseDown(document.body)
+    })
+    act(() => {
+      resizeListener!(new Event('resize'))
+    })
+    expect(screen.queryByRole('dialog', { hidden: true })).not.toBeInTheDocument()
+
+    expect(addEventListenerSpy).toHaveBeenCalledWith('resize', expect.any(Function))
+    expect(removeEventListenerSpy).toHaveBeenCalledWith('resize', expect.any(Function))
+  })
+
+  it('closes an open popup when its trigger disappears before repositioning', () => {
+    const listeners = new Map<string, EventListener>()
+    vi.spyOn(window, 'addEventListener').mockImplementation(
+      ((type: string, listener: EventListenerOrEventListenerObject) => {
+        if (typeof listener === 'function') {
+          listeners.set(type, listener)
+        }
+      }) as typeof window.addEventListener,
+    )
+
+    const { rerender } = render(<Controls {...makeControlsProps()} />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Context' }))
+    const resizeListener = listeners.get('resize')
+    expect(resizeListener).toBeTypeOf('function')
+
+    act(() => {
+      rerender(<Controls beats={makePlainBeats()} />)
+    })
+    act(() => {
+      resizeListener!(new Event('resize'))
+    })
+
+    expect(screen.queryByRole('dialog', { hidden: true })).not.toBeInTheDocument()
   })
 
   it('switches mobile tabs through the callback', () => {
@@ -293,6 +508,103 @@ describe('ui components', () => {
     expect(onChange).toHaveBeenNthCalledWith(1, 'scene')
     expect(onChange).toHaveBeenNthCalledWith(2, 'code')
     expect(onChange).toHaveBeenNthCalledWith(3, 'scene')
+  })
+
+  it('supports reverse keyboard navigation on the mobile section buttons', () => {
+    const onChange = vi.fn()
+    render(<SegmentTabs activeTab="story" onChange={onChange} />)
+
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Story' }), {
+      key: 'ArrowLeft',
+    })
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Story' }), {
+      key: 'ArrowUp',
+    })
+
+    expect(onChange).toHaveBeenNthCalledWith(1, 'code')
+    expect(onChange).toHaveBeenNthCalledWith(2, 'code')
+  })
+
+  it('positions floating annotation popups above or clamped inside the viewport', () => {
+    const entry = getGlossaryEntry('context')
+    const boundingRectSpy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+
+    boundingRectSpy.mockReturnValueOnce(makeRect(0, 80, 0, 220))
+    const upperRef = createRef<HTMLDivElement>()
+    const { unmount } = render(
+      <AnnotationPopup
+        ref={upperRef}
+        anchorRect={makeRect(700, 24)}
+        entry={entry}
+        mode="floating"
+      />,
+    )
+
+    const upperDialog = screen.getByRole('dialog', { hidden: true })
+    expect(upperDialog).toHaveStyle({ top: '606px', left: '50px' })
+    unmount()
+
+    boundingRectSpy.mockReturnValueOnce(makeRect(0, 700, 0, 220))
+    const clampedRef = createRef<HTMLDivElement>()
+    render(
+      <AnnotationPopup
+        ref={clampedRef}
+        anchorRect={makeRect(700, 24)}
+        entry={entry}
+        mode="floating"
+      />,
+    )
+
+    const dialogs = screen.getAllByRole('dialog', { hidden: true })
+    const clampedDialog = dialogs[dialogs.length - 1]!
+    expect(clampedDialog).toHaveStyle({ top: '56px', left: '50px' })
+  })
+
+  it('reuses existing floating popup coordinates when the position does not change', () => {
+    const entry = getGlossaryEntry('context')
+    const boundingRectSpy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+    boundingRectSpy.mockReturnValue(makeRect(0, 80, 0, 220))
+
+    const sharedRef = createRef<HTMLDivElement>()
+    const { rerender } = render(
+      <AnnotationPopup
+        ref={sharedRef}
+        anchorRect={makeRect(240, 24)}
+        entry={entry}
+        mode="floating"
+      />,
+    )
+
+    const dialog = screen.getByRole('dialog', { hidden: true })
+    const initialTop = dialog.style.top
+    const initialLeft = dialog.style.left
+
+    rerender(
+      <AnnotationPopup
+        ref={sharedRef}
+        anchorRect={makeRect(240, 24)}
+        entry={entry}
+        mode="floating"
+      />,
+    )
+
+    expect(screen.getByRole('dialog', { hidden: true })).toHaveStyle({
+      top: initialTop,
+      left: initialLeft,
+    })
+  })
+
+  it('renders floating annotation popups safely when a callback ref is used', () => {
+    render(
+      <AnnotationPopup
+        ref={() => {}}
+        anchorRect={makeRect(120, 24)}
+        entry={getGlossaryEntry('context')}
+        mode="floating"
+      />,
+    )
+
+    expect(screen.getByRole('dialog', { hidden: true })).toHaveStyle({ visibility: 'hidden' })
   })
 
   it('renders the microgpt scene fallback and exposes code-focus affordances', async () => {

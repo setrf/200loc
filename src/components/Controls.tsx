@@ -147,10 +147,7 @@ export function Controls({ beats }: ControlsProps) {
     }
 
     const handlePointerDown = (event: MouseEvent | globalThis.MouseEvent) => {
-      const target = event.target as Node | null
-      if (!target) {
-        return
-      }
+      const target = event.target as Node
 
       const triggerNodes = [...triggerRefs.current.values()]
       if (popupRef.current?.contains(target)) {

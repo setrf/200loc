@@ -131,8 +131,7 @@ function consumeTripleString(
 
 function tokenizePythonLine(line: string, state: TokenizeState): HighlightedLine {
   const tokens: SyntaxToken[] = []
-  const indentMatch = line.match(/^\s*/)
-  const indent = indentMatch?.[0] ?? ''
+  const indent = line.match(/^\s*/)?.[0] as string
   const indentDepth = Math.floor(indent.replace(/\t/g, '    ').length / 4)
   let index = 0
   let expectDefinition = false
@@ -154,7 +153,7 @@ function tokenizePythonLine(line: string, state: TokenizeState): HighlightedLine
     const rest = line.slice(index)
 
     if (/^\s+/.test(rest)) {
-      const text = rest.match(/^\s+/)?.[0] ?? ''
+      const text = rest.match(/^\s+/)![0]
       pushToken(tokens, text, 'plain')
       index += text.length
       continue
@@ -181,21 +180,21 @@ function tokenizePythonLine(line: string, state: TokenizeState): HighlightedLine
     }
 
     if (rest[0] === '@') {
-      const text = rest.match(/^@[A-Za-z_][A-Za-z0-9_]*/)?.[0] ?? '@'
+      const text = rest.match(/^@[A-Za-z_][A-Za-z0-9_]*/)?.[0] || '@'
       pushToken(tokens, text, 'decorator')
       index += text.length
       continue
     }
 
     if (/^\d+(\.\d+)?/.test(rest)) {
-      const text = rest.match(/^\d+(\.\d+)?/)?.[0] ?? ''
+      const text = rest.match(/^\d+(\.\d+)?/)![0]
       pushToken(tokens, text, 'number')
       index += text.length
       continue
     }
 
     if (/^[A-Za-z_][A-Za-z0-9_]*/.test(rest)) {
-      const text = rest.match(/^[A-Za-z_][A-Za-z0-9_]*/)?.[0] ?? ''
+      const text = rest.match(/^[A-Za-z_][A-Za-z0-9_]*/)![0]
       let kind: SyntaxTokenKind = 'plain'
 
       if (expectDefinition) {

@@ -401,7 +401,7 @@ const glossaryData = {
     title: string
     shortDefinition: string
     body: readonly string[]
-    relatedIds?: readonly string[]
+    relatedIds: readonly string[]
   }
 >
 
@@ -412,7 +412,7 @@ export interface GlossaryEntry {
   title: string
   shortDefinition: string
   body: string[]
-  relatedIds?: GlossaryId[]
+  relatedIds: GlossaryId[]
 }
 
 export const glossaryEntries = Object.fromEntries(
@@ -423,7 +423,7 @@ export const glossaryEntries = Object.fromEntries(
       title: entry.title,
       shortDefinition: entry.shortDefinition,
       body: [...entry.body],
-      relatedIds: entry.relatedIds ? [...entry.relatedIds] as GlossaryId[] : undefined,
+      relatedIds: [...entry.relatedIds] as GlossaryId[],
     } satisfies GlossaryEntry,
   ]),
 ) as Record<GlossaryId, GlossaryEntry>

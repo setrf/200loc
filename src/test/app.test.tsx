@@ -101,6 +101,17 @@ describe('App', () => {
   beforeEach(() => {
     vi.resetModules()
     vi.clearAllMocks()
+    Object.defineProperty(window, 'requestAnimationFrame', {
+      writable: true,
+      value: vi.fn((callback: FrameRequestCallback) => {
+        callback(0)
+        return 1
+      }),
+    })
+    Object.defineProperty(window, 'cancelAnimationFrame', {
+      writable: true,
+      value: vi.fn(),
+    })
     Object.defineProperty(window, 'matchMedia', {
       writable: true,
       value: vi.fn().mockReturnValue({
@@ -205,6 +216,10 @@ describe('App', () => {
     }
     expect(screen.getAllByText('Token Embedding').length).toBeGreaterThan(0)
     expectStoryPanelToContain(phaseBeat(3))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Prev' }))
+    expectStoryPanelToContain(phaseBeat(2))
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }))
 
     for (let index = 0; index < 12; index += 1) {
       fireEvent.click(screen.getByRole('button', { name: 'Next' }))
@@ -645,6 +660,38 @@ describe('App', () => {
     expect(screen.getByText('reset failed')).toBeInTheDocument()
   })
 
+  it('falls back to the generic reset error message for non-Error rejections', async () => {
+    const runtime = makeRuntime()
+
+    runtime.reset
+      .mockResolvedValueOnce({
+        trace: makeTrace({ sampledTokenId: 26 }),
+        session: { visibleTokenIds: [4, 12], done: false },
+        diagnostics: {
+          activeBackend: 'cpu',
+          fallbackReason: 'WebGPU unavailable',
+        },
+      })
+      .mockRejectedValueOnce('reset failed')
+
+    loadModelBundleMock.mockResolvedValue(bundleStub)
+    createTokenizerMock.mockReturnValue(makeTokenizer())
+    runtimeCtorMock.mockImplementation(function () {
+      return runtime
+    })
+    mockSourceFetch(sourceText)
+
+    const { default: App } = await import('../App')
+    render(<App />)
+
+    const prefix = await screen.findByRole('textbox', { name: 'Prefix' })
+    fireEvent.change(prefix, { target: { value: 'em' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Reset' }))
+
+    await screen.findByText('Failed to load the walkthrough.')
+    expect(screen.getByText('Failed to reset walkthrough.')).toBeInTheDocument()
+  })
+
   it('closes an open annotation when the phase advances or the walkthrough resets', async () => {
     const runtime = makeRuntime()
     runtime.reset.mockResolvedValue({
@@ -669,19 +716,19 @@ describe('App', () => {
     await screen.findByText('How a tiny GPT predicts the next token')
 
     fireEvent.click(document.querySelector('.annotation-trigger') as HTMLElement)
-    expect(screen.getByRole('dialog')).toHaveTextContent('Context')
+    expect(screen.getByRole('dialog', { hidden: true })).toHaveTextContent('Context')
 
     fireEvent.click(screen.getByRole('button', { name: 'Next' }))
     await waitFor(() => {
-      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      expect(screen.queryByRole('dialog', { hidden: true })).not.toBeInTheDocument()
     })
 
     fireEvent.click(document.querySelector('.annotation-trigger') as HTMLElement)
-    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { hidden: true })).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: 'Reset' }))
     await waitFor(() => {
-      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      expect(screen.queryByRole('dialog', { hidden: true })).not.toBeInTheDocument()
     })
   })
 
@@ -718,11 +765,11 @@ describe('App', () => {
     await screen.findByText('How a tiny GPT predicts the next token')
 
     fireEvent.click(document.querySelector('.annotation-trigger') as HTMLElement)
-    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { hidden: true })).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: 'Scene' }))
     await waitFor(() => {
-      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      expect(screen.queryByRole('dialog', { hidden: true })).not.toBeInTheDocument()
     })
   })
 })

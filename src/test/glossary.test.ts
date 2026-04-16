@@ -24,4 +24,14 @@ describe('glossary', () => {
       }
     }
   })
+
+  it('exposes related glossary ids for every entry', () => {
+    const withRelated = getGlossaryEntry('causal-masking')
+
+    expect(withRelated.relatedIds).toContain('attention')
+
+    for (const entry of Object.values(glossaryEntries)) {
+      expect(entry.relatedIds.length).toBeGreaterThan(0)
+    }
+  })
 })

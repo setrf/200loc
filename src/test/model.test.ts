@@ -98,4 +98,24 @@ describe('reference cpu engine', () => {
     expect(session.values[0]).toHaveLength(0)
     engine.dispose()
   })
+
+  it('throws if asked to step a terminal session', async () => {
+    const engine = new ReferenceCpuEngine()
+    await engine.init(bundle)
+
+    await expect(
+      engine.step({
+        contextTokenIds: [],
+        generatedTokenIds: [],
+        visibleTokenIds: [],
+        keys: [[]],
+        values: [[]],
+        position: 0,
+        done: true,
+        backend: 'cpu',
+        currentTokenId: bundle.config.bosToken,
+        sampleState: bundle.sampling.seed,
+      }),
+    ).rejects.toThrow('CPU session is terminal')
+  })
 })

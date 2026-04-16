@@ -271,4 +271,23 @@ describe('WebGpuEngine', () => {
     )
     engine.dispose()
   })
+
+  it('throws if asked to step a terminal gpu session', async () => {
+    const engine = new WebGpuEngine()
+
+    await expect(
+      engine.step({
+        contextTokenIds: [],
+        generatedTokenIds: [],
+        visibleTokenIds: [],
+        keys: [[]],
+        values: [[]],
+        position: 0,
+        done: true,
+        backend: 'webgpu',
+        currentTokenId: 0,
+        sampleState: 1,
+      }),
+    ).rejects.toThrow('WebGPU session is terminal')
+  })
 })

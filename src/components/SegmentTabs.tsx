@@ -11,9 +11,6 @@ const tabs: MobileTab[] = ['code', 'story', 'scene']
 export function SegmentTabs({ activeTab, onChange }: SegmentTabsProps) {
   function handleKeyDown(event: KeyboardEvent<HTMLButtonElement>, tab: MobileTab) {
     const currentIndex = tabs.indexOf(tab)
-    if (currentIndex === -1) {
-      return
-    }
 
     if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
       event.preventDefault()
