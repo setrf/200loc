@@ -27,9 +27,8 @@ describe('intro walkthrough', () => {
       />,
     )
 
-    expect(screen.getByText('Step 3 of 10')).toBeInTheDocument()
     expect(
-      screen.getByText('Tokens become numbers'),
+      screen.getByText('Step 3 of 10 · Tokens become numbers'),
     ).toBeInTheDocument()
     expect(
       screen.getByText('Each token is turned into numbers.'),
