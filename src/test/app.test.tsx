@@ -165,7 +165,7 @@ describe('App', () => {
     render(<App />)
 
     await screen.findByText('Step 1 of 10')
-    expect(screen.getByRole('heading', { name: 'What this is' })).toBeInTheDocument()
+    expect(screen.getByText('What this is')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Skip' }))
 
     await screen.findByRole('button', { name: 'Start intro again' })
@@ -210,7 +210,7 @@ describe('App', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Start intro again' }))
     await screen.findByText('Step 1 of 10')
-    expect(screen.getByRole('heading', { name: 'What this is' })).toBeInTheDocument()
+    expect(screen.getByText('What this is')).toBeInTheDocument()
   })
 
   it(

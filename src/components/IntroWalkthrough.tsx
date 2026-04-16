@@ -27,9 +27,6 @@ export function IntroWalkthrough({
         <div>
           <p className="eyebrow">200loc</p>
           <h1>How LLM systems actually work</h1>
-          <p className="intro-shell__lede">
-            A plain walk through of what a language model is doing when it writes the next token.
-          </p>
         </div>
         <button
           type="button"
@@ -42,47 +39,17 @@ export function IntroWalkthrough({
 
       <main className="intro-stack">
         <section className="intro-step" aria-label="Intro step">
-          <div className="intro-step__progress">
+          <div className="intro-step__meta">
             <p className="eyebrow">
               Step {activeStepIndex + 1} of {steps.length}
             </p>
-            <div
-              className="intro-step__progress-bar"
-              aria-hidden="true"
-            >
-              <span
-                style={{
-                  width: `${((activeStepIndex + 1) / steps.length) * 100}%`,
-                }}
-              />
-            </div>
+            <p className="intro-step__title">{step.title}</p>
           </div>
-          <p className="intro-step__kicker">One idea at a time</p>
-          <h2>{step.title}</h2>
-          <p className="intro-step__body">{step.body}</p>
-          {step.note ? <p className="intro-step__note">{step.note}</p> : null}
-        </section>
-
-        <section className="intro-example" aria-label="Intro example">
-          <h3>{step.visualTitle}</h3>
-          <div className="intro-example__rows">
-            {step.visualRows.map((row) => (
-              <div className="intro-example__row" key={`${step.id}-${row.label}`}>
-                <span className="intro-example__label">{row.label}</span>
-                <div className="intro-example__values">
-                  {row.values.map((value, index) => {
-                    const emphasized = row.emphasisIndexes?.includes(index) ?? false
-                    return (
-                      <span
-                        className={`intro-example__value${emphasized ? ' is-emphasis' : ''}`}
-                        key={`${row.label}-${value}-${index}`}
-                      >
-                        {value}
-                      </span>
-                    )
-                  })}
-                </div>
-              </div>
+          <div className="intro-step__lines">
+            {step.lines.map((line) => (
+              <p className="intro-step__line" key={`${step.id}-${line}`}>
+                {line}
+              </p>
             ))}
           </div>
         </section>

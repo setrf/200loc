@@ -665,11 +665,11 @@ test.describe('intro walkthrough', () => {
     await page.goto('/')
 
     await expect(page.getByText('Step 1 of 10')).toBeVisible()
-    await expect(page.getByRole('heading', { name: 'What this is' })).toBeVisible()
+    await expect(page.getByText('What this is')).toBeVisible()
 
     await page.getByRole('button', { name: 'Next' }).click()
     await expect(page.getByText('Step 2 of 10')).toBeVisible()
-    await expect(page.getByRole('heading', { name: 'Text becomes tokens' })).toBeVisible()
+    await expect(page.getByText('Text becomes tokens')).toBeVisible()
 
     await page.getByRole('button', { name: 'Skip' }).click()
     await expect(
