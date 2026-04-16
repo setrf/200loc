@@ -5,12 +5,12 @@ import {
   MicrogptRuntime,
   resolveAssetPath,
 } from './model'
+import { WalkthroughShell } from './components/WalkthroughShell'
+import { IntroShell } from './intro/IntroShell'
+import { initialIntroState, introReducer } from './intro/reducer'
+import { readIntroCompletion, writeIntroCompletion } from './intro/storage'
+import { introSteps } from './intro/steps'
 import { normalizePrefixInput } from './prefixNormalization'
-import { ArchitectureScene } from './components/ArchitectureScene'
-import { CodeViewer } from './components/CodeViewer'
-import { Controls } from './components/Controls'
-import { SegmentTabs } from './components/SegmentTabs'
-import { useAutoplay } from './hooks/useAutoplay'
 import {
   inferencePhases,
   type LineRange,
@@ -25,30 +25,27 @@ import './App.css'
 
 const phaseCount = inferencePhases.length
 
+type AppScreen = 'loading' | 'intro' | 'walkthrough' | 'error'
+
 export default function App() {
   const [state, dispatch] = useReducer(
     walkthroughReducer,
     initialWalkthroughState,
   )
+  const [introState, introDispatch] = useReducer(
+    introReducer,
+    initialIntroState,
+  )
   const [source, setSource] = useState('')
   const [sceneModelData, setSceneModelData] = useState<SceneModelData | null>(null)
+  const [showIntro, setShowIntro] = useState(() => !readIntroCompletion())
+  const [walkthroughReady, setWalkthroughReady] = useState(false)
   const runtimeRef = useRef<MicrogptRuntime | null>(null)
   const tokenizerRef = useRef<ReturnType<typeof createTokenizer> | null>(null)
   const advancingRef = useRef(false)
   const hydrateRequestRef = useRef(0)
   const prefixVersionRef = useRef(0)
   const lastStableStatusRef = useRef<WalkthroughStatus>('idle')
-  const [reducedMotion, setReducedMotion] = useState(false)
-
-  useEffect(() => {
-    const media = window.matchMedia('(prefers-reduced-motion: reduce)')
-    const update = () => setReducedMotion(media.matches)
-    update()
-    media.addEventListener('change', update)
-    return () => {
-      media.removeEventListener('change', update)
-    }
-  }, [])
 
   useEffect(() => {
     if (state.status !== 'loading' && state.status !== 'error') {
@@ -170,6 +167,7 @@ export default function App() {
           terminal: result.session.done,
           doneReason: result.session.doneReason,
         })
+        setWalkthroughReady(true)
       } catch (error) {
         if (!cancelled) {
           dispatch({
@@ -225,18 +223,23 @@ export default function App() {
     }
   }
 
-  useAutoplay(
-    state.status === 'playing',
-    () => {
-      void advance()
-    },
-    reducedMotion ? 1800 : 1100,
-  )
-
   const trace = state.traces[state.activeTraceIndex]
-  const phase = inferencePhases[state.activePhaseIndex]
 
-  if (state.status === 'error') {
+  const handleIntroComplete = () => {
+    writeIntroCompletion(true)
+    setShowIntro(false)
+  }
+
+  const appScreen: AppScreen =
+    state.status === 'error'
+      ? 'error'
+      : showIntro
+        ? 'intro'
+        : walkthroughReady && trace && source && sceneModelData && tokenizerRef.current
+          ? 'walkthrough'
+          : 'loading'
+
+  if (appScreen === 'error') {
     return (
       <div className="app-shell app-shell--centered">
         <div className="empty-state">
@@ -248,7 +251,27 @@ export default function App() {
     )
   }
 
-  if (!trace || !phase || !source || !sceneModelData) {
+  if (appScreen === 'intro') {
+    return (
+      <IntroShell
+        state={introState}
+        steps={introSteps}
+        walkthroughReady={walkthroughReady}
+        onNext={() => introDispatch({ type: 'next', stepCount: introSteps.length })}
+        onPrev={() => introDispatch({ type: 'prev' })}
+        onSkip={handleIntroComplete}
+        onFinish={handleIntroComplete}
+      />
+    )
+  }
+
+  if (
+    appScreen === 'loading' ||
+    !trace ||
+    !source ||
+    !sceneModelData ||
+    !tokenizerRef.current
+  ) {
     return (
       <div className="app-shell app-shell--centered">
         <div className="empty-state">
@@ -263,223 +286,19 @@ export default function App() {
     )
   }
 
-  const tokenLabel = tokenizerRef.current!.tokenLabel
-  const currentText = tokenizerRef.current!.decode(state.sequenceTokenIds)
-  const currentTokenLabel = tokenLabel(trace.tokenId)
-  const hasPendingPrefixChange = state.prefixInput !== state.appliedPrefixInput
-  const prefixChars = [...state.appliedNormalization.normalized]
-  const generatedBeforeCurrent =
-    state.activeTraceIndex > 0
-      ? state.traces
-          .slice(0, Math.max(0, state.activeTraceIndex - 1))
-          .map((item) => tokenLabel(item.sampledTokenId))
-          .filter((token) => token !== 'BOS')
-      : []
-  const beforeCurrentTokens =
-    state.activeTraceIndex === 0
-      ? prefixChars.slice(0, Math.max(prefixChars.length - 1, 0))
-      : [...prefixChars, ...generatedBeforeCurrent]
-  const contextTokens =
-    currentTokenLabel === 'BOS' && trace.positionId === 0
-      ? ['BOS']
-      : ['BOS', ...beforeCurrentTokens, currentTokenLabel]
-  const activeRanges = state.hoverRanges ?? phase.codeRanges
-  const canPrev = state.activePhaseIndex > 0 || state.activeTraceIndex > 0
-  const canNext =
-    state.activePhaseIndex < phaseCount - 1 ||
-    state.activeTraceIndex < state.traces.length - 1 ||
-    state.status !== 'terminal'
-  const controlsLocked = state.status === 'loading'
-  const navigationBlocked = controlsLocked || hasPendingPrefixChange
-  const currentTextStatus =
-    hasPendingPrefixChange
-      ? 'Reset required'
-      : state.status === 'loading'
-      ? 'Resetting'
-      : state.status === 'playing'
-        ? 'Generating'
-        : state.status === 'paused'
-          ? 'Paused'
-          : state.status === 'terminal'
-            ? state.stopReason === 'context'
-              ? 'Context full'
-              : 'Stopped at BOS'
-            : 'Ready'
   return (
-    <div className="app-shell">
-      <header className="app-header">
-        <div>
-          <p className="eyebrow">200loc</p>
-          <h2 className="app-header__title">How LLM systems actually work</h2>
-        </div>
-      </header>
-
-      <div className="mobile-only">
-        <SegmentTabs
-          activeTab={state.mobileTab}
-          onChange={(tab) => dispatch({ type: 'setMobileTab', tab })}
-        />
-      </div>
-
-      <main className="walkthrough-layout">
-        <aside
-          className={`code-column ${
-            state.mobileTab === 'code' ? 'is-active' : ''
-          }`}
-        >
-          <div className="code-column__sticky">
-            <CodeViewer source={source} activeRanges={activeRanges} />
-          </div>
-        </aside>
-
-        <section
-          className={`story-scene ${
-            state.mobileTab === 'code' ? '' : 'is-active'
-          }`}
-        >
-          <div className="story-scene__toolbar">
-            <div className="story-scene__toolbar-main">
-              <div
-                className="scene-panel__stage-chip"
-                onMouseEnter={() => handleFocusRanges(phase.codeRanges)}
-                onMouseLeave={() => handleFocusRanges(null)}
-              >
-                <div className="scene-panel__stage-chip-top">
-                  <span className="eyebrow">Current stage</span>
-                  <span className="scene-panel__stage-step">
-                    step {state.activePhaseIndex + 1} / {phaseCount}
-                  </span>
-                </div>
-                <strong>{phase.groupTitle}</strong>
-              </div>
-
-              <div className="story-scene__toolbar-panel">
-                <div className="story-scene__toolbar-inputs">
-                  <label className="story-panel__field" htmlFor="prefix-input">
-                    <div className="story-panel__field-head">
-                      <span className="eyebrow">Starting text</span>
-                    </div>
-                    <input
-                      id="prefix-input"
-                      className="story-panel__input"
-                      aria-label="Starting text"
-                      value={state.prefixInput}
-                      onChange={(event) => handlePrefixChange(event.target.value)}
-                      onKeyDown={(event) => {
-                        if (event.key === 'Enter' && !controlsLocked) {
-                          dispatch({ type: 'setPlaying', playing: false })
-                          void hydrate(state.prefixInput)
-                        }
-                      }}
-                      placeholder="em"
-                      autoComplete="off"
-                      spellCheck={false}
-                    />
-                  </label>
-
-                  <div
-                    className={`story-panel__field story-panel__field--readonly${
-                      hasPendingPrefixChange ? ' is-stale' : ''
-                    }`}
-                  >
-                    <div className="story-panel__field-head">
-                      <span className="eyebrow">Current text</span>
-                      <span className="story-panel__field-status">{currentTextStatus}</span>
-                    </div>
-                    <output
-                      className={`story-panel__readout${currentText ? '' : ' is-empty'}`}
-                      aria-label="Current text"
-                      aria-live="polite"
-                    >
-                      {currentText || 'Nothing generated yet'}
-                    </output>
-                  </div>
-                </div>
-
-                <div className="story-scene__toolbar-footer">
-                  <p className="story-panel__field-note">
-                    {hasPendingPrefixChange
-                      ? 'Current run still uses the previous starting text. Apply text to restart from your draft.'
-                      : 'Edit the starting text, then reset when you want the model to restart from it.'}
-                  </p>
-
-                  <div className="story-panel__actions">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        dispatch({ type: 'setPlaying', playing: false })
-                        void hydrate(state.prefixInput)
-                      }}
-                      disabled={controlsLocked}
-                    >
-                      {hasPendingPrefixChange ? 'Apply text' : 'Reset'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        dispatch({ type: 'setPlaying', playing: false })
-                        dispatch({ type: 'phasePrev', phaseCount })
-                      }}
-                      disabled={!canPrev || navigationBlocked}
-                    >
-                      Prev
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        dispatch({ type: 'setPlaying', playing: false })
-                        void advance()
-                      }}
-                      disabled={!canNext || navigationBlocked}
-                    >
-                      Next
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (state.status === 'playing') {
-                          dispatch({ type: 'setPlaying', playing: false })
-                        } else {
-                          dispatch({ type: 'setPlaying', playing: true })
-                        }
-                      }}
-                      disabled={!canNext || navigationBlocked}
-                    >
-                      {state.status === 'playing' ? 'Pause' : 'Play'}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div
-            className={`story-scene__scene ${
-              state.mobileTab === 'scene' ? 'is-active' : ''
-            }`}
-          >
-            <ArchitectureScene
-              trace={trace}
-              phase={phase}
-              contextTokens={contextTokens}
-              tokenLabel={tokenLabel}
-              sceneModelData={sceneModelData}
-              onFocusRanges={handleFocusRanges}
-            />
-          </div>
-
-          <div
-            className={`story-scene__story ${
-              state.mobileTab === 'story' ? 'is-active' : ''
-            }`}
-          >
-            <Controls
-              key={`${state.mobileTab}-${phase.stepId}-${trace.positionId}-${trace.tokenId}-${trace.sampledTokenId}`}
-              beats={phase.copy.beats}
-            />
-          </div>
-        </section>
-      </main>
-    </div>
+    <WalkthroughShell
+      state={state}
+      source={source}
+      tokenizer={tokenizerRef.current}
+      sceneModelData={sceneModelData}
+      onFocusRanges={handleFocusRanges}
+      onPrefixChange={handlePrefixChange}
+      onHydrate={hydrate}
+      onAdvance={advance}
+      onSetPlaying={(playing) => dispatch({ type: 'setPlaying', playing })}
+      onPhasePrev={() => dispatch({ type: 'phasePrev', phaseCount })}
+      onSetMobileTab={(tab) => dispatch({ type: 'setMobileTab', tab })}
+    />
   )
 }

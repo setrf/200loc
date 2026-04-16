@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { useEffect, useRef } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { PrefixNormalization } from '../model'
+import { INTRO_STORAGE_KEY } from '../intro/storage'
 import { inferencePhases } from '../walkthrough/phases'
 import { loadBundle, makeTrace } from './helpers/fixtures'
 
@@ -106,6 +107,7 @@ describe('App', () => {
   beforeEach(() => {
     vi.resetModules()
     vi.clearAllMocks()
+    window.localStorage.setItem(INTRO_STORAGE_KEY, 'complete')
     Object.defineProperty(window, 'requestAnimationFrame', {
       writable: true,
       value: vi.fn((callback: FrameRequestCallback) => {
@@ -134,6 +136,7 @@ describe('App', () => {
   })
 
   afterEach(() => {
+    window.localStorage.clear()
     vi.doUnmock('../hooks/useAutoplay')
     vi.restoreAllMocks()
   })
@@ -197,7 +200,7 @@ describe('App', () => {
 
     await screen.findByText('How LLM systems actually work')
     expect(screen.getAllByText('microgpt').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('Tokenize Prefix').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Tokenize Starting Text').length).toBeGreaterThan(0)
     expect(screen.getByLabelText('Current text')).toHaveTextContent('em')
     expect(screen.getByText('Ready')).toBeInTheDocument()
     expect(await screen.findByTestId('fallback-scene')).toBeInTheDocument()
@@ -438,7 +441,7 @@ describe('App', () => {
     expect(screen.getByRole('button', { name: 'Pause' })).toBeInTheDocument()
 
     await waitFor(() => {
-      expect(screen.getAllByText('Tokenize Prefix').length).toBeGreaterThan(0)
+      expect(screen.getAllByText('Tokenize Starting Text').length).toBeGreaterThan(0)
       expect(screen.getByText(phaseBeat(1))).toBeInTheDocument()
     })
 
