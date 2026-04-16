@@ -16,6 +16,7 @@ export interface WalkthroughShellProps {
   source: string
   tokenizer: Tokenizer
   sceneModelData: SceneModelData
+  onReplayIntro: () => void
   onFocusRanges: (ranges: LineRange[] | null) => void
   onPrefixChange: (value: string) => void
   onHydrate: (prefixInput: string) => Promise<void>
@@ -46,6 +47,7 @@ export function WalkthroughShell({
   source,
   tokenizer,
   sceneModelData,
+  onReplayIntro,
   onFocusRanges,
   onPrefixChange,
   onHydrate,
@@ -129,6 +131,11 @@ export function WalkthroughShell({
         <div>
           <p className="eyebrow">200loc</p>
           <h2 className="app-header__title">How LLM systems actually work</h2>
+        </div>
+        <div className="app-header__actions">
+          <button type="button" onClick={onReplayIntro}>
+            Replay intro
+          </button>
         </div>
       </header>
 

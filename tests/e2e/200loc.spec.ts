@@ -8,6 +8,8 @@ const iPhone13 = {
   hasTouch: devices['iPhone 13'].hasTouch,
 }
 
+const INTRO_STORAGE_KEY = '200loc.intro.v1'
+
 type BrowserIssue = {
   kind: 'console-error' | 'console-warning' | 'pageerror'
   text: string
@@ -71,6 +73,28 @@ function firstAnnotationTrigger(page: Page) {
   return page.locator('.annotation-trigger').first()
 }
 
+async function suppressIntro(page: Page) {
+  await page.addInitScript((key) => {
+    window.localStorage.setItem(key, 'complete')
+  }, INTRO_STORAGE_KEY)
+}
+
+async function introStepLabel(page: Page) {
+  return (await page.locator('.intro-shell__progress-label').textContent())?.trim() ?? ''
+}
+
+async function advanceIntro(page: Page) {
+  const startButton = page.getByRole('button', { name: 'Start', exact: true })
+  if (await startButton.count()) {
+    if (await startButton.isVisible()) {
+      await startButton.click()
+      return
+    }
+  }
+
+  await page.getByRole('button', { name: 'Next' }).click()
+}
+
 async function advanceOnePhase(page: Page) {
   const beforeStep = await stepLabel(page)
   const beforePhase = await phaseLabel(page)
@@ -126,6 +150,7 @@ async function findHoverablePoint(page: Page, eventSurface: Locator) {
 test.describe('desktop walkthrough', () => {
   test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 1100 })
+    await suppressIntro(page)
     await page.goto('/')
     await expect(
       page.getByRole('heading', { name: 'How LLM systems actually work' }),
@@ -210,7 +235,7 @@ test.describe('desktop walkthrough', () => {
     const issues = collectBrowserIssues(page)
     await page.getByRole('textbox', { name: 'Starting text' }).fill('em')
     await page.getByRole('button', { name: /Reset|Apply text/ }).click()
-    await expect(page.locator('.scene-panel__stage-chip')).toContainText('Tokenize Prefix')
+    await expect(page.locator('.scene-panel__stage-chip')).toContainText('Tokenize Starting Text')
 
     for (let index = 0; index < 33; index += 1) {
       await advanceOnePhase(page)
@@ -221,7 +246,7 @@ test.describe('desktop walkthrough', () => {
 
     await advanceOnePhase(page)
     expect(await stepLabel(page)).toBe('step 1 / 34')
-    expect(await phaseLabel(page)).toBe('Tokenize Prefix')
+    expect(await phaseLabel(page)).toBe('Tokenize Starting Text')
     expect(await stepTitleLabel(page)).toBe(
       'The model starts by checking the small piece of text it is allowed to use for this decision.',
     )
@@ -231,7 +256,7 @@ test.describe('desktop walkthrough', () => {
   test('autoplay advances, pauses cleanly, and stays free of browser errors', async ({ page }) => {
     const issues = collectBrowserIssues(page)
 
-    await page.getByRole('button', { name: 'Play' }).click()
+    await page.getByRole('button', { name: 'Play', exact: true }).click()
     await expect(page.getByRole('button', { name: 'Pause' })).toBeVisible()
     await page.waitForTimeout(1_500)
     expect(await stepLabel(page)).not.toBe('step 1 / 34')
@@ -254,13 +279,13 @@ test.describe('desktop walkthrough', () => {
     await page.getByRole('button', { name: /Reset|Apply text/ }).click()
     await expect(currentText).toContainText('em')
 
-    await page.getByRole('button', { name: 'Play' }).click()
+    await page.getByRole('button', { name: 'Play', exact: true }).click()
     await expect(page.getByRole('button', { name: 'Pause' })).toBeVisible()
 
     await prefix.fill('emi')
 
     await expect(page.getByRole('button', { name: 'Apply text' })).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Play' })).toBeDisabled()
+    await expect(page.getByRole('button', { name: 'Play', exact: true })).toBeDisabled()
     await expect(page.getByRole('button', { name: 'Next' })).toBeDisabled()
     await expect(currentText).toContainText('em')
     await expect(page.locator('.story-panel__field-note')).toContainText(
@@ -651,6 +676,63 @@ test.describe('desktop walkthrough', () => {
   })
 })
 
+test.describe('desktop intro', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 1100 })
+    await page.goto('/')
+    await expect(page.locator('[data-testid=\"intro-shell\"]')).toBeVisible()
+  })
+
+  test('shows the full first-visit intro and hands off to the walkthrough', async ({
+    page,
+  }) => {
+    const issues = collectBrowserIssues(page)
+
+    expect(await introStepLabel(page)).toBe('Step 1 of 13')
+
+    for (let index = 0; index < 12; index += 1) {
+      await advanceIntro(page)
+      await page.waitForTimeout(100)
+    }
+
+    await expect(
+      page.getByRole('button', { name: 'Start the deep walkthrough' }),
+    ).toBeEnabled()
+    await page.getByRole('button', { name: 'Start the deep walkthrough' }).click()
+
+    await expect(
+      page.getByRole('heading', { name: 'How LLM systems actually work' }),
+    ).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Replay intro' })).toBeVisible()
+    expect(issues).toEqual([])
+  })
+
+  test('persists skip across reload and allows replay without losing access', async ({
+    page,
+  }) => {
+    const issues = collectBrowserIssues(page)
+
+    await page.getByRole('button', { name: 'Skip intro' }).click()
+    await expect(
+      page.getByRole('heading', { name: 'How LLM systems actually work' }),
+    ).toBeVisible()
+
+    await page.reload()
+    await expect(
+      page.getByRole('heading', { name: 'How LLM systems actually work' }),
+    ).toBeVisible()
+    await expect(page.locator('[data-testid=\"intro-shell\"]')).toHaveCount(0)
+
+    await page.getByRole('button', { name: 'Replay intro' }).click()
+    await expect(page.locator('[data-testid=\"intro-shell\"]')).toBeVisible()
+    expect(await introStepLabel(page)).toBe('Step 1 of 13')
+
+    await page.getByRole('button', { name: 'Skip intro' }).click()
+    await expect(page.getByRole('textbox', { name: 'Starting text' })).toBeVisible()
+    expect(issues).toEqual([])
+  })
+})
+
 test.describe('mobile walkthrough', () => {
   test.use({
     ...iPhone13,
@@ -660,6 +742,7 @@ test.describe('mobile walkthrough', () => {
     page,
   }) => {
     const issues = collectBrowserIssues(page)
+    await suppressIntro(page)
     await page.goto('/')
 
     await expect(page.getByRole('button', { name: 'Code', exact: true })).toBeVisible()
@@ -701,6 +784,7 @@ test.describe('mobile walkthrough', () => {
     page,
   }) => {
     const issues = collectBrowserIssues(page)
+    await suppressIntro(page)
     await page.goto('/')
 
     await page.getByRole('button', { name: 'Story', exact: true }).click()
@@ -711,6 +795,30 @@ test.describe('mobile walkthrough', () => {
 
     await page.getByRole('button', { name: 'Scene', exact: true }).click()
     await expect(page.locator('.annotation-popup--inline')).toHaveCount(0)
+    expect(issues).toEqual([])
+  })
+})
+
+test.describe('mobile intro', () => {
+  test.use({
+    ...iPhone13,
+  })
+
+  test('shows the intro first on mobile and hands off into the story view', async ({
+    page,
+  }) => {
+    const issues = collectBrowserIssues(page)
+    await page.goto('/')
+
+    await expect(page.locator('[data-testid=\"intro-shell\"]')).toBeVisible()
+    expect(await introStepLabel(page)).toBe('Step 1 of 13')
+
+    await page.getByRole('button', { name: 'Skip intro' }).click()
+    await expect(page.getByRole('textbox', { name: 'Starting text' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Story', exact: true })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
     expect(issues).toEqual([])
   })
 })

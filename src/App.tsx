@@ -230,6 +230,12 @@ export default function App() {
     setShowIntro(false)
   }
 
+  const handleReplayIntro = () => {
+    dispatch({ type: 'setPlaying', playing: false })
+    introDispatch({ type: 'reset' })
+    setShowIntro(true)
+  }
+
   const appScreen: AppScreen =
     state.status === 'error'
       ? 'error'
@@ -292,6 +298,7 @@ export default function App() {
       source={source}
       tokenizer={tokenizerRef.current}
       sceneModelData={sceneModelData}
+      onReplayIntro={handleReplayIntro}
       onFocusRanges={handleFocusRanges}
       onPrefixChange={handlePrefixChange}
       onHydrate={hydrate}

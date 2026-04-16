@@ -28,6 +28,32 @@
   color: var(--text-muted);
 }
 
+.app-header__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.app-header__actions button {
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--panel-deep);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease,
+    color 160ms ease;
+}
+
+.app-header__actions button:hover {
+  border-color: rgba(255, 255, 255, 0.14);
+  background: var(--panel-raised);
+  color: var(--text);
+}
+
 .scene-panel__meta span,
 .scene-panel__stage-step {
   padding: 4px 8px;
@@ -1654,6 +1680,10 @@ button.annotation-trigger:focus-visible {
   .app-header {
     flex-direction: column;
     align-items: start;
+  }
+
+  .app-header__actions {
+    width: 100%;
   }
 
   .scene-panel__meta,
