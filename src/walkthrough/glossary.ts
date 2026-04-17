@@ -53,6 +53,15 @@ const glossaryData = {
     ],
     relatedIds: ['token-id', 'bos'],
   },
+  token: {
+    title: 'Token',
+    shortDefinition: 'One small text piece the model can read or write in a single step.',
+    body: [
+      'A token is the basic chunk the model works with during generation.',
+      'A token can be a full word, part of a word, or punctuation, depending on how the tokenizer splits the text.',
+    ],
+    relatedIds: ['token-id', 'vocabulary'],
+  },
   vector: {
     title: 'Vector',
     shortDefinition: 'A list of numbers that the model treats as one representation.',
@@ -368,6 +377,15 @@ const glossaryData = {
     ],
     relatedIds: ['temperature', 'seeded-sampler', 'autoregressive-generation'],
   },
+  training: {
+    title: 'Training',
+    shortDefinition: 'The long process where the model adjusts its internal weights by learning from lots of text.',
+    body: [
+      'Training happens before the finished model is used in a product like this walkthrough.',
+      'During training, the model repeatedly compares its guesses with real text and adjusts its weights so future guesses improve.',
+    ],
+    relatedIds: ['weight-table', 'sampling'],
+  },
   'seeded-sampler': {
     title: 'Seeded Sampler',
     shortDefinition: 'A sampler that starts from a fixed random state so its choices can repeat.',
@@ -394,6 +412,15 @@ const glossaryData = {
       'When sampling returns that marker, the model stops appending tokens and ends the current generation run.',
     ],
     relatedIds: ['bos', 'sampling', 'autoregressive-generation'],
+  },
+  hallucination: {
+    title: 'Hallucination',
+    shortDefinition: 'A fluent-sounding answer that is not actually supported by the facts.',
+    body: [
+      'A model can produce text that sounds confident because it is good at pattern completion, not because it has verified the claim.',
+      'That is why plausible wording and factual accuracy are not the same thing.',
+    ],
+    relatedIds: ['sampling', 'context'],
   },
 } as const satisfies Record<
   string,

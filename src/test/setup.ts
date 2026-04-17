@@ -23,9 +23,31 @@ const matchMediaMock = (query: string) => ({
 vi.stubGlobal('ResizeObserver', ResizeObserverMock)
 vi.stubGlobal('matchMedia', matchMediaMock)
 beforeEach(() => {
+  const storage = new Map<string, string>()
+
+  const localStorageMock = {
+    getItem(key: string) {
+      return storage.has(key) ? storage.get(key)! : null
+    },
+    setItem(key: string, value: string) {
+      storage.set(key, String(value))
+    },
+    removeItem(key: string) {
+      storage.delete(key)
+    },
+    clear() {
+      storage.clear()
+    },
+  }
+
   Object.defineProperty(window, 'matchMedia', {
     writable: true,
     value: matchMediaMock,
+  })
+  Object.defineProperty(window, 'localStorage', {
+    configurable: true,
+    writable: true,
+    value: localStorageMock,
   })
 })
 

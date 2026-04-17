@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react'
 import {
   createTokenizer,
   loadModelBundle,
@@ -9,8 +9,20 @@ import { normalizePrefixInput } from './prefixNormalization'
 import { ArchitectureScene } from './components/ArchitectureScene'
 import { CodeViewer } from './components/CodeViewer'
 import { Controls } from './components/Controls'
+import { IntroWalkthrough } from './components/IntroWalkthrough'
+import { LabTourOverlay } from './components/LabTourOverlay'
 import { SegmentTabs } from './components/SegmentTabs'
 import { useAutoplay } from './hooks/useAutoplay'
+import { introSteps } from './intro/steps'
+import { readHasSeenIntro, writeHasSeenIntro } from './intro/storage'
+import {
+  readHasSeenLabTour,
+  writeHasSeenLabTour,
+} from './labTour/storage'
+import {
+  desktopLabTourSteps,
+  mobileLabTourSteps,
+} from './labTour/steps'
 import {
   inferencePhases,
   type LineRange,
@@ -24,8 +36,25 @@ import type { SceneModelData } from './viz/llmViz/types'
 import './App.css'
 
 const phaseCount = inferencePhases.length
+type AppMode = 'intro' | 'lab'
+const COMPACT_QUERY = '(hover: none), (pointer: coarse), (max-width: 1023px)'
+
+function isCompactViewport() {
+  if (typeof window === 'undefined' || !window.matchMedia) {
+    return false
+  }
+  return window.matchMedia(COMPACT_QUERY).matches
+}
 
 export default function App() {
+  const hasSeenIntro = readHasSeenIntro()
+  const [appMode, setAppMode] = useState<AppMode>(() => (hasSeenIntro ? 'lab' : 'intro'))
+  const [introStepIndex, setIntroStepIndex] = useState(0)
+  const [isCompact, setIsCompact] = useState(isCompactViewport)
+  const [showLabTour, setShowLabTour] = useState(
+    () => hasSeenIntro && !readHasSeenLabTour(),
+  )
+  const [labTourStepIndex, setLabTourStepIndex] = useState(0)
   const [state, dispatch] = useReducer(
     walkthroughReducer,
     initialWalkthroughState,
@@ -39,6 +68,10 @@ export default function App() {
   const prefixVersionRef = useRef(0)
   const lastStableStatusRef = useRef<WalkthroughStatus>('idle')
   const [reducedMotion, setReducedMotion] = useState(false)
+  const labTourSteps = useMemo(
+    () => (isCompact ? mobileLabTourSteps : desktopLabTourSteps),
+    [isCompact],
+  )
 
   useEffect(() => {
     const media = window.matchMedia('(prefers-reduced-motion: reduce)')
@@ -49,6 +82,22 @@ export default function App() {
       media.removeEventListener('change', update)
     }
   }, [])
+
+  useEffect(() => {
+    const media = window.matchMedia(COMPACT_QUERY)
+    const update = () => setIsCompact(media.matches)
+    update()
+    media.addEventListener('change', update)
+    return () => {
+      media.removeEventListener('change', update)
+    }
+  }, [])
+
+  useEffect(() => {
+    setLabTourStepIndex((currentIndex) =>
+      Math.min(currentIndex, labTourSteps.length - 1),
+    )
+  }, [labTourSteps.length])
 
   useEffect(() => {
     if (state.status !== 'loading' && state.status !== 'error') {
@@ -236,6 +285,69 @@ export default function App() {
   const trace = state.traces[state.activeTraceIndex]
   const phase = inferencePhases[state.activePhaseIndex]
 
+  function openLab() {
+    writeHasSeenIntro(true)
+    setAppMode('lab')
+    if (!readHasSeenLabTour()) {
+      setLabTourStepIndex(0)
+      setShowLabTour(true)
+      return
+    }
+
+    setShowLabTour(false)
+  }
+
+  function reopenIntro() {
+    setShowLabTour(false)
+    setIntroStepIndex(0)
+    setAppMode('intro')
+  }
+
+  function startLabTour() {
+    if (state.status === 'playing') {
+      dispatch({ type: 'setPlaying', playing: false })
+    }
+    setLabTourStepIndex(0)
+    setShowLabTour(true)
+  }
+
+  function finishLabTour() {
+    writeHasSeenLabTour(true)
+    setShowLabTour(false)
+  }
+
+  useEffect(() => {
+    if (!showLabTour) {
+      return
+    }
+
+    const currentTourStep = labTourSteps[labTourStepIndex]
+    if (currentTourStep?.mobileTab && state.mobileTab !== currentTourStep.mobileTab) {
+      dispatch({ type: 'setMobileTab', tab: currentTourStep.mobileTab })
+    }
+  }, [labTourStepIndex, labTourSteps, showLabTour, state.mobileTab])
+
+  if (appMode === 'intro') {
+    return (
+      <div className="app-shell app-shell--intro">
+        <IntroWalkthrough
+          activeStepIndex={introStepIndex}
+          steps={introSteps}
+          onBack={() => {
+            setIntroStepIndex((currentIndex) => Math.max(0, currentIndex - 1))
+          }}
+          onNext={() => {
+            setIntroStepIndex((currentIndex) =>
+              Math.min(introSteps.length - 1, currentIndex + 1),
+            )
+          }}
+          onSkip={openLab}
+          onOpenLab={openLab}
+        />
+      </div>
+    )
+  }
+
   if (state.status === 'error') {
     return (
       <div className="app-shell app-shell--centered">
@@ -307,14 +419,30 @@ export default function App() {
             : 'Ready'
   return (
     <div className="app-shell">
-      <header className="app-header">
+      <header className="app-header" data-lab-tour="header">
         <div>
           <p className="eyebrow">200loc</p>
           <h2 className="app-header__title">How LLM systems actually work</h2>
         </div>
+        <div className="app-header__actions">
+          <button
+            type="button"
+            className="ghost-button ghost-button--quiet"
+            onClick={startLabTour}
+          >
+            Show lab tour
+          </button>
+          <button
+            type="button"
+            className="ghost-button"
+            onClick={reopenIntro}
+          >
+            Start intro again
+          </button>
+        </div>
       </header>
 
-      <div className="mobile-only">
+      <div className="mobile-only" data-lab-tour="tabs">
         <SegmentTabs
           activeTab={state.mobileTab}
           onChange={(tab) => dispatch({ type: 'setMobileTab', tab })}
@@ -326,6 +454,7 @@ export default function App() {
           className={`code-column ${
             state.mobileTab === 'code' ? 'is-active' : ''
           }`}
+          data-lab-tour="code"
         >
           <div className="code-column__sticky">
             <CodeViewer source={source} activeRanges={activeRanges} />
@@ -341,6 +470,7 @@ export default function App() {
             <div className="story-scene__toolbar-main">
               <div
                 className="scene-panel__stage-chip"
+                data-lab-tour="stage"
                 onMouseEnter={() => handleFocusRanges(phase.codeRanges)}
                 onMouseLeave={() => handleFocusRanges(null)}
               >
@@ -353,7 +483,7 @@ export default function App() {
                 <strong>{phase.groupTitle}</strong>
               </div>
 
-              <div className="story-scene__toolbar-panel">
+              <div className="story-scene__toolbar-panel" data-lab-tour="controls">
                 <div className="story-scene__toolbar-inputs">
                   <label className="story-panel__field" htmlFor="prefix-input">
                     <div className="story-panel__field-head">
@@ -457,6 +587,7 @@ export default function App() {
             className={`story-scene__scene ${
               state.mobileTab === 'scene' ? 'is-active' : ''
             }`}
+            data-lab-tour="scene"
           >
             <ArchitectureScene
               trace={trace}
@@ -472,6 +603,7 @@ export default function App() {
             className={`story-scene__story ${
               state.mobileTab === 'story' ? 'is-active' : ''
             }`}
+            data-lab-tour="story"
           >
             <Controls
               key={`${state.mobileTab}-${phase.stepId}-${trace.positionId}-${trace.tokenId}-${trace.sampledTokenId}`}
@@ -480,6 +612,24 @@ export default function App() {
           </div>
         </section>
       </main>
+
+      {showLabTour ? (
+        <LabTourOverlay
+          activeStepIndex={labTourStepIndex}
+          layoutVersion={state.mobileTab}
+          steps={labTourSteps}
+          onBack={() => {
+            setLabTourStepIndex((currentIndex) => Math.max(0, currentIndex - 1))
+          }}
+          onNext={() => {
+            setLabTourStepIndex((currentIndex) =>
+              Math.min(labTourSteps.length - 1, currentIndex + 1),
+            )
+          }}
+          onSkip={finishLabTour}
+          onFinish={finishLabTour}
+        />
+      ) : null}
     </div>
   )
 }

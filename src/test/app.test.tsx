@@ -1,6 +1,8 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { useEffect, useRef } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { INTRO_SEEN_STORAGE_KEY } from '../intro/storage'
+import { LAB_TOUR_SEEN_STORAGE_KEY } from '../labTour/storage'
 import type { PrefixNormalization } from '../model'
 import { inferencePhases } from '../walkthrough/phases'
 import { loadBundle, makeTrace } from './helpers/fixtures'
@@ -106,6 +108,8 @@ describe('App', () => {
   beforeEach(() => {
     vi.resetModules()
     vi.clearAllMocks()
+    window.localStorage.setItem(INTRO_SEEN_STORAGE_KEY, 'true')
+    window.localStorage.setItem(LAB_TOUR_SEEN_STORAGE_KEY, 'true')
     Object.defineProperty(window, 'requestAnimationFrame', {
       writable: true,
       value: vi.fn((callback: FrameRequestCallback) => {
@@ -136,6 +140,120 @@ describe('App', () => {
   afterEach(() => {
     vi.doUnmock('../hooks/useAutoplay')
     vi.restoreAllMocks()
+    window.localStorage.clear()
+  })
+
+  it('shows the intro on first visit, then skips into the live walkthrough', async () => {
+    window.localStorage.removeItem(INTRO_SEEN_STORAGE_KEY)
+    window.localStorage.removeItem(LAB_TOUR_SEEN_STORAGE_KEY)
+
+    const runtime = makeRuntime()
+    runtime.reset.mockResolvedValue({
+      trace: makeTrace({ sampledTokenId: 26 }),
+      session: { visibleTokenIds: [4, 12], done: false },
+      diagnostics: {
+        activeBackend: 'cpu',
+        fallbackReason: 'WebGPU unavailable',
+      },
+    })
+
+    loadModelBundleMock.mockResolvedValue(bundleStub)
+    createTokenizerMock.mockReturnValue(makeTokenizer())
+    runtimeCtorMock.mockImplementation(function () {
+      return runtime
+    })
+    mockSourceFetch(sourceText)
+
+    const { default: App } = await import('../App')
+    render(<App />)
+
+    await screen.findByText('A language model keeps guessing what should come next.')
+    fireEvent.click(screen.getByRole('button', { name: 'Skip' }))
+
+    await screen.findByRole('dialog', { name: 'Lab tour' })
+    fireEvent.click(screen.getByRole('button', { name: 'Skip tour' }))
+    await screen.findByRole('button', { name: 'Start intro again' })
+    expect(window.localStorage.getItem(INTRO_SEEN_STORAGE_KEY)).toBe('true')
+    expect(window.localStorage.getItem(LAB_TOUR_SEEN_STORAGE_KEY)).toBe('true')
+  })
+
+  it('finishes the intro, remembers it, and can reopen it from the lab', async () => {
+    window.localStorage.removeItem(INTRO_SEEN_STORAGE_KEY)
+    window.localStorage.removeItem(LAB_TOUR_SEEN_STORAGE_KEY)
+
+    const runtime = makeRuntime()
+    runtime.reset.mockResolvedValue({
+      trace: makeTrace({ sampledTokenId: 26 }),
+      session: { visibleTokenIds: [4, 12], done: false },
+      diagnostics: {
+        activeBackend: 'cpu',
+        fallbackReason: 'WebGPU unavailable',
+      },
+    })
+
+    loadModelBundleMock.mockResolvedValue(bundleStub)
+    createTokenizerMock.mockReturnValue(makeTokenizer())
+    runtimeCtorMock.mockImplementation(function () {
+      return runtime
+    })
+    mockSourceFetch(sourceText)
+
+    const { default: App } = await import('../App')
+    render(<App />)
+
+    await screen.findByText('A language model keeps guessing what should come next.')
+    for (let index = 0; index < 9; index += 1) {
+      fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+    }
+
+    expect(
+      screen.getByRole('button', { name: 'Open live walkthrough' }),
+    ).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Open live walkthrough' }))
+
+    await screen.findByRole('dialog', { name: 'Lab tour' })
+    for (let index = 0; index < 4; index += 1) {
+      fireEvent.click(screen.getAllByRole('button', { name: 'Next' }).at(-1)!)
+    }
+    fireEvent.click(screen.getByRole('button', { name: 'Start exploring' }))
+    await screen.findByRole('button', { name: 'Start intro again' })
+    expect(screen.getByRole('button', { name: 'Show lab tour' })).toBeInTheDocument()
+    expect(window.localStorage.getItem(INTRO_SEEN_STORAGE_KEY)).toBe('true')
+    expect(window.localStorage.getItem(LAB_TOUR_SEEN_STORAGE_KEY)).toBe('true')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Start intro again' }))
+    await screen.findByText('A language model keeps guessing what should come next.')
+  })
+
+  it('can replay the lab tour from the header', async () => {
+    const runtime = makeRuntime()
+    runtime.reset.mockResolvedValue({
+      trace: makeTrace({ sampledTokenId: 26 }),
+      session: { visibleTokenIds: [4, 12], done: false },
+      diagnostics: {
+        activeBackend: 'cpu',
+        fallbackReason: 'WebGPU unavailable',
+      },
+    })
+
+    loadModelBundleMock.mockResolvedValue(bundleStub)
+    createTokenizerMock.mockReturnValue(makeTokenizer())
+    runtimeCtorMock.mockImplementation(function () {
+      return runtime
+    })
+    mockSourceFetch(sourceText)
+
+    const { default: App } = await import('../App')
+    render(<App />)
+
+    await screen.findByText('How LLM systems actually work')
+    fireEvent.click(screen.getByRole('button', { name: 'Show lab tour' }))
+
+    const tour = await screen.findByRole('dialog', { name: 'Lab tour' })
+    fireEvent.click(within(tour).getByRole('button', { name: 'Next' }))
+    expect(
+      within(tour).getByText('This is how you drive the walkthrough'),
+    ).toBeInTheDocument()
   })
 
   it(

@@ -8,6 +8,9 @@ const iPhone13 = {
   hasTouch: devices['iPhone 13'].hasTouch,
 }
 
+const introSeenStorageKey = '200loc.hasSeenIntro.v1'
+const labTourSeenStorageKey = '200loc.hasSeenLabTour.v1'
+
 type BrowserIssue = {
   kind: 'console-error' | 'console-warning' | 'pageerror'
   text: string
@@ -126,6 +129,13 @@ async function findHoverablePoint(page: Page, eventSurface: Locator) {
 test.describe('desktop walkthrough', () => {
   test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 1100 })
+    await page.addInitScript(
+      ({ introKey, tourKey }: { introKey: string; tourKey: string }) => {
+        window.localStorage.setItem(introKey, 'true')
+        window.localStorage.setItem(tourKey, 'true')
+      },
+      { introKey: introSeenStorageKey, tourKey: labTourSeenStorageKey },
+    )
     await page.goto('/')
     await expect(
       page.getByRole('heading', { name: 'How LLM systems actually work' }),
@@ -651,9 +661,153 @@ test.describe('desktop walkthrough', () => {
   })
 })
 
+test.describe('intro walkthrough', () => {
+  test('opens on first visit, advances simply, and can skip into the lab', async ({
+    page,
+  }) => {
+    const issues = collectBrowserIssues(page)
+    await page.setViewportSize({ width: 1280, height: 920 })
+    await page.goto('/')
+
+    await expect(
+      page.getByText('A language model keeps guessing what should come next.'),
+    ).toBeVisible()
+
+    await page.getByRole('button', { name: 'Next' }).click()
+    await expect(
+      page.getByText('The model cannot work with raw text directly.'),
+    ).toBeVisible()
+
+    await page.getByRole('button', { name: 'Skip' }).click()
+    await expect(page.getByRole('dialog', { name: 'Lab tour' })).toBeVisible()
+    await expect(
+      page.getByText(
+        'The stage badge shows which part of the 34-step loop you are looking at right now.',
+      ),
+    ).toBeVisible()
+    await page.getByRole('button', { name: 'Skip tour' }).click()
+    await expect(
+      page.getByRole('heading', { name: 'How LLM systems actually work' }),
+    ).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Start intro again' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Show lab tour' })).toBeVisible()
+    expect(issues).toEqual([])
+  })
+
+  test('remembers completion on reload and can replay the intro', async ({ page }) => {
+    const issues = collectBrowserIssues(page)
+    await page.setViewportSize({ width: 1280, height: 920 })
+    await page.goto('/')
+
+    for (let index = 0; index < 9; index += 1) {
+      await page.getByRole('button', { name: 'Next' }).click()
+    }
+
+    await expect(
+      page.getByText('Next you can open the live walkthrough.'),
+    ).toBeVisible()
+    await page.getByRole('button', { name: 'Open live walkthrough' }).click()
+    const tour = page.getByRole('dialog', { name: 'Lab tour' })
+    await expect(tour).toBeVisible()
+    for (let index = 0; index < 4; index += 1) {
+      await tour.getByRole('button', { name: 'Next' }).click()
+    }
+    await tour.getByRole('button', { name: 'Start exploring' }).click()
+    await expect(
+      page.getByRole('heading', { name: 'How LLM systems actually work' }),
+    ).toBeVisible()
+
+    await page.reload()
+    await expect(page.getByText('Step 1 of 10')).toHaveCount(0)
+    await expect(
+      page.getByRole('heading', { name: 'How LLM systems actually work' }),
+    ).toBeVisible()
+
+    await page.getByRole('button', { name: 'Start intro again' }).click()
+    await expect(
+      page.getByText('A language model keeps guessing what should come next.'),
+    ).toBeVisible()
+    expect(issues).toEqual([])
+  })
+
+  test('can replay the lab tour from the main app header', async ({ page }) => {
+    const issues = collectBrowserIssues(page)
+    await page.setViewportSize({ width: 1280, height: 920 })
+    await page.addInitScript(
+      ({ introKey, tourKey }: { introKey: string; tourKey: string }) => {
+        window.localStorage.setItem(introKey, 'true')
+        window.localStorage.setItem(tourKey, 'true')
+      },
+      { introKey: introSeenStorageKey, tourKey: labTourSeenStorageKey },
+    )
+    await page.goto('/')
+
+    await page.getByRole('button', { name: 'Show lab tour' }).click()
+    const tour = page.getByRole('dialog', { name: 'Lab tour' })
+    await expect(tour).toBeVisible()
+    await tour.getByRole('button', { name: 'Next' }).click()
+    await expect(
+      tour.getByText('This is how you drive the walkthrough'),
+    ).toBeVisible()
+    expect(issues).toEqual([])
+  })
+
+  test('supports the same glossary popups inside the intro copy', async ({ page }) => {
+    const issues = collectBrowserIssues(page)
+    await page.setViewportSize({ width: 1280, height: 920 })
+    await page.goto('/')
+
+    const tokenTrigger = page.getByRole('button', { name: 'token' })
+    await expect(tokenTrigger).toBeVisible()
+
+    await tokenTrigger.click()
+    await expect(page.getByRole('dialog')).toContainText('Token')
+    await expect(page.getByRole('dialog')).toContainText(
+      'One small text piece the model can read or write in a single step.',
+    )
+
+    await page.getByRole('heading', { name: 'How LLM systems actually work' }).click()
+    await expect(page.locator('.annotation-popup--floating')).toHaveCount(0)
+    expect(issues).toEqual([])
+  })
+})
+
 test.describe('mobile walkthrough', () => {
   test.use({
     ...iPhone13,
+  })
+
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(
+      ({ introKey, tourKey }: { introKey: string; tourKey: string }) => {
+        window.localStorage.setItem(introKey, 'true')
+        window.localStorage.setItem(tourKey, 'true')
+      },
+      { introKey: introSeenStorageKey, tourKey: labTourSeenStorageKey },
+    )
+  })
+
+  test('keeps the intro simple on mobile with no horizontal overflow', async ({
+    browser,
+  }) => {
+    const context = await browser.newContext({
+      ...iPhone13,
+    })
+    const page = await context.newPage()
+    const issues = collectBrowserIssues(page)
+
+    await page.goto('/')
+    await expect(
+      page.getByText('A language model keeps guessing what should come next.'),
+    ).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Skip' })).toBeVisible()
+
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - window.innerWidth,
+    )
+    expect(overflow).toBeLessThanOrEqual(1)
+    expect(issues).toEqual([])
+    await context.close()
   })
 
   test('switches between code, story, and scene without overflow or browser errors', async ({
