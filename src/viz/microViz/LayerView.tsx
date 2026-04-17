@@ -71,6 +71,7 @@ class MicroCanvasRender {
   prevTime = performance.now()
   rafHandle = 0
   private hoverFocusId: FocusRangeKey | null = null
+  private hasRenderedFrame = false
   private blockFocusByIndex: Map<number, FocusRangeKey | null>
 
   constructor(
@@ -79,6 +80,7 @@ class MicroCanvasRender {
     sceneModelData: SceneModelData,
     fontAtlasData: Awaited<ReturnType<typeof loadMicroVizFontAtlas>>,
     private onHoverFocusChange: (focusId: FocusRangeKey | null) => void,
+    private onFirstFrame: () => void,
   ) {
     this.progState = initMicroVizProgramState(canvasEl, fontAtlasData, sceneModelData)
     this.progState.markDirty = this.markDirty
@@ -207,6 +209,10 @@ class MicroCanvasRender {
     runMicroVizProgram({ time, dt, markDirty: this.markDirty }, this.progState)
     this.progState.htmlSubs.notify()
     this.publishHoverFocus()
+    if (!this.hasRenderedFrame) {
+      this.hasRenderedFrame = true
+      this.onFirstFrame()
+    }
   }
 
   private publishHoverFocus() {
@@ -308,6 +314,7 @@ export const MicroLayerView = forwardRef<MicroLayerViewHandle, MicroLayerViewPro
       const activeCanvas = canvasEl
 
       let stale = false
+      let firstFrameSeen = false
       let canvasRenderLocal: MicroCanvasRender | null = null
       let resizeObserver: ResizeObserver | null = null
       const handleWheel = (event: WheelEvent) => event.preventDefault()
@@ -331,6 +338,13 @@ export const MicroLayerView = forwardRef<MicroLayerViewHandle, MicroLayerViewPro
             sceneModelData,
             fontAtlasData,
             onHoverFocusChange,
+            () => {
+              if (stale || firstFrameSeen) {
+                return
+              }
+              firstFrameSeen = true
+              onRenderModeChange('webgl')
+            },
           )
           resizeObserver = new ResizeObserver(() => {
             canvasRenderLocal!.canvasSizeDirty = true
@@ -340,7 +354,6 @@ export const MicroLayerView = forwardRef<MicroLayerViewHandle, MicroLayerViewPro
           activeCanvas.addEventListener('wheel', handleWheel, { passive: false })
           setCanvasRender(canvasRenderLocal)
           setDebugProgramState(canvasRenderLocal.progState)
-          onRenderModeChange('webgl')
         } catch {
           if (!stale) {
             onHoverFocusChange(null)
