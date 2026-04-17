@@ -680,9 +680,13 @@ button.annotation-trigger {
   border-radius: 0;
   background: transparent;
   color: var(--annotation-text);
+  font: inherit;
+  letter-spacing: inherit;
   line-height: inherit;
+  text-align: inherit;
   vertical-align: baseline;
   box-shadow: none;
+  cursor: pointer;
 }
 
 button.annotation-trigger:hover,

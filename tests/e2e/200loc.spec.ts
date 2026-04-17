@@ -710,6 +710,25 @@ test.describe('intro walkthrough', () => {
     ).toBeVisible()
     expect(issues).toEqual([])
   })
+
+  test('supports the same glossary popups inside the intro copy', async ({ page }) => {
+    const issues = collectBrowserIssues(page)
+    await page.setViewportSize({ width: 1280, height: 920 })
+    await page.goto('/')
+
+    const tokenTrigger = page.getByRole('button', { name: 'token' })
+    await expect(tokenTrigger).toBeVisible()
+
+    await tokenTrigger.click()
+    await expect(page.getByRole('dialog')).toContainText('Token')
+    await expect(page.getByRole('dialog')).toContainText(
+      'One small text piece the model can read or write in a single step.',
+    )
+
+    await page.getByRole('heading', { name: 'How LLM systems actually work' }).click()
+    await expect(page.locator('.annotation-popup--floating')).toHaveCount(0)
+    expect(issues).toEqual([])
+  })
 })
 
 test.describe('mobile walkthrough', () => {

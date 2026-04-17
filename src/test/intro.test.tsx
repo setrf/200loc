@@ -107,4 +107,35 @@ describe('intro walkthrough', () => {
     expect(onNext).toHaveBeenCalledTimes(1)
     expect(onSkip).toHaveBeenCalledTimes(1)
   })
+
+  it('reuses the glossary popup system for selected intro terms', () => {
+    Object.defineProperty(window, 'matchMedia', {
+      writable: true,
+      value: vi.fn().mockReturnValue({
+        matches: true,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      }),
+    })
+
+    render(
+      <IntroWalkthrough
+        activeStepIndex={0}
+        steps={introSteps}
+        onBack={vi.fn()}
+        onNext={vi.fn()}
+        onSkip={vi.fn()}
+        onOpenLab={vi.fn()}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'token' }))
+
+    expect(screen.getByRole('dialog')).toHaveTextContent('Token')
+    expect(
+      screen.getByText(
+        'One small text piece the model can read or write in a single step.',
+      ),
+    ).toBeInTheDocument()
+  })
 })
