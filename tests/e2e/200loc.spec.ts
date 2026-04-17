@@ -9,6 +9,7 @@ const iPhone13 = {
 }
 
 const introSeenStorageKey = '200loc.hasSeenIntro.v1'
+const labTourSeenStorageKey = '200loc.hasSeenLabTour.v1'
 
 type BrowserIssue = {
   kind: 'console-error' | 'console-warning' | 'pageerror'
@@ -128,9 +129,13 @@ async function findHoverablePoint(page: Page, eventSurface: Locator) {
 test.describe('desktop walkthrough', () => {
   test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 1100 })
-    await page.addInitScript((storageKey: string) => {
-      window.localStorage.setItem(storageKey, 'true')
-    }, introSeenStorageKey)
+    await page.addInitScript(
+      ({ introKey, tourKey }: { introKey: string; tourKey: string }) => {
+        window.localStorage.setItem(introKey, 'true')
+        window.localStorage.setItem(tourKey, 'true')
+      },
+      { introKey: introSeenStorageKey, tourKey: labTourSeenStorageKey },
+    )
     await page.goto('/')
     await expect(
       page.getByRole('heading', { name: 'How LLM systems actually work' }),
@@ -674,10 +679,18 @@ test.describe('intro walkthrough', () => {
     ).toBeVisible()
 
     await page.getByRole('button', { name: 'Skip' }).click()
+    await expect(page.getByRole('dialog', { name: 'Lab tour' })).toBeVisible()
+    await expect(
+      page.getByText(
+        'The stage badge shows which part of the 34-step loop you are looking at right now.',
+      ),
+    ).toBeVisible()
+    await page.getByRole('button', { name: 'Skip tour' }).click()
     await expect(
       page.getByRole('heading', { name: 'How LLM systems actually work' }),
     ).toBeVisible()
     await expect(page.getByRole('button', { name: 'Start intro again' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Show lab tour' })).toBeVisible()
     expect(issues).toEqual([])
   })
 
@@ -694,6 +707,12 @@ test.describe('intro walkthrough', () => {
       page.getByText('Next you can open the live walkthrough.'),
     ).toBeVisible()
     await page.getByRole('button', { name: 'Open live walkthrough' }).click()
+    const tour = page.getByRole('dialog', { name: 'Lab tour' })
+    await expect(tour).toBeVisible()
+    for (let index = 0; index < 4; index += 1) {
+      await tour.getByRole('button', { name: 'Next' }).click()
+    }
+    await tour.getByRole('button', { name: 'Start exploring' }).click()
     await expect(
       page.getByRole('heading', { name: 'How LLM systems actually work' }),
     ).toBeVisible()
@@ -707,6 +726,28 @@ test.describe('intro walkthrough', () => {
     await page.getByRole('button', { name: 'Start intro again' }).click()
     await expect(
       page.getByText('A language model keeps guessing what should come next.'),
+    ).toBeVisible()
+    expect(issues).toEqual([])
+  })
+
+  test('can replay the lab tour from the main app header', async ({ page }) => {
+    const issues = collectBrowserIssues(page)
+    await page.setViewportSize({ width: 1280, height: 920 })
+    await page.addInitScript(
+      ({ introKey, tourKey }: { introKey: string; tourKey: string }) => {
+        window.localStorage.setItem(introKey, 'true')
+        window.localStorage.setItem(tourKey, 'true')
+      },
+      { introKey: introSeenStorageKey, tourKey: labTourSeenStorageKey },
+    )
+    await page.goto('/')
+
+    await page.getByRole('button', { name: 'Show lab tour' }).click()
+    const tour = page.getByRole('dialog', { name: 'Lab tour' })
+    await expect(tour).toBeVisible()
+    await tour.getByRole('button', { name: 'Next' }).click()
+    await expect(
+      tour.getByText('This is how you drive the walkthrough'),
     ).toBeVisible()
     expect(issues).toEqual([])
   })
@@ -737,9 +778,13 @@ test.describe('mobile walkthrough', () => {
   })
 
   test.beforeEach(async ({ page }) => {
-    await page.addInitScript((storageKey: string) => {
-      window.localStorage.setItem(storageKey, 'true')
-    }, introSeenStorageKey)
+    await page.addInitScript(
+      ({ introKey, tourKey }: { introKey: string; tourKey: string }) => {
+        window.localStorage.setItem(introKey, 'true')
+        window.localStorage.setItem(tourKey, 'true')
+      },
+      { introKey: introSeenStorageKey, tourKey: labTourSeenStorageKey },
+    )
   })
 
   test('keeps the intro simple on mobile with no horizontal overflow', async ({
