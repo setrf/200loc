@@ -31,8 +31,9 @@ App URL: `http://127.0.0.1:5173/`
 
 - The scene now stays in the explicit `loading scene…` state until the first WebGL frame actually renders.
 - This avoids showing a misleading empty scene panel during Safari's slow first paint path.
+- The font atlas loader now fetches `fonts/font-def.json` as a normal same-origin JSON request instead of using `mode: 'no-cors'`, which was a fragile fit for Safari.
 
 ## Follow-up worth doing
 
 - Add true WebKit coverage to Playwright once WebKit browsers are installed locally.
-- Investigate why Safari's first scene frame is so delayed on reload instead of only smoothing over the symptom.
+- Re-run the Safari reload path after the font-loader change once Computer Use access is available again, to confirm whether the same-origin fetch fix resolves the delayed first frame outright.

@@ -71,7 +71,12 @@ export async function fetchFontAtlasData(): Promise<IFontAtlasData> {
     });
     imgEl.src = 'fonts/font-atlas.png';
 
-    let fontDefP = fetch('fonts/font-def.json', { credentials: 'include', mode: 'no-cors' }).then(r => r.json());
+    let fontDefP = fetch('fonts/font-def.json').then(r => {
+        if (!r.ok) {
+            throw new Error(`Failed to load font definition: ${r.status}`);
+        }
+        return r.json();
+    });
 
     let [fontAtlasImage, fontDef] = await Promise.all([imgP, fontDefP]);
 
