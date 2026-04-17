@@ -54,6 +54,7 @@ export default function App() {
   const [showLabTour, setShowLabTour] = useState(
     () => hasSeenIntro && !readHasSeenLabTour(),
   )
+  const [showProjectInfo, setShowProjectInfo] = useState(false)
   const [labTourStepIndex, setLabTourStepIndex] = useState(0)
   const [state, dispatch] = useReducer(
     walkthroughReducer,
@@ -82,6 +83,23 @@ export default function App() {
       media.removeEventListener('change', update)
     }
   }, [])
+
+  useEffect(() => {
+    if (!showProjectInfo) {
+      return
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setShowProjectInfo(false)
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [showProjectInfo])
 
   useEffect(() => {
     const media = window.matchMedia(COMPACT_QUERY)
@@ -428,6 +446,13 @@ export default function App() {
           <button
             type="button"
             className="ghost-button ghost-button--quiet"
+            onClick={() => setShowProjectInfo(true)}
+          >
+            About
+          </button>
+          <button
+            type="button"
+            className="ghost-button ghost-button--quiet"
             onClick={startLabTour}
           >
             Show lab tour
@@ -468,70 +493,22 @@ export default function App() {
         >
           <div className="story-scene__toolbar">
             <div className="story-scene__toolbar-main">
-              <div
-                className="scene-panel__stage-chip"
-                data-lab-tour="stage"
-                onMouseEnter={() => handleFocusRanges(phase.codeRanges)}
-                onMouseLeave={() => handleFocusRanges(null)}
-              >
-                <div className="scene-panel__stage-chip-top">
-                  <span className="eyebrow">Current stage</span>
-                  <span className="scene-panel__stage-step">
-                    step {state.activePhaseIndex + 1} / {phaseCount}
-                  </span>
-                </div>
-                <strong>{phase.groupTitle}</strong>
-              </div>
-
               <div className="story-scene__toolbar-panel" data-lab-tour="controls">
-                <div className="story-scene__toolbar-inputs">
-                  <label className="story-panel__field" htmlFor="prefix-input">
-                    <div className="story-panel__field-head">
-                      <span className="eyebrow">Starting text</span>
-                    </div>
-                    <input
-                      id="prefix-input"
-                      className="story-panel__input"
-                      aria-label="Starting text"
-                      value={state.prefixInput}
-                      onChange={(event) => handlePrefixChange(event.target.value)}
-                      onKeyDown={(event) => {
-                        if (event.key === 'Enter' && !controlsLocked) {
-                          dispatch({ type: 'setPlaying', playing: false })
-                          void hydrate(state.prefixInput)
-                        }
-                      }}
-                      placeholder="em"
-                      autoComplete="off"
-                      spellCheck={false}
-                    />
-                  </label>
-
+                <div className="story-scene__toolbar-bar">
                   <div
-                    className={`story-panel__field story-panel__field--readonly${
-                      hasPendingPrefixChange ? ' is-stale' : ''
-                    }`}
+                    className="scene-panel__stage-chip"
+                    data-lab-tour="stage"
+                    onMouseEnter={() => handleFocusRanges(phase.codeRanges)}
+                    onMouseLeave={() => handleFocusRanges(null)}
                   >
-                    <div className="story-panel__field-head">
-                      <span className="eyebrow">Current text</span>
-                      <span className="story-panel__field-status">{currentTextStatus}</span>
+                    <div className="scene-panel__stage-chip-copy">
+                      <span className="eyebrow">Current stage</span>
+                      <strong>{phase.groupTitle}</strong>
                     </div>
-                    <output
-                      className={`story-panel__readout${currentText ? '' : ' is-empty'}`}
-                      aria-label="Current text"
-                      aria-live="polite"
-                    >
-                      {currentText || 'Nothing generated yet'}
-                    </output>
+                    <span className="scene-panel__stage-step">
+                      step {state.activePhaseIndex + 1} / {phaseCount}
+                    </span>
                   </div>
-                </div>
-
-                <div className="story-scene__toolbar-footer">
-                  <p className="story-panel__field-note">
-                    {hasPendingPrefixChange
-                      ? 'Current run still uses the previous starting text. Apply text to restart from your draft.'
-                      : 'Edit the starting text, then reset when you want the model to restart from it.'}
-                  </p>
 
                   <div className="story-panel__actions">
                     <button
@@ -579,6 +556,57 @@ export default function App() {
                     </button>
                   </div>
                 </div>
+
+                <div className="story-scene__toolbar-inputs">
+                  <label
+                    className="story-panel__field story-panel__field--editable"
+                    htmlFor="prefix-input"
+                  >
+                    <div className="story-panel__field-head">
+                      <span className="eyebrow">Starting text</span>
+                    </div>
+                    <input
+                      id="prefix-input"
+                      className="story-panel__input"
+                      aria-label="Starting text"
+                      value={state.prefixInput}
+                      onChange={(event) => handlePrefixChange(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' && !controlsLocked) {
+                          dispatch({ type: 'setPlaying', playing: false })
+                          void hydrate(state.prefixInput)
+                        }
+                      }}
+                      placeholder="em"
+                      autoComplete="off"
+                      spellCheck={false}
+                    />
+                  </label>
+
+                  <div
+                    className={`story-panel__field story-panel__field--readonly${
+                      hasPendingPrefixChange ? ' is-stale' : ''
+                    }`}
+                  >
+                    <div className="story-panel__field-head">
+                      <span className="eyebrow">Current text</span>
+                      <span className="story-panel__field-status">{currentTextStatus}</span>
+                    </div>
+                    <output
+                      className={`story-panel__readout${currentText ? '' : ' is-empty'}`}
+                      aria-label="Current text"
+                      aria-live="polite"
+                    >
+                      {currentText || 'Nothing generated yet'}
+                    </output>
+                  </div>
+                </div>
+
+                <p className="story-panel__field-note">
+                  {hasPendingPrefixChange
+                    ? 'Current run still uses the previous starting text. Apply text to restart from your draft.'
+                    : 'Edit the starting text, then reset when you want the model to restart from it.'}
+                </p>
               </div>
             </div>
           </div>
@@ -626,9 +654,98 @@ export default function App() {
               Math.min(labTourSteps.length - 1, currentIndex + 1),
             )
           }}
-          onSkip={finishLabTour}
           onFinish={finishLabTour}
         />
+      ) : null}
+
+      {showProjectInfo ? (
+        <div
+          className="project-splash"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Project information"
+        >
+          <button
+            type="button"
+            className="project-splash__backdrop"
+            aria-label="Close project information"
+            onClick={() => setShowProjectInfo(false)}
+          />
+          <div className="project-splash__card">
+            <div className="project-splash__header">
+              <div>
+                <p className="eyebrow">200loc</p>
+                <h3>About this project</h3>
+              </div>
+              <button
+                type="button"
+                className="ghost-button ghost-button--quiet"
+                onClick={() => setShowProjectInfo(false)}
+              >
+                Close
+              </button>
+            </div>
+
+            <p className="project-splash__summary">
+              A compact, interactive walkthrough of how a GPT-style language model
+              reads context, steps through inference, and maps code to the model
+              state you see on screen.
+            </p>
+
+            <div className="project-splash__section">
+              <p className="project-splash__label">Links</p>
+              <div className="project-splash__links">
+                <a href="https://mertgulsun.com/" target="_blank" rel="noreferrer">
+                  mertgulsun.com
+                </a>
+                <a
+                  href="https://www.linkedin.com/in/mert-gulsun"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  linkedin.com/in/mert-gulsun
+                </a>
+                <a href="https://github.com/setrf" target="_blank" rel="noreferrer">
+                  github.com/setrf
+                </a>
+              </div>
+            </div>
+
+            <div className="project-splash__section">
+              <p className="project-splash__label">Credits</p>
+              <p>
+                Inspired by{' '}
+                <a href="https://github.com/karpathy" target="_blank" rel="noreferrer">
+                  Andrej Karpathy
+                </a>{' '}
+                and adapted from Brendan Bycroft&apos;s{' '}
+                <a href="https://bbycroft.net/llm" target="_blank" rel="noreferrer">
+                  LLM Visualization
+                </a>{' '}
+                and the underlying{' '}
+                <a
+                  href="https://github.com/bbycroft/llm-viz"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  llm-viz
+                </a>{' '}
+                project.
+              </p>
+            </div>
+
+            <div className="project-splash__section">
+              <p className="project-splash__label">License</p>
+              <p>
+                This project is released under the{' '}
+                <a href="/LICENSE" target="_blank" rel="noreferrer">
+                  MIT License
+                </a>
+                .
+              </p>
+            </div>
+          </div>
+        </div>
       ) : null}
     </div>
   )

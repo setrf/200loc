@@ -51,15 +51,10 @@ export function CodeViewer({ source, activeRanges }: CodeViewerProps) {
 
   return (
     <div className="code-viewer">
-      <div className="code-viewer__tabs">
-        <div className="code-viewer__tab is-active">
-          <span className="code-viewer__tab-icon" aria-hidden="true" />
-          <span>microgpt</span>
-        </div>
-      </div>
-
       <div className="code-viewer__header">
-        <p className="code-viewer__breadcrumbs">assets {'>'} microgpt.py</p>
+        <div className="code-viewer__file">
+          <strong className="code-viewer__filename">microgpt.py</strong>
+        </div>
         <div className="code-viewer__meta-group">
           <span className="code-viewer__language">Python</span>
           <p className="code-viewer__meta">{lines.length} lines</p>

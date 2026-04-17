@@ -12,7 +12,6 @@ interface LabTourOverlayProps {
   steps: LabTourStepDefinition[]
   onBack: () => void
   onNext: () => void
-  onSkip: () => void
   onFinish: () => void
 }
 
@@ -44,7 +43,6 @@ export function LabTourOverlay({
   steps,
   onBack,
   onNext,
-  onSkip,
   onFinish,
 }: LabTourOverlayProps) {
   const step = steps[activeStepIndex]!
@@ -165,24 +163,16 @@ export function LabTourOverlay({
         <div className="lab-tour__actions">
           <button
             type="button"
-            className="intro-button intro-button--secondary"
+            className="intro-button intro-button--secondary lab-tour__action-back"
             onClick={onBack}
             disabled={isFirst}
           >
             Back
           </button>
-          <button
-            type="button"
-            className="ghost-button ghost-button--quiet"
-            onClick={onSkip}
-          >
-            Skip tour
-          </button>
-          <div className="intro-actions__spacer" />
           {isLast ? (
             <button
               type="button"
-              className="intro-button intro-button--primary"
+              className="intro-button intro-button--primary lab-tour__action-next"
               onClick={onFinish}
             >
               Start exploring
@@ -190,7 +180,7 @@ export function LabTourOverlay({
           ) : (
             <button
               type="button"
-              className="intro-button intro-button--primary"
+              className="intro-button intro-button--primary lab-tour__action-next"
               onClick={onNext}
             >
               Next

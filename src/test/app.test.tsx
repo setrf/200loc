@@ -171,10 +171,45 @@ describe('App', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Skip' }))
 
     await screen.findByRole('dialog', { name: 'Lab tour' })
-    fireEvent.click(screen.getByRole('button', { name: 'Skip tour' }))
+    for (let index = 0; index < 4; index += 1) {
+      fireEvent.click(screen.getAllByRole('button', { name: 'Next' }).at(-1)!)
+    }
+    fireEvent.click(screen.getByRole('button', { name: 'Start exploring' }))
     await screen.findByRole('button', { name: 'Start intro again' })
     expect(window.localStorage.getItem(INTRO_SEEN_STORAGE_KEY)).toBe('true')
     expect(window.localStorage.getItem(LAB_TOUR_SEEN_STORAGE_KEY)).toBe('true')
+  })
+
+  it('opens the project info dialog from the header', async () => {
+    const runtime = makeRuntime()
+    runtime.reset.mockResolvedValue({
+      trace: makeTrace({ sampledTokenId: 26 }),
+      session: { visibleTokenIds: [4, 12], done: false },
+      diagnostics: {
+        activeBackend: 'cpu',
+        fallbackReason: 'WebGPU unavailable',
+      },
+    })
+
+    loadModelBundleMock.mockResolvedValue(bundleStub)
+    createTokenizerMock.mockReturnValue(makeTokenizer())
+    runtimeCtorMock.mockImplementation(function () {
+      return runtime
+    })
+    mockSourceFetch(sourceText)
+
+    const { default: App } = await import('../App')
+    render(<App />)
+
+    await screen.findByText('How LLM systems actually work')
+    fireEvent.click(screen.getByRole('button', { name: 'About' }))
+
+    const dialog = screen.getByRole('dialog', { name: 'Project information' })
+    expect(within(dialog).getByText('About this project')).toBeInTheDocument()
+    expect(within(dialog).getByText('mertgulsun.com')).toBeInTheDocument()
+    expect(within(dialog).getByText('MIT License')).toBeInTheDocument()
+    expect(within(dialog).getByText('Andrej Karpathy')).toBeInTheDocument()
+    expect(within(dialog).getByText('LLM Visualization')).toBeInTheDocument()
   })
 
   it('finishes the intro, remembers it, and can reopen it from the lab', async () => {
@@ -314,7 +349,7 @@ describe('App', () => {
     ).toBeInTheDocument()
 
     await screen.findByText('How LLM systems actually work')
-    expect(screen.getAllByText('microgpt').length).toBeGreaterThan(0)
+    expect(screen.getByText('microgpt.py')).toBeInTheDocument()
     expect(screen.getAllByText('Tokenize Prefix').length).toBeGreaterThan(0)
     expect(screen.getByLabelText('Current text')).toHaveTextContent('em')
     expect(screen.getByText('Ready')).toBeInTheDocument()

@@ -69,14 +69,6 @@ Start the app:
 npm run dev
 ```
 
-React Grab is enabled in development. Once the app is running, hover an element
-and press:
-
-- `Cmd+C` on macOS
-- `Ctrl+C` on Windows/Linux
-
-to copy the grabbed UI context from the page.
-
 ## Regenerating the Model Bundle
 
 Rebuild the exported model bundle and the reference trace fixture:
