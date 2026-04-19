@@ -37,6 +37,7 @@ import './App.css'
 
 const phaseCount = inferencePhases.length
 type AppMode = 'intro' | 'lab'
+type PanelKey = 'code' | 'scene' | 'story'
 const COMPACT_QUERY = '(hover: none), (pointer: coarse), (max-width: 1023px)'
 
 function isCompactViewport() {
@@ -56,6 +57,11 @@ export default function App() {
   )
   const [showProjectInfo, setShowProjectInfo] = useState(false)
   const [labTourStepIndex, setLabTourStepIndex] = useState(0)
+  const [collapsedPanels, setCollapsedPanels] = useState<Record<PanelKey, boolean>>({
+    code: false,
+    scene: false,
+    story: false,
+  })
   const [state, dispatch] = useReducer(
     walkthroughReducer,
     initialWalkthroughState,
@@ -73,6 +79,13 @@ export default function App() {
     () => (isCompact ? mobileLabTourSteps : desktopLabTourSteps),
     [isCompact],
   )
+
+  const togglePanel = useCallback((panel: PanelKey) => {
+    setCollapsedPanels((current) => ({
+      ...current,
+      [panel]: !current[panel],
+    }))
+  }, [])
 
   useEffect(() => {
     const media = window.matchMedia('(prefers-reduced-motion: reduce)')
@@ -435,6 +448,15 @@ export default function App() {
               ? 'Context full'
               : 'Stopped at BOS'
             : 'Ready'
+  const hasCollapsedPanels =
+    collapsedPanels.code || collapsedPanels.scene || collapsedPanels.story
+  const storySceneRows = ['auto']
+  if (!collapsedPanels.scene) {
+    storySceneRows.push('minmax(0, 1fr)')
+  }
+  if (!collapsedPanels.story) {
+    storySceneRows.push('var(--story-panel-height)')
+  }
   return (
     <div className="app-shell">
       <header className="app-header" data-lab-tour="header">
@@ -474,40 +496,72 @@ export default function App() {
         />
       </div>
 
-      <main className="walkthrough-layout">
-        <aside
-          className={`code-column ${
-            state.mobileTab === 'code' ? 'is-active' : ''
-          }`}
-          data-lab-tour="code"
-        >
-          <div className="code-column__sticky">
-            <CodeViewer source={source} activeRanges={activeRanges} />
-          </div>
-        </aside>
+      <main
+        className="walkthrough-layout"
+        style={
+          isCompact
+            ? undefined
+            : {
+                gridTemplateColumns: collapsedPanels.code
+                  ? 'minmax(0, 1fr)'
+                  : 'max-content minmax(420px, 1fr)',
+              }
+        }
+      >
+        {!collapsedPanels.code ? (
+          <aside
+            className={`code-column ${state.mobileTab === 'code' ? 'is-active' : ''}`}
+            data-lab-tour="code"
+          >
+            <div className="code-column__sticky">
+              <section className="panel-shell panel-shell--code">
+                <div className="panel-shell__header">
+                  <span className="panel-shell__title">Code</span>
+                  <button
+                    type="button"
+                    className="panel-shell__toggle"
+                    onClick={() => togglePanel('code')}
+                    aria-expanded="true"
+                    aria-controls="code-panel-body"
+                  >
+                    Collapse
+                  </button>
+                </div>
+                <div id="code-panel-body" className="panel-shell__body">
+                  <CodeViewer source={source} activeRanges={activeRanges} />
+                </div>
+              </section>
+            </div>
+          </aside>
+        ) : null}
 
         <section
           className={`story-scene ${
             state.mobileTab === 'code' ? '' : 'is-active'
           }`}
+          style={isCompact ? undefined : { gridTemplateRows: storySceneRows.join(' ') }}
         >
           <div className="story-scene__toolbar">
             <div className="story-scene__toolbar-main">
               <div className="story-scene__toolbar-panel" data-lab-tour="controls">
                 <div className="story-scene__toolbar-bar">
-                  <div
-                    className="scene-panel__stage-chip"
-                    data-lab-tour="stage"
-                    onMouseEnter={() => handleFocusRanges(phase.codeRanges)}
-                    onMouseLeave={() => handleFocusRanges(null)}
-                  >
-                    <div className="scene-panel__stage-chip-copy">
-                      <span className="eyebrow">Current stage</span>
-                      <strong>{phase.groupTitle}</strong>
+                  <div className="story-scene__toolbar-stage">
+                    <div
+                      className="scene-panel__stage-chip"
+                      data-lab-tour="stage"
+                      onMouseEnter={() => handleFocusRanges(phase.codeRanges)}
+                      onMouseLeave={() => handleFocusRanges(null)}
+                    >
+                      <div className="scene-panel__stage-chip-main">
+                        <div className="scene-panel__stage-chip-copy">
+                          <span className="eyebrow">Current stage</span>
+                          <strong>{phase.groupTitle}</strong>
+                        </div>
+                        <span className="scene-panel__stage-step">
+                          step {state.activePhaseIndex + 1} / {phaseCount}
+                        </span>
+                      </div>
                     </div>
-                    <span className="scene-panel__stage-step">
-                      step {state.activePhaseIndex + 1} / {phaseCount}
-                    </span>
                   </div>
 
                   <div className="story-panel__actions">
@@ -608,37 +662,120 @@ export default function App() {
                     : 'Edit the starting text, then reset when you want the model to restart from it.'}
                 </p>
               </div>
+
+              {hasCollapsedPanels ? (
+                <div className="panel-dock-shell" aria-label="Hidden panels">
+                  <div className="panel-dock panel-dock--toolbar">
+                    {collapsedPanels.code ? (
+                      <button
+                        type="button"
+                        className="panel-dock__button panel-dock__button--code"
+                        onClick={() => togglePanel('code')}
+                        aria-label="Expand"
+                      >
+                        <span className="panel-dock__button-title">Code</span>
+                        <span className="panel-dock__button-detail">
+                          Return source viewer
+                        </span>
+                      </button>
+                    ) : null}
+                    {collapsedPanels.scene ? (
+                      <button
+                        type="button"
+                        className="panel-dock__button panel-dock__button--scene"
+                        onClick={() => togglePanel('scene')}
+                        aria-label="Expand"
+                      >
+                        <span className="panel-dock__button-title">Model viewer</span>
+                        <span className="panel-dock__button-detail">
+                          Restore active network view
+                        </span>
+                      </button>
+                    ) : null}
+                    {collapsedPanels.story ? (
+                      <button
+                        type="button"
+                        className="panel-dock__button panel-dock__button--story"
+                        onClick={() => togglePanel('story')}
+                        aria-label="Expand"
+                      >
+                        <span className="panel-dock__button-title">Explanation</span>
+                        <span className="panel-dock__button-detail">
+                          Bring back step notes
+                        </span>
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+              ) : null}
             </div>
           </div>
 
-          <div
-            className={`story-scene__scene ${
-              state.mobileTab === 'scene' ? 'is-active' : ''
-            }`}
-            data-lab-tour="scene"
-          >
-            <ArchitectureScene
-              trace={trace}
-              phase={phase}
-              contextTokens={contextTokens}
-              tokenLabel={tokenLabel}
-              sceneModelData={sceneModelData}
-              onFocusRanges={handleFocusRanges}
-            />
-          </div>
+          {!collapsedPanels.scene ? (
+            <div
+              className={`story-scene__scene ${
+                state.mobileTab === 'scene' ? 'is-active' : ''
+              }`}
+              data-lab-tour="scene"
+            >
+              <div className="panel-shell panel-shell--scene">
+                <div className="panel-shell__header">
+                  <span className="panel-shell__title">Model viewer</span>
+                  <button
+                    type="button"
+                    className="panel-shell__toggle"
+                    onClick={() => togglePanel('scene')}
+                    aria-expanded="true"
+                    aria-controls="scene-panel-body"
+                  >
+                    Collapse
+                  </button>
+                </div>
+                <div id="scene-panel-body" className="panel-shell__body">
+                  <ArchitectureScene
+                    trace={trace}
+                    phase={phase}
+                    contextTokens={contextTokens}
+                    tokenLabel={tokenLabel}
+                    sceneModelData={sceneModelData}
+                    onFocusRanges={handleFocusRanges}
+                  />
+                </div>
+              </div>
+            </div>
+          ) : null}
 
-          <div
-            className={`story-scene__story ${
-              state.mobileTab === 'story' ? 'is-active' : ''
-            }`}
-            data-lab-tour="story"
-          >
-            <Controls
-              key={`${state.mobileTab}-${phase.stepId}-${trace.positionId}-${trace.tokenId}-${trace.sampledTokenId}`}
-              beats={phase.copy.beats}
-            />
-          </div>
+          {!collapsedPanels.story ? (
+            <div
+              className={`story-scene__story ${
+                state.mobileTab === 'story' ? 'is-active' : ''
+              }`}
+              data-lab-tour="story"
+            >
+              <div className="panel-shell panel-shell--story">
+                <div className="panel-shell__header">
+                  <span className="panel-shell__title">Explanation</span>
+                  <button
+                    type="button"
+                    className="panel-shell__toggle"
+                    onClick={() => togglePanel('story')}
+                    aria-expanded="true"
+                    aria-controls="story-panel-body"
+                  >
+                    Collapse
+                  </button>
+                </div>
+                <div id="story-panel-body" className="panel-shell__body">
+                  <Controls
+                    key={`${state.mobileTab}-${phase.stepId}-${trace.positionId}-${trace.tokenId}-${trace.sampledTokenId}`}
+                    beats={phase.copy.beats}
+                  />
+                </div>
+              </div>
+            </div>
+          ) : null}
         </section>
+
       </main>
 
       {showLabTour ? (

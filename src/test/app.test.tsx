@@ -212,6 +212,47 @@ describe('App', () => {
     expect(within(dialog).getByText('LLM Visualization')).toBeInTheDocument()
   })
 
+  it('collapses and expands the main panels', async () => {
+    const runtime = makeRuntime()
+    runtime.reset.mockResolvedValue({
+      trace: makeTrace({ sampledTokenId: 26 }),
+      session: { visibleTokenIds: [4, 12], done: false },
+      diagnostics: {
+        activeBackend: 'cpu',
+        fallbackReason: 'WebGPU unavailable',
+      },
+    })
+
+    loadModelBundleMock.mockResolvedValue(bundleStub)
+    createTokenizerMock.mockReturnValue(makeTokenizer())
+    runtimeCtorMock.mockImplementation(function () {
+      return runtime
+    })
+    mockSourceFetch(sourceText)
+
+    const { default: App } = await import('../App')
+    render(<App />)
+
+    await screen.findByText('How LLM systems actually work')
+
+    const collapseButtons = screen.getAllByRole('button', { name: 'Collapse' })
+    fireEvent.click(collapseButtons[0]!)
+    fireEvent.click(collapseButtons[1]!)
+    fireEvent.click(collapseButtons[2]!)
+
+    expect(screen.queryByText('microgpt.py')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('scene-viewport')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Step explanation')).not.toBeInTheDocument()
+
+    const expandButtons = screen.getAllByRole('button', { name: 'Expand' })
+    fireEvent.click(expandButtons[0]!)
+    fireEvent.click(screen.getAllByRole('button', { name: 'Expand' })[0]!)
+    fireEvent.click(screen.getAllByRole('button', { name: 'Expand' })[0]!)
+
+    expect(screen.getByText('microgpt.py')).toBeInTheDocument()
+    expect(screen.getByLabelText('Step explanation')).toBeInTheDocument()
+  })
+
   it('finishes the intro, remembers it, and can reopen it from the lab', async () => {
     window.localStorage.removeItem(INTRO_SEEN_STORAGE_KEY)
     window.localStorage.removeItem(LAB_TOUR_SEEN_STORAGE_KEY)
