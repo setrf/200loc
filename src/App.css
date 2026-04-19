@@ -353,26 +353,16 @@
   grid-template-columns: max-content minmax(420px, 1fr);
   gap: var(--space-16);
   padding: var(--space-16);
+  align-content: start;
   align-items: stretch;
 }
 
 .left-column {
-  --story-panel-height: var(--top-panel-height);
   min-width: 0;
   min-height: 0;
   display: grid;
   grid-template-rows: minmax(0, 1fr);
-  gap: var(--space-16);
-  align-content: start;
-}
-
-.left-column--stacked {
-  grid-template-rows: var(--story-panel-height) minmax(0, 1fr);
-}
-
-.left-column--panel-only {
-  grid-template-rows: var(--story-panel-height);
-  align-self: start;
+  align-content: stretch;
 }
 
 .panel-shell {
@@ -432,6 +422,89 @@
   min-height: 0;
 }
 
+.desktop-top-panel {
+  grid-column: 1 / -1;
+  min-width: 0;
+  min-height: 0;
+  height: auto;
+  align-self: start;
+}
+
+.desktop-top-panel__body {
+  display: grid;
+  gap: var(--space-16);
+  min-height: 0;
+  padding: var(--space-12) var(--space-16) var(--space-16);
+}
+
+.desktop-top-panel__main {
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-12);
+}
+
+.desktop-top-panel__main.is-single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.desktop-top-panel__controls,
+.desktop-top-panel__story {
+  min-width: 0;
+  min-height: 0;
+}
+
+.desktop-top-panel__controls {
+  display: grid;
+  gap: var(--space-8);
+  align-content: start;
+  padding-bottom: var(--space-12);
+  border-bottom: 1px solid var(--border);
+}
+
+.desktop-top-panel__controls.is-full {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.desktop-top-panel__story {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: var(--space-12);
+  min-height: 0;
+}
+
+.desktop-top-panel__story-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+}
+
+.desktop-top-panel__story-body {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  max-height: 156px;
+}
+
+.desktop-top-panel__story .story-panel {
+  flex: 1 1 auto;
+  height: auto;
+  min-height: 0;
+  max-height: none;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+}
+
+.desktop-top-panel__story .story-panel__lesson {
+  padding-right: 0;
+}
+
 .left-column,
 .code-column,
 .story-scene,
@@ -448,7 +521,17 @@
 }
 
 .story-scene__scene {
+  flex: 1 1 auto;
   gap: var(--rhs-stack-gap, var(--space-16));
+}
+
+.story-scene {
+  --rhs-stack-gap: var(--space-16);
+  display: flex;
+  flex-direction: column;
+  gap: var(--rhs-stack-gap);
+  height: 100%;
+  align-content: start;
 }
 
 .code-column__sticky {
@@ -472,16 +555,6 @@
   padding-right: 0;
   scrollbar-gutter: stable;
   scrollbar-width: auto;
-}
-
-.story-scene {
-  --rhs-stack-gap: var(--space-16);
-  --story-panel-height: var(--top-panel-height);
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr) var(--story-panel-height);
-  gap: var(--rhs-stack-gap);
-  height: 100%;
-  align-content: start;
 }
 
 .story-panel,
@@ -806,6 +879,15 @@
   box-shadow: var(--shadow);
 }
 
+.panel-dock-shell--inline {
+  padding: var(--space-16) 0 0;
+  border: 0;
+  border-top: 1px solid var(--border);
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+}
+
 .panel-dock--toolbar {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -975,6 +1057,7 @@
 }
 
 .story-scene__toolbar button,
+.desktop-top-panel button,
 .story-panel button,
 .segment-tabs button {
   min-height: var(--control-height);
@@ -990,11 +1073,13 @@
     color 160ms ease;
 }
 
-.story-scene__toolbar .story-panel__actions--toolbar button {
+.story-scene__toolbar .story-panel__actions--toolbar button,
+.desktop-top-panel .story-panel__actions--toolbar button {
   min-height: 52px;
 }
 
 .story-scene__toolbar button:hover,
+.desktop-top-panel button:hover,
 .story-panel button:hover,
 .segment-tabs button:hover {
   border-color: rgba(255, 255, 255, 0.14);
@@ -1002,6 +1087,7 @@
 }
 
 .story-scene__toolbar button:disabled,
+.desktop-top-panel button:disabled,
 .story-panel button:disabled {
   opacity: 0.45;
   cursor: not-allowed;
@@ -1536,6 +1622,10 @@ button.annotation-trigger:focus-visible {
     grid-template-columns: 1fr;
     gap: var(--space-12);
     padding: var(--space-12) var(--space-16) var(--space-16);
+  }
+
+  .desktop-top-panel {
+    display: none;
   }
 
   .code-column__sticky {

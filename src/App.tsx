@@ -458,185 +458,238 @@ export default function App() {
     !collapsedPanels.story && (!isCompact || state.mobileTab === 'story')
   const showDesktopStoryPanel = !isCompact && showStoryPanel
   const showCompactStoryPanel = isCompact && showStoryPanel
-  const showDesktopRightColumn = !isCompact && (showDesktopStoryPanel || showScenePanel)
-  const showStoryScene = isCompact ? state.mobileTab !== 'code' : showDesktopRightColumn
-  const storySceneRows: string[] = []
-  if (!isCompact && showDesktopStoryPanel) {
-    storySceneRows.push('var(--story-panel-height)')
-  }
-  if (!isCompact && showScenePanel) {
-    storySceneRows.push('minmax(0, 1fr)')
-  }
+  const showStoryScene = isCompact ? state.mobileTab !== 'code' : showScenePanel
   const layoutStyle = isCompact
     ? undefined
     : {
-        gridTemplateColumns: showDesktopRightColumn
+        gridTemplateColumns: showCodeColumn && showScenePanel
           ? 'minmax(560px, 1fr) minmax(520px, 1fr)'
           : 'minmax(0, 1fr)',
+        gridTemplateRows: showCodeColumn || showScenePanel
+          ? 'auto minmax(0, 1fr)'
+          : 'auto',
       }
+
+  const controlsPanelContent = (
+    <>
+      <div className="story-scene__toolbar-bar">
+        <div className="story-scene__toolbar-stage">
+          <div
+            className="scene-panel__stage-chip"
+            data-lab-tour="stage"
+            onMouseEnter={() => handleFocusRanges(phase.codeRanges)}
+            onMouseLeave={() => handleFocusRanges(null)}
+          >
+            <div className="scene-panel__stage-chip-main">
+              <div className="scene-panel__stage-chip-copy">
+                <span className="eyebrow">Current stage</span>
+                <strong>{phase.groupTitle}</strong>
+              </div>
+              <span className="scene-panel__stage-step">
+                step {state.activePhaseIndex + 1} / {phaseCount}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div className="story-panel__actions story-panel__actions--toolbar">
+          <button
+            type="button"
+            onClick={() => {
+              dispatch({ type: 'setPlaying', playing: false })
+              void hydrate(state.prefixInput)
+            }}
+            disabled={controlsLocked}
+          >
+            {hasPendingPrefixChange ? 'Apply text' : 'Reset'}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              dispatch({ type: 'setPlaying', playing: false })
+              dispatch({ type: 'phasePrev', phaseCount })
+            }}
+            disabled={!canPrev || navigationBlocked}
+          >
+            Prev
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              dispatch({ type: 'setPlaying', playing: false })
+              void advance()
+            }}
+            disabled={!canNext || navigationBlocked}
+          >
+            Next
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              if (state.status === 'playing') {
+                dispatch({ type: 'setPlaying', playing: false })
+              } else {
+                dispatch({ type: 'setPlaying', playing: true })
+              }
+            }}
+            disabled={!canNext || navigationBlocked}
+          >
+            {state.status === 'playing' ? 'Pause' : 'Play'}
+          </button>
+        </div>
+      </div>
+
+      <div className="story-scene__toolbar-inputs">
+        <label
+          className="story-panel__field story-panel__field--editable"
+          htmlFor="prefix-input"
+        >
+          <div className="story-panel__field-head">
+            <span className="eyebrow">Starting text</span>
+          </div>
+          <input
+            id="prefix-input"
+            className="story-panel__input"
+            aria-label="Starting text"
+            value={state.prefixInput}
+            onChange={(event) => handlePrefixChange(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' && !controlsLocked) {
+                dispatch({ type: 'setPlaying', playing: false })
+                void hydrate(state.prefixInput)
+              }
+            }}
+            placeholder="em"
+            autoComplete="off"
+            spellCheck={false}
+          />
+        </label>
+
+        <div
+          className={`story-panel__field story-panel__field--readonly${
+            hasPendingPrefixChange ? ' is-stale' : ''
+          }`}
+        >
+          <div className="story-panel__field-head">
+            <span className="eyebrow">Current text</span>
+            <span className="story-panel__field-status">{currentTextStatus}</span>
+          </div>
+          <output
+            className={`story-panel__readout${currentText ? '' : ' is-empty'}`}
+            aria-label="Current text"
+            aria-live="polite"
+          >
+            {currentText || 'Nothing generated yet'}
+          </output>
+        </div>
+      </div>
+
+      <p className="story-panel__field-note">
+        {hasPendingPrefixChange
+          ? 'Current run still uses the previous starting text. Apply text to restart from your draft.'
+          : 'Edit the starting text, then reset when you want the model to restart from it.'}
+      </p>
+    </>
+  )
+
+  const renderHiddenPanelsDock = (className?: string) =>
+    hasCollapsedPanels ? (
+      <div
+        className={`panel-dock-shell${className ? ` ${className}` : ''}`}
+        aria-label="Hidden panels"
+      >
+        <div className="panel-dock panel-dock--toolbar">
+          {collapsedPanels.code ? (
+            <button
+              type="button"
+              className="panel-dock__button panel-dock__button--code"
+              onClick={() => togglePanel('code')}
+              aria-label="Expand code panel"
+            >
+              <span className="panel-dock__button-title">Code</span>
+            </button>
+          ) : null}
+          {collapsedPanels.scene ? (
+            <button
+              type="button"
+              className="panel-dock__button panel-dock__button--scene"
+              onClick={() => togglePanel('scene')}
+              aria-label="Expand model viewer panel"
+            >
+              <span className="panel-dock__button-title">Model viewer</span>
+            </button>
+          ) : null}
+          {collapsedPanels.story ? (
+            <button
+              type="button"
+              className="panel-dock__button panel-dock__button--story"
+              onClick={() => togglePanel('story')}
+              aria-label="Expand explanation panel"
+            >
+              <span className="panel-dock__button-title">Explanation</span>
+            </button>
+          ) : null}
+        </div>
+      </div>
+    ) : null
 
   const toolbarPanel = (
     <div className="story-scene__toolbar">
       <div className="story-scene__toolbar-main">
         <div className="story-scene__toolbar-panel" data-lab-tour="controls">
-          <div className="story-scene__toolbar-bar">
-            <div className="story-scene__toolbar-stage">
-              <div
-                className="scene-panel__stage-chip"
-                data-lab-tour="stage"
-                onMouseEnter={() => handleFocusRanges(phase.codeRanges)}
-                onMouseLeave={() => handleFocusRanges(null)}
-              >
-                <div className="scene-panel__stage-chip-main">
-                  <div className="scene-panel__stage-chip-copy">
-                    <span className="eyebrow">Current stage</span>
-                    <strong>{phase.groupTitle}</strong>
-                  </div>
-                  <span className="scene-panel__stage-step">
-                    step {state.activePhaseIndex + 1} / {phaseCount}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div className="story-panel__actions story-panel__actions--toolbar">
-              <button
-                type="button"
-                onClick={() => {
-                  dispatch({ type: 'setPlaying', playing: false })
-                  void hydrate(state.prefixInput)
-                }}
-                disabled={controlsLocked}
-              >
-                {hasPendingPrefixChange ? 'Apply text' : 'Reset'}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  dispatch({ type: 'setPlaying', playing: false })
-                  dispatch({ type: 'phasePrev', phaseCount })
-                }}
-                disabled={!canPrev || navigationBlocked}
-              >
-                Prev
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  dispatch({ type: 'setPlaying', playing: false })
-                  void advance()
-                }}
-                disabled={!canNext || navigationBlocked}
-              >
-                Next
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  if (state.status === 'playing') {
-                    dispatch({ type: 'setPlaying', playing: false })
-                  } else {
-                    dispatch({ type: 'setPlaying', playing: true })
-                  }
-                }}
-                disabled={!canNext || navigationBlocked}
-              >
-                {state.status === 'playing' ? 'Pause' : 'Play'}
-              </button>
-            </div>
-          </div>
-
-          <div className="story-scene__toolbar-inputs">
-            <label
-              className="story-panel__field story-panel__field--editable"
-              htmlFor="prefix-input"
-            >
-              <div className="story-panel__field-head">
-                <span className="eyebrow">Starting text</span>
-              </div>
-              <input
-                id="prefix-input"
-                className="story-panel__input"
-                aria-label="Starting text"
-                value={state.prefixInput}
-                onChange={(event) => handlePrefixChange(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter' && !controlsLocked) {
-                    dispatch({ type: 'setPlaying', playing: false })
-                    void hydrate(state.prefixInput)
-                  }
-                }}
-                placeholder="em"
-                autoComplete="off"
-                spellCheck={false}
-              />
-            </label>
-
-            <div
-              className={`story-panel__field story-panel__field--readonly${
-                hasPendingPrefixChange ? ' is-stale' : ''
-              }`}
-            >
-              <div className="story-panel__field-head">
-                <span className="eyebrow">Current text</span>
-                <span className="story-panel__field-status">{currentTextStatus}</span>
-              </div>
-              <output
-                className={`story-panel__readout${currentText ? '' : ' is-empty'}`}
-                aria-label="Current text"
-                aria-live="polite"
-              >
-                {currentText || 'Nothing generated yet'}
-              </output>
-            </div>
-          </div>
-
-          <p className="story-panel__field-note">
-            {hasPendingPrefixChange
-              ? 'Current run still uses the previous starting text. Apply text to restart from your draft.'
-              : 'Edit the starting text, then reset when you want the model to restart from it.'}
-          </p>
+          {controlsPanelContent}
         </div>
 
-        {hasCollapsedPanels ? (
-          <div className="panel-dock-shell" aria-label="Hidden panels">
-            <div className="panel-dock panel-dock--toolbar">
-              {collapsedPanels.code ? (
-                <button
-                  type="button"
-                  className="panel-dock__button panel-dock__button--code"
-                  onClick={() => togglePanel('code')}
-                  aria-label="Expand code panel"
-                >
-                  <span className="panel-dock__button-title">Code</span>
-                </button>
-              ) : null}
-              {collapsedPanels.scene ? (
-                <button
-                  type="button"
-                  className="panel-dock__button panel-dock__button--scene"
-                  onClick={() => togglePanel('scene')}
-                  aria-label="Expand model viewer panel"
-                >
-                  <span className="panel-dock__button-title">Model viewer</span>
-                </button>
-              ) : null}
-              {collapsedPanels.story ? (
-                <button
-                  type="button"
-                  className="panel-dock__button panel-dock__button--story"
-                  onClick={() => togglePanel('story')}
-                  aria-label="Expand explanation panel"
-                >
-                  <span className="panel-dock__button-title">Explanation</span>
-                </button>
-              ) : null}
-            </div>
-          </div>
-        ) : null}
+        {renderHiddenPanelsDock()}
       </div>
     </div>
   )
+
+  const desktopTopPanel = !isCompact ? (
+    <section className="panel-shell desktop-top-panel">
+      <div className="desktop-top-panel__body">
+        <div
+          className={`desktop-top-panel__main${
+            showDesktopStoryPanel ? '' : ' is-single'
+          }`}
+        >
+          <div
+            className={`desktop-top-panel__controls${
+              showDesktopStoryPanel ? '' : ' is-full'
+            }`}
+            data-lab-tour="controls"
+          >
+            {controlsPanelContent}
+          </div>
+
+          {showDesktopStoryPanel ? (
+            <div className="desktop-top-panel__story" data-lab-tour="story">
+              <div className="desktop-top-panel__story-header">
+                <span className="panel-shell__title">Explanation</span>
+                <button
+                  type="button"
+                  className="panel-shell__toggle"
+                  onClick={() => togglePanel('story')}
+                  aria-expanded="true"
+                  aria-controls="story-panel-body"
+                >
+                  Collapse
+                </button>
+              </div>
+              <div id="story-panel-body" className="desktop-top-panel__story-body">
+                <Controls
+                  key={`desktop-${state.mobileTab}-${phase.stepId}-${trace.positionId}-${trace.tokenId}-${trace.sampledTokenId}`}
+                  beats={phase.copy.beats}
+                />
+              </div>
+            </div>
+          ) : null}
+        </div>
+
+        {renderHiddenPanelsDock('panel-dock-shell--inline')}
+      </div>
+    </section>
+  ) : null
 
   const storyPanel = (
     <div
@@ -709,42 +762,34 @@ export default function App() {
         className="walkthrough-layout"
         style={layoutStyle}
       >
-        {!isCompact ? (
-          <div
-            className={`left-column${
-              showCodeColumn
-                ? ' left-column--stacked'
-                : ' left-column--panel-only'
-            }`}
-          >
-            {toolbarPanel}
+        {desktopTopPanel}
 
-            {showCodeColumn ? (
-              <aside
-                className={`code-column ${state.mobileTab === 'code' ? 'is-active' : ''}`}
-                data-lab-tour="code"
-              >
-                <div className="code-column__sticky">
-                  <section className="panel-shell panel-shell--code">
-                    <div className="panel-shell__header">
-                      <span className="panel-shell__title">Code</span>
-                      <button
-                        type="button"
-                        className="panel-shell__toggle"
-                        onClick={() => togglePanel('code')}
-                        aria-expanded="true"
-                        aria-controls="code-panel-body"
-                      >
-                        Collapse
-                      </button>
-                    </div>
-                    <div id="code-panel-body" className="panel-shell__body">
-                      <CodeViewer source={source} activeRanges={activeRanges} />
-                    </div>
-                  </section>
-                </div>
-              </aside>
-            ) : null}
+        {!isCompact && showCodeColumn ? (
+          <div className="left-column">
+            <aside
+              className={`code-column ${state.mobileTab === 'code' ? 'is-active' : ''}`}
+              data-lab-tour="code"
+            >
+              <div className="code-column__sticky">
+                <section className="panel-shell panel-shell--code">
+                  <div className="panel-shell__header">
+                    <span className="panel-shell__title">Code</span>
+                    <button
+                      type="button"
+                      className="panel-shell__toggle"
+                      onClick={() => togglePanel('code')}
+                      aria-expanded="true"
+                      aria-controls="code-panel-body"
+                    >
+                      Collapse
+                    </button>
+                  </div>
+                  <div id="code-panel-body" className="panel-shell__body">
+                    <CodeViewer source={source} activeRanges={activeRanges} />
+                  </div>
+                </section>
+              </div>
+            </aside>
           </div>
         ) : null}
 
@@ -753,15 +798,8 @@ export default function App() {
             className={`story-scene ${
               state.mobileTab === 'code' ? '' : 'is-active'
             }`}
-            style={
-              isCompact || storySceneRows.length === 0
-                ? undefined
-                : { gridTemplateRows: storySceneRows.join(' ') }
-            }
           >
             {isCompact ? toolbarPanel : null}
-
-            {showDesktopStoryPanel ? storyPanel : null}
 
             {showScenePanel ? (
               <div
