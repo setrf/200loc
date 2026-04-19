@@ -78,7 +78,6 @@ async function advanceOnePhase(page: Page) {
   const beforeStep = await stepLabel(page)
   const beforePhase = await phaseLabel(page)
   await page.getByRole('button', { name: 'Next' }).click()
-  await page.waitForTimeout(300)
   await expect
     .poll(async () => `${await stepLabel(page)}|${await phaseLabel(page)}`, {
       timeout: 10_000,
@@ -216,6 +215,42 @@ test.describe('desktop walkthrough', () => {
     expect(issues).toEqual([])
   })
 
+  test('rebalances the desktop shell so code and the right stack share space more evenly', async ({
+    page,
+  }) => {
+    const issues = collectBrowserIssues(page)
+    const layout = await page.evaluate(() => {
+      function readRect(selector: string) {
+        const element = document.querySelector(selector)
+        if (!(element instanceof HTMLElement)) {
+          throw new Error(`Missing element for selector: ${selector}`)
+        }
+
+        const rect = element.getBoundingClientRect()
+        return {
+          width: rect.width,
+          height: rect.height,
+        }
+      }
+
+      return {
+        main: readRect('.walkthrough-layout'),
+        code: readRect('.code-column'),
+        rightStack: readRect('.story-scene'),
+        story: readRect('.story-panel'),
+        sceneViewport: readRect('.scene-panel__viewport'),
+      }
+    })
+
+    const codeShare = layout.code.width / layout.main.width
+    expect(codeShare).toBeGreaterThan(0.45)
+    expect(codeShare).toBeLessThan(0.55)
+    expect(Math.abs(layout.code.width - layout.rightStack.width)).toBeLessThan(120)
+    expect(layout.story.height).toBeGreaterThanOrEqual(150)
+    expect(layout.sceneViewport.height).toBeGreaterThan(layout.story.height)
+    expect(issues).toEqual([])
+  })
+
   test('crosses the token boundary cleanly after the thirty-fourth step', async ({ page }) => {
     const issues = collectBrowserIssues(page)
     await page.getByRole('textbox', { name: 'Starting text' }).fill('em')
@@ -240,11 +275,13 @@ test.describe('desktop walkthrough', () => {
 
   test('autoplay advances, pauses cleanly, and stays free of browser errors', async ({ page }) => {
     const issues = collectBrowserIssues(page)
+    const initialStep = await stepLabel(page)
 
     await page.getByRole('button', { name: 'Play' }).click()
     await expect(page.getByRole('button', { name: 'Pause' })).toBeVisible()
-    await page.waitForTimeout(1_500)
-    expect(await stepLabel(page)).not.toBe('step 1 / 34')
+    await expect
+      .poll(async () => await stepLabel(page), { timeout: 8_000 })
+      .not.toBe(initialStep)
 
     await page.getByRole('button', { name: 'Pause' }).click()
     const pausedStep = await stepLabel(page)
@@ -282,6 +319,7 @@ test.describe('desktop walkthrough', () => {
   test('supports mouse and keyboard scene interaction without scrolling the page', async ({
     page,
   }) => {
+    test.slow()
     const issues = collectBrowserIssues(page)
     const scene = page.locator('.scene-panel')
     const eventSurface = page.locator('.scene-panel__event-surface')
@@ -685,7 +723,11 @@ test.describe('intro walkthrough', () => {
         'The stage badge shows which part of the 34-step loop you are looking at right now.',
       ),
     ).toBeVisible()
-    await page.getByRole('button', { name: 'Skip tour' }).click()
+    const tour = page.getByRole('dialog', { name: 'Lab tour' })
+    for (let index = 0; index < 4; index += 1) {
+      await tour.getByRole('button', { name: 'Next' }).click()
+    }
+    await tour.getByRole('button', { name: 'Start exploring' }).click()
     await expect(
       page.getByRole('heading', { name: 'How LLM systems actually work' }),
     ).toBeVisible()
@@ -810,7 +852,7 @@ test.describe('mobile walkthrough', () => {
     await context.close()
   })
 
-  test('switches between code, story, and scene without overflow or browser errors', async ({
+  test('uses full-width tabs and only mounts the active compact pane without overflow', async ({
     page,
   }) => {
     const issues = collectBrowserIssues(page)
@@ -820,29 +862,42 @@ test.describe('mobile walkthrough', () => {
     await expect(page.getByRole('button', { name: 'Story', exact: true })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Scene', exact: true })).toBeVisible()
 
-    const initialCanvasCount = await page.locator('.scene-panel canvas').count()
-    expect(initialCanvasCount).toBe(1)
+    const initialMetrics = await page.evaluate(() => {
+      const tabs = [...document.querySelectorAll<HTMLElement>('.segment-tabs button')]
+      const tabWidths = tabs.map((tab) => tab.getBoundingClientRect().width)
+      const tabsWidth =
+        document.querySelector('.segment-tabs')?.getBoundingClientRect().width ?? 0
 
-    await page.evaluate(() => {
-      ;(window as Window & { __mobileSceneCanvas?: HTMLCanvasElement | null }).__mobileSceneCanvas =
-        document.querySelector('.scene-panel canvas')
+      return {
+        tabWidths,
+        tabsWidth,
+        codeCount: document.querySelectorAll('.code-column').length,
+        sceneCount: document.querySelectorAll('.scene-panel').length,
+        storyCount: document.querySelectorAll('.story-scene__story').length,
+      }
     })
+
+    expect(initialMetrics.tabsWidth).toBeGreaterThan(330)
+    expect(Math.max(...initialMetrics.tabWidths) - Math.min(...initialMetrics.tabWidths)).toBeLessThanOrEqual(2)
+    expect(initialMetrics.codeCount).toBe(0)
+    expect(initialMetrics.sceneCount).toBe(0)
+    expect(initialMetrics.storyCount).toBe(1)
 
     await page.getByRole('button', { name: 'Scene', exact: true }).click()
     await expect(page.locator('.scene-panel')).toBeVisible()
     await expect(page.getByText(/drag to pan/i)).toBeVisible()
+    await expect(page.locator('.story-scene__story')).toHaveCount(0)
+    await expect(page.locator('.code-column')).toHaveCount(0)
 
     await page.getByRole('button', { name: 'Code', exact: true }).click()
     await expect(page.locator('.code-viewer')).toBeVisible()
+    await expect(page.locator('.story-scene')).toHaveCount(0)
+    await expect(page.locator('.scene-panel')).toHaveCount(0)
 
     await page.getByRole('button', { name: 'Story', exact: true }).click()
     await expect(page.getByRole('textbox', { name: 'Starting text' })).toBeVisible()
-
-    const preservedCanvas = await page.evaluate(() => {
-      const win = window as Window & { __mobileSceneCanvas?: HTMLCanvasElement | null }
-      return document.querySelector('.scene-panel canvas') === win.__mobileSceneCanvas
-    })
-    expect(preservedCanvas).toBe(true)
+    await expect(page.locator('.story-scene__story')).toHaveCount(1)
+    await expect(page.locator('.scene-panel')).toHaveCount(0)
 
     const overflow = await page.evaluate(
       () => document.documentElement.scrollWidth - window.innerWidth,

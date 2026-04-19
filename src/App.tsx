@@ -450,13 +450,222 @@ export default function App() {
             : 'Ready'
   const hasCollapsedPanels =
     collapsedPanels.code || collapsedPanels.scene || collapsedPanels.story
-  const storySceneRows = ['auto']
-  if (!collapsedPanels.scene) {
-    storySceneRows.push('minmax(0, 1fr)')
-  }
-  if (!collapsedPanels.story) {
+  const showCodeColumn =
+    !collapsedPanels.code && (!isCompact || state.mobileTab === 'code')
+  const showScenePanel =
+    !collapsedPanels.scene && (!isCompact || state.mobileTab === 'scene')
+  const showStoryPanel =
+    !collapsedPanels.story && (!isCompact || state.mobileTab === 'story')
+  const showDesktopStoryPanel = !isCompact && showStoryPanel
+  const showCompactStoryPanel = isCompact && showStoryPanel
+  const showDesktopRightColumn = !isCompact && (showDesktopStoryPanel || showScenePanel)
+  const showStoryScene = isCompact ? state.mobileTab !== 'code' : showDesktopRightColumn
+  const storySceneRows: string[] = []
+  if (!isCompact && showDesktopStoryPanel) {
     storySceneRows.push('var(--story-panel-height)')
   }
+  if (!isCompact && showScenePanel) {
+    storySceneRows.push('minmax(0, 1fr)')
+  }
+  const layoutStyle = isCompact
+    ? undefined
+    : {
+        gridTemplateColumns: showDesktopRightColumn
+          ? 'minmax(560px, 1fr) minmax(520px, 1fr)'
+          : 'minmax(0, 1fr)',
+      }
+
+  const toolbarPanel = (
+    <div className="story-scene__toolbar">
+      <div className="story-scene__toolbar-main">
+        <div className="story-scene__toolbar-panel" data-lab-tour="controls">
+          <div className="story-scene__toolbar-bar">
+            <div className="story-scene__toolbar-stage">
+              <div
+                className="scene-panel__stage-chip"
+                data-lab-tour="stage"
+                onMouseEnter={() => handleFocusRanges(phase.codeRanges)}
+                onMouseLeave={() => handleFocusRanges(null)}
+              >
+                <div className="scene-panel__stage-chip-main">
+                  <div className="scene-panel__stage-chip-copy">
+                    <span className="eyebrow">Current stage</span>
+                    <strong>{phase.groupTitle}</strong>
+                  </div>
+                  <span className="scene-panel__stage-step">
+                    step {state.activePhaseIndex + 1} / {phaseCount}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="story-panel__actions story-panel__actions--toolbar">
+              <button
+                type="button"
+                onClick={() => {
+                  dispatch({ type: 'setPlaying', playing: false })
+                  void hydrate(state.prefixInput)
+                }}
+                disabled={controlsLocked}
+              >
+                {hasPendingPrefixChange ? 'Apply text' : 'Reset'}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  dispatch({ type: 'setPlaying', playing: false })
+                  dispatch({ type: 'phasePrev', phaseCount })
+                }}
+                disabled={!canPrev || navigationBlocked}
+              >
+                Prev
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  dispatch({ type: 'setPlaying', playing: false })
+                  void advance()
+                }}
+                disabled={!canNext || navigationBlocked}
+              >
+                Next
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (state.status === 'playing') {
+                    dispatch({ type: 'setPlaying', playing: false })
+                  } else {
+                    dispatch({ type: 'setPlaying', playing: true })
+                  }
+                }}
+                disabled={!canNext || navigationBlocked}
+              >
+                {state.status === 'playing' ? 'Pause' : 'Play'}
+              </button>
+            </div>
+          </div>
+
+          <div className="story-scene__toolbar-inputs">
+            <label
+              className="story-panel__field story-panel__field--editable"
+              htmlFor="prefix-input"
+            >
+              <div className="story-panel__field-head">
+                <span className="eyebrow">Starting text</span>
+              </div>
+              <input
+                id="prefix-input"
+                className="story-panel__input"
+                aria-label="Starting text"
+                value={state.prefixInput}
+                onChange={(event) => handlePrefixChange(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' && !controlsLocked) {
+                    dispatch({ type: 'setPlaying', playing: false })
+                    void hydrate(state.prefixInput)
+                  }
+                }}
+                placeholder="em"
+                autoComplete="off"
+                spellCheck={false}
+              />
+            </label>
+
+            <div
+              className={`story-panel__field story-panel__field--readonly${
+                hasPendingPrefixChange ? ' is-stale' : ''
+              }`}
+            >
+              <div className="story-panel__field-head">
+                <span className="eyebrow">Current text</span>
+                <span className="story-panel__field-status">{currentTextStatus}</span>
+              </div>
+              <output
+                className={`story-panel__readout${currentText ? '' : ' is-empty'}`}
+                aria-label="Current text"
+                aria-live="polite"
+              >
+                {currentText || 'Nothing generated yet'}
+              </output>
+            </div>
+          </div>
+
+          <p className="story-panel__field-note">
+            {hasPendingPrefixChange
+              ? 'Current run still uses the previous starting text. Apply text to restart from your draft.'
+              : 'Edit the starting text, then reset when you want the model to restart from it.'}
+          </p>
+        </div>
+
+        {hasCollapsedPanels ? (
+          <div className="panel-dock-shell" aria-label="Hidden panels">
+            <div className="panel-dock panel-dock--toolbar">
+              {collapsedPanels.code ? (
+                <button
+                  type="button"
+                  className="panel-dock__button panel-dock__button--code"
+                  onClick={() => togglePanel('code')}
+                  aria-label="Expand code panel"
+                >
+                  <span className="panel-dock__button-title">Code</span>
+                </button>
+              ) : null}
+              {collapsedPanels.scene ? (
+                <button
+                  type="button"
+                  className="panel-dock__button panel-dock__button--scene"
+                  onClick={() => togglePanel('scene')}
+                  aria-label="Expand model viewer panel"
+                >
+                  <span className="panel-dock__button-title">Model viewer</span>
+                </button>
+              ) : null}
+              {collapsedPanels.story ? (
+                <button
+                  type="button"
+                  className="panel-dock__button panel-dock__button--story"
+                  onClick={() => togglePanel('story')}
+                  aria-label="Expand explanation panel"
+                >
+                  <span className="panel-dock__button-title">Explanation</span>
+                </button>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
+      </div>
+    </div>
+  )
+
+  const storyPanel = (
+    <div
+      className={`story-scene__story ${state.mobileTab === 'story' ? 'is-active' : ''}`}
+      data-lab-tour="story"
+    >
+      <div className="panel-shell panel-shell--story">
+        <div className="panel-shell__header">
+          <span className="panel-shell__title">Explanation</span>
+          <button
+            type="button"
+            className="panel-shell__toggle"
+            onClick={() => togglePanel('story')}
+            aria-expanded="true"
+            aria-controls="story-panel-body"
+          >
+            Collapse
+          </button>
+        </div>
+        <div id="story-panel-body" className="panel-shell__body">
+          <Controls
+            key={`${state.mobileTab}-${phase.stepId}-${trace.positionId}-${trace.tokenId}-${trace.sampledTokenId}`}
+            beats={phase.copy.beats}
+          />
+        </div>
+      </div>
+    </div>
+  )
+
   return (
     <div className="app-shell">
       <header className="app-header" data-lab-tour="header">
@@ -498,283 +707,99 @@ export default function App() {
 
       <main
         className="walkthrough-layout"
-        style={
-          isCompact
-            ? undefined
-            : {
-                gridTemplateColumns: collapsedPanels.code
-                  ? 'minmax(0, 1fr)'
-                  : 'max-content minmax(420px, 1fr)',
-              }
-        }
+        style={layoutStyle}
       >
-        {!collapsedPanels.code ? (
-          <aside
-            className={`code-column ${state.mobileTab === 'code' ? 'is-active' : ''}`}
-            data-lab-tour="code"
+        {!isCompact ? (
+          <div
+            className={`left-column${
+              showCodeColumn
+                ? ' left-column--stacked'
+                : ' left-column--panel-only'
+            }`}
           >
-            <div className="code-column__sticky">
-              <section className="panel-shell panel-shell--code">
-                <div className="panel-shell__header">
-                  <span className="panel-shell__title">Code</span>
-                  <button
-                    type="button"
-                    className="panel-shell__toggle"
-                    onClick={() => togglePanel('code')}
-                    aria-expanded="true"
-                    aria-controls="code-panel-body"
-                  >
-                    Collapse
-                  </button>
+            {toolbarPanel}
+
+            {showCodeColumn ? (
+              <aside
+                className={`code-column ${state.mobileTab === 'code' ? 'is-active' : ''}`}
+                data-lab-tour="code"
+              >
+                <div className="code-column__sticky">
+                  <section className="panel-shell panel-shell--code">
+                    <div className="panel-shell__header">
+                      <span className="panel-shell__title">Code</span>
+                      <button
+                        type="button"
+                        className="panel-shell__toggle"
+                        onClick={() => togglePanel('code')}
+                        aria-expanded="true"
+                        aria-controls="code-panel-body"
+                      >
+                        Collapse
+                      </button>
+                    </div>
+                    <div id="code-panel-body" className="panel-shell__body">
+                      <CodeViewer source={source} activeRanges={activeRanges} />
+                    </div>
+                  </section>
                 </div>
-                <div id="code-panel-body" className="panel-shell__body">
-                  <CodeViewer source={source} activeRanges={activeRanges} />
-                </div>
-              </section>
-            </div>
-          </aside>
+              </aside>
+            ) : null}
+          </div>
         ) : null}
 
-        <section
-          className={`story-scene ${
-            state.mobileTab === 'code' ? '' : 'is-active'
-          }`}
-          style={isCompact ? undefined : { gridTemplateRows: storySceneRows.join(' ') }}
-        >
-          <div className="story-scene__toolbar">
-            <div className="story-scene__toolbar-main">
-              <div className="story-scene__toolbar-panel" data-lab-tour="controls">
-                <div className="story-scene__toolbar-bar">
-                  <div className="story-scene__toolbar-stage">
-                    <div
-                      className="scene-panel__stage-chip"
-                      data-lab-tour="stage"
-                      onMouseEnter={() => handleFocusRanges(phase.codeRanges)}
-                      onMouseLeave={() => handleFocusRanges(null)}
-                    >
-                      <div className="scene-panel__stage-chip-main">
-                        <div className="scene-panel__stage-chip-copy">
-                          <span className="eyebrow">Current stage</span>
-                          <strong>{phase.groupTitle}</strong>
-                        </div>
-                        <span className="scene-panel__stage-step">
-                          step {state.activePhaseIndex + 1} / {phaseCount}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
+        {showStoryScene ? (
+          <section
+            className={`story-scene ${
+              state.mobileTab === 'code' ? '' : 'is-active'
+            }`}
+            style={
+              isCompact || storySceneRows.length === 0
+                ? undefined
+                : { gridTemplateRows: storySceneRows.join(' ') }
+            }
+          >
+            {isCompact ? toolbarPanel : null}
 
-                  <div className="story-panel__actions">
+            {showDesktopStoryPanel ? storyPanel : null}
+
+            {showScenePanel ? (
+              <div
+                className={`story-scene__scene ${
+                  state.mobileTab === 'scene' ? 'is-active' : ''
+                }`}
+                data-lab-tour="scene"
+              >
+                <div className="panel-shell panel-shell--scene">
+                  <div className="panel-shell__header">
+                    <span className="panel-shell__title">Model viewer</span>
                     <button
                       type="button"
-                      onClick={() => {
-                        dispatch({ type: 'setPlaying', playing: false })
-                        void hydrate(state.prefixInput)
-                      }}
-                      disabled={controlsLocked}
+                      className="panel-shell__toggle"
+                      onClick={() => togglePanel('scene')}
+                      aria-expanded="true"
+                      aria-controls="scene-panel-body"
                     >
-                      {hasPendingPrefixChange ? 'Apply text' : 'Reset'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        dispatch({ type: 'setPlaying', playing: false })
-                        dispatch({ type: 'phasePrev', phaseCount })
-                      }}
-                      disabled={!canPrev || navigationBlocked}
-                    >
-                      Prev
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        dispatch({ type: 'setPlaying', playing: false })
-                        void advance()
-                      }}
-                      disabled={!canNext || navigationBlocked}
-                    >
-                      Next
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (state.status === 'playing') {
-                          dispatch({ type: 'setPlaying', playing: false })
-                        } else {
-                          dispatch({ type: 'setPlaying', playing: true })
-                        }
-                      }}
-                      disabled={!canNext || navigationBlocked}
-                    >
-                      {state.status === 'playing' ? 'Pause' : 'Play'}
+                      Collapse
                     </button>
                   </div>
-                </div>
-
-                <div className="story-scene__toolbar-inputs">
-                  <label
-                    className="story-panel__field story-panel__field--editable"
-                    htmlFor="prefix-input"
-                  >
-                    <div className="story-panel__field-head">
-                      <span className="eyebrow">Starting text</span>
-                    </div>
-                    <input
-                      id="prefix-input"
-                      className="story-panel__input"
-                      aria-label="Starting text"
-                      value={state.prefixInput}
-                      onChange={(event) => handlePrefixChange(event.target.value)}
-                      onKeyDown={(event) => {
-                        if (event.key === 'Enter' && !controlsLocked) {
-                          dispatch({ type: 'setPlaying', playing: false })
-                          void hydrate(state.prefixInput)
-                        }
-                      }}
-                      placeholder="em"
-                      autoComplete="off"
-                      spellCheck={false}
+                  <div id="scene-panel-body" className="panel-shell__body">
+                    <ArchitectureScene
+                      trace={trace}
+                      phase={phase}
+                      contextTokens={contextTokens}
+                      tokenLabel={tokenLabel}
+                      sceneModelData={sceneModelData}
+                      onFocusRanges={handleFocusRanges}
                     />
-                  </label>
-
-                  <div
-                    className={`story-panel__field story-panel__field--readonly${
-                      hasPendingPrefixChange ? ' is-stale' : ''
-                    }`}
-                  >
-                    <div className="story-panel__field-head">
-                      <span className="eyebrow">Current text</span>
-                      <span className="story-panel__field-status">{currentTextStatus}</span>
-                    </div>
-                    <output
-                      className={`story-panel__readout${currentText ? '' : ' is-empty'}`}
-                      aria-label="Current text"
-                      aria-live="polite"
-                    >
-                      {currentText || 'Nothing generated yet'}
-                    </output>
                   </div>
                 </div>
-
-                <p className="story-panel__field-note">
-                  {hasPendingPrefixChange
-                    ? 'Current run still uses the previous starting text. Apply text to restart from your draft.'
-                    : 'Edit the starting text, then reset when you want the model to restart from it.'}
-                </p>
               </div>
+            ) : null}
 
-              {hasCollapsedPanels ? (
-                <div className="panel-dock-shell" aria-label="Hidden panels">
-                  <div className="panel-dock panel-dock--toolbar">
-                    {collapsedPanels.code ? (
-                      <button
-                        type="button"
-                        className="panel-dock__button panel-dock__button--code"
-                        onClick={() => togglePanel('code')}
-                        aria-label="Expand"
-                      >
-                        <span className="panel-dock__button-title">Code</span>
-                        <span className="panel-dock__button-detail">
-                          Return source viewer
-                        </span>
-                      </button>
-                    ) : null}
-                    {collapsedPanels.scene ? (
-                      <button
-                        type="button"
-                        className="panel-dock__button panel-dock__button--scene"
-                        onClick={() => togglePanel('scene')}
-                        aria-label="Expand"
-                      >
-                        <span className="panel-dock__button-title">Model viewer</span>
-                        <span className="panel-dock__button-detail">
-                          Restore active network view
-                        </span>
-                      </button>
-                    ) : null}
-                    {collapsedPanels.story ? (
-                      <button
-                        type="button"
-                        className="panel-dock__button panel-dock__button--story"
-                        onClick={() => togglePanel('story')}
-                        aria-label="Expand"
-                      >
-                        <span className="panel-dock__button-title">Explanation</span>
-                        <span className="panel-dock__button-detail">
-                          Bring back step notes
-                        </span>
-                      </button>
-                    ) : null}
-                  </div>
-                </div>
-              ) : null}
-            </div>
-          </div>
-
-          {!collapsedPanels.scene ? (
-            <div
-              className={`story-scene__scene ${
-                state.mobileTab === 'scene' ? 'is-active' : ''
-              }`}
-              data-lab-tour="scene"
-            >
-              <div className="panel-shell panel-shell--scene">
-                <div className="panel-shell__header">
-                  <span className="panel-shell__title">Model viewer</span>
-                  <button
-                    type="button"
-                    className="panel-shell__toggle"
-                    onClick={() => togglePanel('scene')}
-                    aria-expanded="true"
-                    aria-controls="scene-panel-body"
-                  >
-                    Collapse
-                  </button>
-                </div>
-                <div id="scene-panel-body" className="panel-shell__body">
-                  <ArchitectureScene
-                    trace={trace}
-                    phase={phase}
-                    contextTokens={contextTokens}
-                    tokenLabel={tokenLabel}
-                    sceneModelData={sceneModelData}
-                    onFocusRanges={handleFocusRanges}
-                  />
-                </div>
-              </div>
-            </div>
-          ) : null}
-
-          {!collapsedPanels.story ? (
-            <div
-              className={`story-scene__story ${
-                state.mobileTab === 'story' ? 'is-active' : ''
-              }`}
-              data-lab-tour="story"
-            >
-              <div className="panel-shell panel-shell--story">
-                <div className="panel-shell__header">
-                  <span className="panel-shell__title">Explanation</span>
-                  <button
-                    type="button"
-                    className="panel-shell__toggle"
-                    onClick={() => togglePanel('story')}
-                    aria-expanded="true"
-                    aria-controls="story-panel-body"
-                  >
-                    Collapse
-                  </button>
-                </div>
-                <div id="story-panel-body" className="panel-shell__body">
-                  <Controls
-                    key={`${state.mobileTab}-${phase.stepId}-${trace.positionId}-${trace.tokenId}-${trace.sampledTokenId}`}
-                    beats={phase.copy.beats}
-                  />
-                </div>
-              </div>
-            </div>
-          ) : null}
-        </section>
+            {showCompactStoryPanel ? storyPanel : null}
+          </section>
+        ) : null}
 
       </main>
 
