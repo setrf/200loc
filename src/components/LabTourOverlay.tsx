@@ -22,7 +22,7 @@ interface RectState {
   height: number
 }
 
-const VIEWPORT_GUTTER = 18
+const VIEWPORT_GUTTER = 16
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max)
@@ -112,9 +112,9 @@ export function LabTourOverlay({
     const spaceBelow = window.innerHeight - targetRect.top - targetRect.height
     const spaceAbove = targetRect.top
 
-    let top = targetRect.top + targetRect.height + 18
+    let top = targetRect.top + targetRect.height + 16
     if (spaceBelow < cardRect.height + 28 && spaceAbove > cardRect.height + 28) {
-      top = targetRect.top - cardRect.height - 18
+      top = targetRect.top - cardRect.height - 16
     }
 
     const maxTop = Math.max(

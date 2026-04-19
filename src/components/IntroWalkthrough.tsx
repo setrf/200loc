@@ -332,32 +332,33 @@ export function IntroWalkthrough({
         </section>
 
         <section className="intro-actions" aria-label="Intro navigation">
-          <button
-            type="button"
-            className="intro-button intro-button--secondary"
-            onClick={onBack}
-            disabled={isFirst}
-          >
-            Back
-          </button>
-          <div className="intro-actions__spacer" />
-          {isLast ? (
+          <div className="intro-actions__group">
             <button
               type="button"
-              className="intro-button intro-button--primary"
-              onClick={onOpenLab}
+              className="intro-button intro-button--secondary"
+              onClick={onBack}
+              disabled={isFirst}
             >
-              Open live walkthrough
+              Back
             </button>
-          ) : (
-            <button
-              type="button"
-              className="intro-button intro-button--primary"
-              onClick={onNext}
-            >
-              Next
-            </button>
-          )}
+            {isLast ? (
+              <button
+                type="button"
+                className="intro-button intro-button--primary"
+                onClick={onOpenLab}
+              >
+                Open live walkthrough
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="intro-button intro-button--primary"
+                onClick={onNext}
+              >
+                Next
+              </button>
+            )}
+          </div>
         </section>
       </main>
 
