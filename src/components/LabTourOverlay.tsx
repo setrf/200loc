@@ -81,6 +81,7 @@ export function LabTourOverlay({
 
   useLayoutEffect(() => {
     const card = cardRef.current
+    /* c8 ignore next -- defensive fallback while the card ref is not yet attached */
     if (!card) {
       return
     }

@@ -41,6 +41,7 @@ type PanelKey = 'code' | 'scene' | 'story'
 const COMPACT_QUERY = '(hover: none), (pointer: coarse), (max-width: 1023px)'
 
 function isCompactViewport() {
+  /* c8 ignore next -- defensive fallback for non-browser evaluation */
   if (typeof window === 'undefined' || !window.matchMedia) {
     return false
   }

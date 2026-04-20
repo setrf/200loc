@@ -255,6 +255,27 @@ describe('llm viz helpers', () => {
       expect(attentionFrame.overlay.slots[2].isCurrent).toBe(true)
     }
 
+    const sparseAttentionFrame = buildVizFrame(
+      makeTrace({
+        heads: makeTrace().heads.map((head, index) => ({
+          ...head,
+          weights: index === 0 ? [0.6] : [],
+        })),
+      }),
+      phaseById('attention-softmax'),
+      bundle,
+      ['BOS', 'e', 'm'],
+      tokenLabel,
+    )
+    if (sparseAttentionFrame.overlay.kind === 'attention-weights') {
+      expect(sparseAttentionFrame.overlay.slots.map((slot) => slot.emphasis)).toEqual([
+        0.15,
+        0,
+        0,
+      ])
+      expect(sparseAttentionFrame.overlay.attentionReads[1]?.targetLabel).toBe('p0:BOS')
+    }
+
     const contextFrame = buildVizFrame(
       makeTrace({ heads: [], positionId: 0, tokenId: 26 }),
       inferencePhases[0],

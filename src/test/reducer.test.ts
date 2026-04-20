@@ -235,6 +235,26 @@ describe('walkthrough reducer', () => {
     expect(editedState.appliedNormalization.normalized).toBe('em')
   })
 
+  it('keeps the existing draft normalization when a prefix edit omits a replacement', () => {
+    const nextState = walkthroughReducer(
+      {
+        ...initialWalkthroughState,
+        draftNormalization: {
+          normalized: 'em',
+          removedUnsupported: false,
+          truncated: false,
+        },
+      },
+      {
+        type: 'setPrefixInput',
+        prefixInput: 'emi',
+      },
+    )
+
+    expect(nextState.prefixInput).toBe('emi')
+    expect(nextState.draftNormalization.normalized).toBe('em')
+  })
+
   it('marks reset and append as terminal when requested', () => {
     const resetTerminal = walkthroughReducer(initialWalkthroughState, {
       type: 'reset',

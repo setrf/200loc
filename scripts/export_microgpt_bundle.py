@@ -1,5 +1,6 @@
 """
-Train Karpathy's microgpt.py and export the browser bundle used by the app.
+Train the tiny char-level GPT used by 200loc and export the browser fixtures
+that keep the UI, tests, and shipped microgpt walkthrough in sync.
 """
 
 from __future__ import annotations

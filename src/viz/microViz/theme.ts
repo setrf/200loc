@@ -107,7 +107,7 @@ export const siteMicroVizTheme: MicroVizTheme = {
   typography: {
     fontAtlasSrc: 'fonts/microviz-geist-mono-atlas.png',
     fontDefSrc: 'fonts/microviz-geist-mono.json',
-    fontFaceName: 'Geist-Medium',
+    fontFaceName: 'GeistMono-Medium',
     scale: {
       xs: 12,
       sm: 12,

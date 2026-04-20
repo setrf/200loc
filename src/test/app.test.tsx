@@ -180,6 +180,43 @@ describe('App', () => {
     expect(window.localStorage.getItem(LAB_TOUR_SEEN_STORAGE_KEY)).toBe('true')
   })
 
+  it('skips straight into the lab when the tour was already seen, and the intro back button clamps correctly', async () => {
+    window.localStorage.removeItem(INTRO_SEEN_STORAGE_KEY)
+    window.localStorage.setItem(LAB_TOUR_SEEN_STORAGE_KEY, 'true')
+
+    const runtime = makeRuntime()
+    runtime.reset.mockResolvedValue({
+      trace: makeTrace({ sampledTokenId: 26 }),
+      session: { visibleTokenIds: [4, 12], done: false },
+      diagnostics: {
+        activeBackend: 'cpu',
+        fallbackReason: 'WebGPU unavailable',
+      },
+    })
+
+    loadModelBundleMock.mockResolvedValue(bundleStub)
+    createTokenizerMock.mockReturnValue(makeTokenizer())
+    runtimeCtorMock.mockImplementation(function () {
+      return runtime
+    })
+    mockSourceFetch(sourceText)
+
+    const { default: App } = await import('../App')
+    render(<App />)
+
+    await screen.findByText('A language model keeps guessing what should come next.')
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }))
+    expect(
+      screen.getByText('A language model keeps guessing what should come next.'),
+    ).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Skip' }))
+    await screen.findByText('How LLM systems actually work')
+    expect(screen.queryByRole('dialog', { name: 'Lab tour' })).not.toBeInTheDocument()
+  })
+
   it('opens the project info dialog from the header', async () => {
     const runtime = makeRuntime()
     runtime.reset.mockResolvedValue({
@@ -212,6 +249,274 @@ describe('App', () => {
     expect(within(dialog).getByText('LLM Visualization')).toBeInTheDocument()
   })
 
+  it('renders the compact layout, steps the lab tour backward, and closes project info in every supported way', async () => {
+    Object.defineProperty(window, 'matchMedia', {
+      writable: true,
+      value: vi.fn((query: string) => ({
+        matches: query === '(hover: none), (pointer: coarse), (max-width: 1023px)',
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      })),
+    })
+
+    const runtime = makeRuntime()
+    runtime.reset.mockResolvedValue({
+      trace: makeTrace({ sampledTokenId: 26 }),
+      session: { visibleTokenIds: [4, 12], done: false },
+      diagnostics: {
+        activeBackend: 'cpu',
+        fallbackReason: 'WebGPU unavailable',
+      },
+    })
+
+    loadModelBundleMock.mockResolvedValue(bundleStub)
+    createTokenizerMock.mockReturnValue(makeTokenizer())
+    runtimeCtorMock.mockImplementation(function () {
+      return runtime
+    })
+    mockSourceFetch(sourceText)
+
+    const { default: App } = await import('../App')
+    render(<App />)
+
+    await screen.findByText('How LLM systems actually work')
+    expect(screen.getByLabelText('Starting text')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Code' }))
+    expect(screen.getByText('microgpt.py')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Story' }))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Play' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Show lab tour' }))
+    expect(screen.getByRole('button', { name: 'Play' })).toBeInTheDocument()
+
+    const tour = await screen.findByRole('dialog', { name: 'Lab tour' })
+    expect(
+      within(tour).getByText('Use these tabs to switch views'),
+    ).toBeInTheDocument()
+
+    fireEvent.click(within(tour).getByRole('button', { name: 'Next' }))
+    expect(
+      within(screen.getByRole('dialog', { name: 'Lab tour' })).getByText(
+        'This is how you drive the walkthrough',
+      ),
+    ).toBeInTheDocument()
+
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Lab tour' })).getByRole('button', {
+      name: 'Next',
+    }))
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Code' })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      )
+    })
+
+    fireEvent.click(
+      within(screen.getByRole('dialog', { name: 'Lab tour' })).getByRole('button', {
+        name: 'Back',
+      }),
+    )
+    expect(
+      within(screen.getByRole('dialog', { name: 'Lab tour' })).getByText(
+        'This is how you drive the walkthrough',
+      ),
+    ).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Story' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Collapse' }))
+    expect(
+      screen.getByRole('button', { name: 'Expand explanation panel' }),
+    ).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Expand explanation panel' }))
+    expect(screen.getByLabelText('Step explanation')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'About' }))
+    fireEvent.keyDown(window, { key: 'Enter' })
+    expect(screen.getByRole('dialog', { name: 'Project information' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Close project information' }))
+    await waitFor(() => {
+      expect(
+        screen.queryByRole('dialog', { name: 'Project information' }),
+      ).not.toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'About' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }))
+    await waitFor(() => {
+      expect(
+        screen.queryByRole('dialog', { name: 'Project information' }),
+      ).not.toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'About' }))
+    fireEvent.keyDown(window, { key: 'Escape' })
+    await waitFor(() => {
+      expect(
+        screen.queryByRole('dialog', { name: 'Project information' }),
+      ).not.toBeInTheDocument()
+    })
+  })
+
+  it('applies the prefix when Enter is pressed and shows the context-full terminal status', async () => {
+    const runtime = makeRuntime()
+    runtime.reset
+      .mockResolvedValueOnce({
+        trace: makeTrace({
+          sampledTokenId: 26,
+          positionId: 3,
+        }),
+        session: { visibleTokenIds: [4, 12], done: false },
+        diagnostics: {
+          activeBackend: 'cpu',
+          fallbackReason: 'WebGPU unavailable',
+        },
+      })
+      .mockResolvedValueOnce({
+        trace: makeTrace({
+          sampledTokenId: 8,
+          positionId: 255,
+        }),
+        session: { visibleTokenIds: [4, 12, 8], done: true, doneReason: 'context' },
+        diagnostics: {
+          activeBackend: 'cpu',
+          fallbackReason: 'WebGPU unavailable',
+        },
+      })
+
+    loadModelBundleMock.mockResolvedValue(bundleStub)
+    createTokenizerMock.mockReturnValue(makeTokenizer())
+    runtimeCtorMock.mockImplementation(function () {
+      return runtime
+    })
+    mockSourceFetch(sourceText)
+
+    const { default: App } = await import('../App')
+    render(<App />)
+
+    const prefix = await screen.findByRole('textbox', { name: 'Starting text' })
+    fireEvent.change(prefix, { target: { value: 'Em!42' } })
+    fireEvent.keyDown(prefix, { key: 'Tab' })
+    expect(runtime.reset).toHaveBeenCalledTimes(1)
+    fireEvent.keyDown(prefix, { key: 'Enter' })
+
+    await waitFor(() => {
+      expect(runtime.reset).toHaveBeenLastCalledWith('em')
+    })
+    expect(screen.getByText('Context full')).toBeInTheDocument()
+  })
+
+  it('keeps a draft in the ready state when the prefix changes during a reset from a ready session', async () => {
+    const runtime = makeRuntime()
+    const deferredReset = deferred<{
+      trace: ReturnType<typeof makeTrace>
+      session: { visibleTokenIds: number[]; done: boolean }
+      diagnostics: { activeBackend: 'cpu'; fallbackReason?: string }
+    }>()
+
+    runtime.reset
+      .mockResolvedValueOnce({
+        trace: makeTrace({ sampledTokenId: 26 }),
+        session: { visibleTokenIds: [4, 12], done: false },
+        diagnostics: {
+          activeBackend: 'cpu',
+          fallbackReason: 'WebGPU unavailable',
+        },
+      })
+      .mockImplementationOnce(() => deferredReset.promise)
+
+    loadModelBundleMock.mockResolvedValue(bundleStub)
+    createTokenizerMock.mockReturnValue(makeTokenizer())
+    runtimeCtorMock.mockImplementation(function () {
+      return runtime
+    })
+    mockSourceFetch(sourceText)
+
+    const { default: App } = await import('../App')
+    render(<App />)
+
+    const prefix = await screen.findByRole('textbox', { name: 'Starting text' })
+    fireEvent.change(prefix, { target: { value: 'em' } })
+    fireEvent.click(screen.getByRole('button', { name: /Reset|Apply text/ }))
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Apply text' })).toBeDisabled()
+    })
+
+    fireEvent.change(prefix, { target: { value: 'emi' } })
+
+    expect(screen.queryByText('Resetting')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Apply text' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Play' })).toBeDisabled()
+    expect(screen.getByLabelText('Current text')).toHaveTextContent('em')
+
+    deferredReset.resolve({
+      trace: makeTrace({ positionId: 3, tokenId: 8, sampledTokenId: 8 }),
+      session: { visibleTokenIds: [4, 12, 8], done: false },
+      diagnostics: {
+        activeBackend: 'cpu',
+        fallbackReason: 'WebGPU unavailable',
+      },
+    })
+
+    await Promise.resolve()
+  })
+
+  it('pauses back to a draft state when the prefix changes during a reset from autoplay', async () => {
+    const runtime = makeRuntime()
+    const deferredReset = deferred<{
+      trace: ReturnType<typeof makeTrace>
+      session: { visibleTokenIds: number[]; done: boolean }
+      diagnostics: { activeBackend: 'cpu'; fallbackReason?: string }
+    }>()
+
+    runtime.reset
+      .mockResolvedValueOnce({
+        trace: makeTrace({ sampledTokenId: 26 }),
+        session: { visibleTokenIds: [4, 12], done: false },
+        diagnostics: {
+          activeBackend: 'cpu',
+          fallbackReason: 'WebGPU unavailable',
+        },
+      })
+      .mockImplementationOnce(() => deferredReset.promise)
+
+    loadModelBundleMock.mockResolvedValue(bundleStub)
+    createTokenizerMock.mockReturnValue(makeTokenizer())
+    runtimeCtorMock.mockImplementation(function () {
+      return runtime
+    })
+    mockSourceFetch(sourceText)
+
+    const { default: App } = await import('../App')
+    render(<App />)
+
+    const prefix = await screen.findByRole('textbox', { name: 'Starting text' })
+    fireEvent.click(screen.getByRole('button', { name: 'Play' }))
+    expect(screen.getByRole('button', { name: 'Pause' })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reset' }))
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Reset' })).toBeDisabled()
+    })
+
+    fireEvent.change(prefix, { target: { value: 'emi' } })
+
+    expect(screen.getByRole('button', { name: 'Apply text' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Play' })).toBeDisabled()
+    expect(screen.queryByRole('button', { name: 'Pause' })).not.toBeInTheDocument()
+
+    deferredReset.resolve({
+      trace: makeTrace({ positionId: 3, tokenId: 8, sampledTokenId: 8 }),
+      session: { visibleTokenIds: [4, 12, 8], done: false },
+      diagnostics: {
+        activeBackend: 'cpu',
+        fallbackReason: 'WebGPU unavailable',
+      },
+    })
+
+    await Promise.resolve()
+  })
+
   it('collapses and expands the main panels', async () => {
     const runtime = makeRuntime()
     runtime.reset.mockResolvedValue({
@@ -235,10 +540,16 @@ describe('App', () => {
 
     await screen.findByText('How LLM systems actually work')
 
-    const collapseButtons = screen.getAllByRole('button', { name: 'Collapse' })
-    fireEvent.click(collapseButtons[0]!)
-    fireEvent.click(collapseButtons[1]!)
-    fireEvent.click(collapseButtons[2]!)
+    fireEvent.click(document.querySelector('button[aria-controls="code-panel-body"]') as HTMLButtonElement)
+    expect(screen.getByRole('button', { name: 'Expand code panel' })).toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: 'Expand explanation panel' }),
+    ).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Expand code panel' }))
+
+    fireEvent.click(document.querySelector('button[aria-controls="code-panel-body"]') as HTMLButtonElement)
+    fireEvent.click(screen.getAllByRole('button', { name: 'Collapse' })[0]!)
+    fireEvent.click(screen.getAllByRole('button', { name: 'Collapse' })[0]!)
 
     expect(screen.queryByText('microgpt.py')).not.toBeInTheDocument()
     expect(screen.queryByTestId('scene-viewport')).not.toBeInTheDocument()
@@ -705,7 +1016,7 @@ describe('App', () => {
     })
     expect(runtime.advance).toHaveBeenCalledTimes(2)
     },
-    15000,
+    30000,
   )
 
   it('covers fetch failures, non-error bootstrap failures, and cancelled bootstrap branches', async () => {

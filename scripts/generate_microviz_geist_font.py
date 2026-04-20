@@ -133,11 +133,11 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Generate the MicroViz viewer font atlas.")
     parser.add_argument(
         "--font-path",
-        default="node_modules/geist/dist/fonts/geist-sans/Geist-Medium.ttf",
+        default="node_modules/geist/dist/fonts/geist-mono/GeistMono-Medium.ttf",
     )
     parser.add_argument(
         "--face-name",
-        default="Geist-Medium",
+        default="GeistMono-Medium",
     )
     parser.add_argument(
         "--atlas-output",
