@@ -237,7 +237,7 @@ test.describe('desktop walkthrough', () => {
         main: readRect('.walkthrough-layout'),
         code: readRect('.code-column'),
         rightStack: readRect('.story-scene'),
-        story: readRect('.story-panel'),
+        story: readRect('.desktop-top-panel__story-body'),
         sceneViewport: readRect('.scene-panel__viewport'),
       }
     })
@@ -246,8 +246,22 @@ test.describe('desktop walkthrough', () => {
     expect(codeShare).toBeGreaterThan(0.45)
     expect(codeShare).toBeLessThan(0.55)
     expect(Math.abs(layout.code.width - layout.rightStack.width)).toBeLessThan(120)
-    expect(layout.story.height).toBeGreaterThanOrEqual(150)
+    expect(layout.story.height).toBeGreaterThanOrEqual(60)
     expect(layout.sceneViewport.height).toBeGreaterThan(layout.story.height)
+    expect(issues).toEqual([])
+  })
+
+  test('keeps the scene ready after a fresh load and reload', async ({ page }) => {
+    const issues = collectBrowserIssues(page)
+    const loadingChip = page.locator('.scene-panel__loading')
+
+    await expect(loadingChip).toHaveCount(0, { timeout: 8000 })
+    await expect(page.locator('[data-testid="scene-viewport"]')).toBeVisible()
+
+    await page.reload()
+
+    await expect(loadingChip).toHaveCount(0, { timeout: 8000 })
+    await expect(page.locator('[data-testid="scene-viewport"]')).toBeVisible()
     expect(issues).toEqual([])
   })
 

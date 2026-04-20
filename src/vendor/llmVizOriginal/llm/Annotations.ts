@@ -443,7 +443,7 @@ export interface IFontConfig {
     align?: TextAlignHoriz; // default left
     valign?: TextAlignVert; // default top
     size?: number; // default 1
-    face?: string; // default 'Roboto-Regular'
+    face?: string; // default 'GeistMono-Regular'
 }
 
 export function drawTextOnModel(state: IRenderState, text: string, pos: Vec3, cfg: IFontConfig) {

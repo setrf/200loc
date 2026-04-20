@@ -3,6 +3,7 @@ import type { IRenderState } from "../render/modelRender";
 import { clamp } from "@llmviz/utils/data";
 import { measureTextWidth } from "../render/fontRender";
 import { Vec3, Vec4 } from "@llmviz/utils/vector";
+import { getCurrentMicroVizTheme } from "../../../../viz/microViz/theme";
 import { Phase, PhaseGroup } from "./Walkthrough";
 import type { IWalkthrough } from "./Walkthrough";
 import type { IProgramState } from "../Program";
@@ -372,27 +373,28 @@ export enum DimStyle {
 }
 
 export function dimStyleColor(style: DimStyle) {
+     let theme = getCurrentMicroVizTheme();
      switch (style) {
         case DimStyle.t:
         case DimStyle.T:
-            return Vec4.fromHexColor('#359da8');
+            return theme.scene.dimStyles.time;
         case DimStyle.A:
-            return Vec4.fromHexColor('#d368a4');
+            return theme.scene.dimStyles.head;
         case DimStyle.C:
         case DimStyle.C4:
-            return Vec4.fromHexColor('#ce2983');
+            return theme.scene.dimStyles.channel;
         case DimStyle.Token:
-            return new Vec4(0.3, 0.7, 0.3, 1);
+            return theme.scene.dimStyles.token;
         case DimStyle.TokenIdx:
-            return Vec4.fromHexColor('#1b495d');
+            return theme.scene.dimStyles.tokenIndex;
         case DimStyle.n_vocab:
-            return Vec4.fromHexColor('#7c3c8d'); // new Vec4(0.8, 0.6, 0.3, 1);
+            return theme.scene.dimStyles.vocab;
         case DimStyle.Intermediates:
-            return Vec4.fromHexColor('#00ad00');
+            return theme.scene.dimStyles.intermediates;
         case DimStyle.Weights:
             return Colors.Weights;
         case DimStyle.Aggregates:
-            return Vec4.fromHexColor('#e3a300');
+            return theme.scene.dimStyles.aggregates;
     }
     return new Vec4(0,0,0);
 }
@@ -417,10 +419,9 @@ export function dimStyleTextShort(style: DimStyle) {
 }
 
 export const Colors = {
-    Weights: new Vec4(0.3, 0.3, 1.0),
-    Intermediates: new Vec4(0.4, 0.8, 0.4),
-    Aggregates: new Vec4(1.0, 0.8, 0.3), // a yellowish color
-
+    get Weights() { return getCurrentMicroVizTheme().scene.blocks.weights; },
+    get Intermediates() { return getCurrentMicroVizTheme().scene.blocks.intermediates; },
+    get Aggregates() { return getCurrentMicroVizTheme().scene.blocks.aggregates; },
     Black: new Vec4(0, 0, 0),
 }
 

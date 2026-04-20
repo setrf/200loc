@@ -479,14 +479,13 @@
 }
 
 .desktop-top-panel__story-body {
-  min-height: 0;
   display: flex;
   flex-direction: column;
-  max-height: 156px;
+  min-height: 0;
 }
 
 .desktop-top-panel__story .story-panel {
-  flex: 1 1 auto;
+  flex: 0 0 auto;
   height: auto;
   min-height: 0;
   max-height: none;
@@ -1091,7 +1090,7 @@
 
 .story-panel__lesson {
   display: block;
-  flex: 1 1 auto;
+  flex: 0 0 auto;
   min-height: 0;
   position: relative;
   margin: 0;
@@ -1133,7 +1132,8 @@
 }
 
 button.annotation-trigger {
-  display: inline;
+  display: inline-flex;
+  align-items: baseline;
   min-height: 0;
   width: auto;
   padding: 0;
@@ -1149,6 +1149,8 @@ button.annotation-trigger {
   vertical-align: baseline;
   box-shadow: none;
   cursor: pointer;
+  position: relative;
+  z-index: 1;
 }
 
 button.annotation-trigger:hover,
@@ -1212,6 +1214,32 @@ button.annotation-trigger:focus-visible {
 }
 
 .scene-panel {
+  --scene-viz-viewport-bg:
+    radial-gradient(circle at 20% 12%, rgba(111, 134, 182, 0.18), transparent 32%),
+    linear-gradient(180deg, #111720 0%, #0b1017 100%);
+  --scene-viz-viewport-border: rgba(157, 170, 186, 0.18);
+  --scene-viz-viewport-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.02),
+    inset 0 -42px 80px rgba(5, 8, 12, 0.34);
+  --scene-viz-canvas-inset: rgba(195, 206, 219, 0.11);
+  --scene-viz-canvas-glow: rgba(0, 0, 0, 0.36);
+  --scene-viz-hint-bg: rgba(12, 17, 24, 0.82);
+  --scene-viz-hint-border: rgba(157, 170, 186, 0.16);
+  --scene-viz-hint-text: #b3becb;
+  --scene-viz-loading-bg: rgba(12, 17, 24, 0.88);
+  --scene-viz-loading-border: rgba(157, 170, 186, 0.16);
+  --scene-viz-loading-text: #d7e0ea;
+  --scene-viz-fallback-edge: rgba(112, 188, 152, 0.34);
+  --scene-viz-fallback-edge-active: rgba(127, 212, 172, 0.95);
+  --scene-viz-fallback-node-side: rgba(81, 98, 158, 0.42);
+  --scene-viz-fallback-node-side-stroke: rgba(115, 130, 168, 0.28);
+  --scene-viz-fallback-node-top: rgba(107, 125, 184, 0.84);
+  --scene-viz-fallback-node-top-stroke: rgba(126, 142, 186, 0.34);
+  --scene-viz-fallback-node-front: rgba(89, 151, 126, 0.76);
+  --scene-viz-fallback-node-front-stroke: rgba(116, 171, 145, 0.28);
+  --scene-viz-fallback-node-active-top: rgba(125, 210, 172, 0.88);
+  --scene-viz-fallback-node-active-front: rgba(93, 183, 144, 0.92);
+  --scene-viz-fallback-node-label: #d9e3ed;
   display: flex;
   flex-direction: column;
   flex: 1 1 auto;
@@ -1231,9 +1259,10 @@ button.annotation-trigger:focus-visible {
   overflow: hidden;
   overscroll-behavior: contain;
   touch-action: none;
-  border: 1px solid rgba(15, 23, 42, 0.08);
+  border: 1px solid var(--scene-viz-viewport-border);
   border-radius: var(--radius-surface);
-  background: #f2f0ea;
+  background: var(--scene-viz-viewport-bg);
+  box-shadow: var(--scene-viz-viewport-shadow);
 }
 
 .llmviz-embed,
@@ -1270,12 +1299,14 @@ button.annotation-trigger:focus-visible {
   bottom: var(--space-12);
   z-index: 2;
   padding: var(--space-8) var(--space-12);
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  border-radius: var(--radius-surface);
-  background: rgba(255, 255, 255, 0.94);
-  color: #636977;
-  font: 500 0.74rem/1.2 var(--mono);
-  letter-spacing: 0.01em;
+  border: 1px solid var(--scene-viz-hint-border);
+  border-radius: 999px;
+  background: var(--scene-viz-hint-bg);
+  color: var(--scene-viz-hint-text);
+  backdrop-filter: blur(14px);
+  font: 600 0.7rem/1.2 var(--mono);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
 }
 
 .scene-panel__loading {
@@ -1284,54 +1315,71 @@ button.annotation-trigger:focus-visible {
   bottom: var(--space-12);
   z-index: 2;
   padding: var(--space-8) var(--space-12);
-  border: 1px solid rgba(15, 23, 42, 0.08);
+  border: 1px solid var(--scene-viz-loading-border);
+  border-radius: 999px;
+  background: var(--scene-viz-loading-bg);
+  color: var(--scene-viz-loading-text);
+  backdrop-filter: blur(14px);
+  font: 600 0.7rem/1.2 var(--mono);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.scene-panel__loading--error {
+  top: var(--space-12);
+  bottom: auto;
+  max-width: min(360px, calc(100% - 24px));
   border-radius: var(--radius-surface);
-  background: rgba(255, 255, 255, 0.94);
-  color: #636977;
-  font: 500 0.74rem/1.2 var(--mono);
+  font: 600 0.72rem/1.35 var(--mono);
+  letter-spacing: 0.02em;
+  text-transform: none;
 }
 
 .scene-panel__fallback {
   width: 100%;
   height: 100%;
   display: block;
-  background: #f2f0ea;
+  background: var(--scene-viz-viewport-bg);
 }
 
 .scene-panel__fallback-edge {
-  stroke: rgba(80, 181, 88, 0.35);
+  stroke: var(--scene-viz-fallback-edge);
   stroke-width: 1.6;
 }
 
 .scene-panel__fallback-edge.is-active {
-  stroke: rgba(24, 153, 34, 0.9);
+  stroke: var(--scene-viz-fallback-edge-active);
   stroke-width: 2.6;
 }
 
 .scene-panel__fallback-node polygon:nth-of-type(1) {
-  fill: rgba(170, 185, 220, 0.58);
-  stroke: rgba(67, 83, 121, 0.32);
+  fill: var(--scene-viz-fallback-node-side);
+  stroke: var(--scene-viz-fallback-node-side-stroke);
 }
 
 .scene-panel__fallback-node polygon:nth-of-type(2) {
-  fill: rgba(218, 226, 242, 0.92);
-  stroke: rgba(67, 83, 121, 0.28);
+  fill: var(--scene-viz-fallback-node-top);
+  stroke: var(--scene-viz-fallback-node-top-stroke);
 }
 
 .scene-panel__fallback-node polygon:nth-of-type(3) {
-  fill: rgba(80, 87, 145, 0.9);
-  stroke: rgba(67, 83, 121, 0.28);
+  fill: var(--scene-viz-fallback-node-front);
+  stroke: var(--scene-viz-fallback-node-front-stroke);
 }
 
 .scene-panel__fallback-node.is-active polygon:nth-of-type(2),
 .scene-panel__fallback-node.is-active polygon:nth-of-type(3) {
-  fill: rgba(92, 185, 92, 0.88);
+  fill: var(--scene-viz-fallback-node-active-top);
+}
+
+.scene-panel__fallback-node.is-active polygon:nth-of-type(3) {
+  fill: var(--scene-viz-fallback-node-active-front);
 }
 
 .scene-panel__fallback-node text {
-  fill: rgba(24, 26, 35, 0.88);
-  font: 600 11px/1.1 var(--mono);
-  text-transform: lowercase;
+  fill: var(--scene-viz-fallback-node-label);
+  font: 600 12px/1.1 var(--mono);
+  letter-spacing: 0.04em;
 }
 
 .scene-panel__legend,
@@ -1612,6 +1660,8 @@ button.annotation-trigger:focus-visible {
   .mobile-only {
     display: block;
     padding: 0 var(--space-16);
+    position: relative;
+    z-index: 4;
   }
 
   .walkthrough-layout {
@@ -1627,6 +1677,10 @@ button.annotation-trigger:focus-visible {
   .code-column__sticky {
     position: static;
     height: auto;
+  }
+
+  .code-column--compact {
+    min-height: 0;
   }
 
   .story-scene {
@@ -1646,6 +1700,18 @@ button.annotation-trigger:focus-visible {
     height: auto;
     min-height: 0;
     max-height: none;
+  }
+
+  .panel-shell--code,
+  .panel-shell--scene,
+  .panel-shell--story {
+    height: auto;
+    min-height: 0;
+  }
+
+  .panel-shell--story .panel-shell__body,
+  .panel-shell--story .panel-shell__body > * {
+    flex: 0 0 auto;
   }
 
   .story-scene__toolbar-panel {

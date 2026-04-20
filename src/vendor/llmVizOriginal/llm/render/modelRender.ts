@@ -3,7 +3,7 @@ import type { IFontAtlas, IFontAtlasData, IFontBuffers } from "./fontRender";
 import { Mat4f } from "@llmviz/utils/matrix";
 import { createShaderManager, ensureShadersReady } from "@llmviz/utils/shader";
 import type { IGLContext } from "@llmviz/utils/shader";
-import { Vec3, Vec4 } from "@llmviz/utils/vector";
+import { Vec3 } from "@llmviz/utils/vector";
 import { initBlockRender, renderAllBlocks, renderAllBlocksInstanced, renderBlocksSimple } from "./blockRender";
 import type { IBlockRender } from "./blockRender";
 import { initBlurRender, renderBlur, setupBlurTarget } from "./blurRender";
@@ -16,6 +16,8 @@ import { createQueryManager } from "./queryManager";
 import type { IQueryManager } from "./queryManager";
 import type { IProgramState } from "../Program";
 import type { ISyncObject } from "./syncObjects";
+import type { MicroVizTheme } from "../../../../viz/microViz/theme";
+import { siteMicroVizTheme } from "../../../../viz/microViz/theme";
 
 export interface IRenderView {
     time: number;
@@ -43,9 +45,14 @@ export interface IRenderState {
     renderTiming: boolean;
     lastGpuMs: number;
     lastJsMs: number;
+    theme: MicroVizTheme;
 }
 
-export function initRender(canvasEl: HTMLCanvasElement, fontAtlasData: IFontAtlasData): IRenderState | null {
+export function initRender(
+    canvasEl: HTMLCanvasElement,
+    fontAtlasData: IFontAtlasData,
+    theme?: MicroVizTheme,
+): IRenderState | null {
     // init shaders for various block types
 
     // console.clear();
@@ -86,6 +93,7 @@ export function initRender(canvasEl: HTMLCanvasElement, fontAtlasData: IFontAtla
     gl.enableVertexAttribArray(0);
     gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
 
+    const renderTheme = theme ?? siteMicroVizTheme;
     let sharedRender = initSharedRender(ctx);
 
     let fontAtlas = setupFontAtlas(ctx, fontAtlasData);
@@ -93,7 +101,7 @@ export function initRender(canvasEl: HTMLCanvasElement, fontAtlasData: IFontAtla
     let modelFontBuf = createFontBuffers(fontAtlas, sharedRender);
     let threadRender = initThreadRender(ctx);
     let lineRender = createLineRender(ctx, sharedRender);
-    let blockRender = initBlockRender(ctx);
+    let blockRender = initBlockRender(ctx, renderTheme);
     let triRender = initTriRender(ctx, sharedRender);
     let blurRender = initBlurRender(ctx, quadVao);
     let queryManager = createQueryManager(ctx);
@@ -119,6 +127,7 @@ export function initRender(canvasEl: HTMLCanvasElement, fontAtlasData: IFontAtla
         lastGpuMs: 0,
         lastJsMs: 0,
         renderTiming: false,
+        theme: renderTheme,
     };
 }
 
@@ -173,10 +182,19 @@ export function renderModel(state: IProgramState) {
     if (args.renderTiming) {
         let text = `GPU: ${args.lastGpuMs.toFixed(1)}ms JS: ${args.lastJsMs.toFixed(1)}ms`;
         let w = size.x;
-        let fontSize = 14;
+        let fontSize = args.theme.typography.scale.md;
         args.sharedRender.activePhase = RenderPhase.Overlay2D;
         let tw = measureTextWidth(args.modelFontBuf, text, fontSize);
-        writeTextToBuffer(args.modelFontBuf, text, new Vec4(0,0,0,1), w - tw - 4, 4, fontSize, new Mat4f());
+        writeTextToBuffer(
+            args.modelFontBuf,
+            text,
+            args.theme.scene.debugText,
+            w - tw - 4,
+            4,
+            fontSize,
+            new Mat4f(),
+            args.theme.typography.fontFaceName,
+        );
     }
 
     writeModelViewUbo(args.sharedRender, modelMtx, viewMtx);

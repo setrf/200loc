@@ -30,6 +30,7 @@ import {
   type MicroVizProgramState,
 } from './program'
 import { Vec3 } from '../../vendor/llmVizOriginal/utils/vector'
+import type { MicroVizTheme } from './theme'
 
 type FocusRangeKey = keyof typeof vizFocusRanges
 
@@ -43,8 +44,22 @@ interface MicroLayerViewProps {
   contextTokens: string[]
   vizFrame: VizFrame
   sceneModelData: SceneModelData
+  theme: MicroVizTheme
   onHoverFocusChange: (focusId: FocusRangeKey | null) => void
   onRenderModeChange: (mode: 'loading' | 'webgl' | 'fallback') => void
+  onRenderIssueChange: (issue: string | null) => void
+}
+
+const FONT_ATLAS_TIMEOUT_MS = 4000
+const FIRST_FRAME_TIMEOUT_MS = 5000
+
+function reportMicroVizError(error: unknown) {
+  const globalWithDebug = globalThis as typeof globalThis & {
+    __microVizLastErrorText?: string
+  }
+  globalWithDebug.__microVizLastErrorText =
+    error instanceof Error ? error.stack ?? error.message : String(error)
+  console.error(error)
 }
 
 interface CanvasData {
@@ -79,10 +94,17 @@ class MicroCanvasRender {
     private canvasData: CanvasData | null,
     sceneModelData: SceneModelData,
     fontAtlasData: Awaited<ReturnType<typeof loadMicroVizFontAtlas>>,
+    theme: MicroVizTheme,
     private onHoverFocusChange: (focusId: FocusRangeKey | null) => void,
     private onFirstFrame: () => void,
+    private onRenderFailure: () => void,
   ) {
-    this.progState = initMicroVizProgramState(canvasEl, fontAtlasData, sceneModelData)
+    this.progState = initMicroVizProgramState(
+      canvasEl,
+      fontAtlasData,
+      sceneModelData,
+      theme,
+    )
     this.progState.markDirty = this.markDirty
     this.blockFocusByIndex = new Map(
       Object.entries(this.progState.layout.cubeFocusIds).map(([cubeIdx, codeFocusId]) => [
@@ -206,12 +228,19 @@ class MicroCanvasRender {
       this.canvasSizeDirty = false
     }
 
-    runMicroVizProgram({ time, dt, markDirty: this.markDirty }, this.progState)
-    this.progState.htmlSubs.notify()
-    this.publishHoverFocus()
-    if (!this.hasRenderedFrame) {
-      this.hasRenderedFrame = true
-      this.onFirstFrame()
+    try {
+      runMicroVizProgram({ time, dt, markDirty: this.markDirty }, this.progState)
+      this.progState.htmlSubs.notify()
+      this.publishHoverFocus()
+      if (!this.hasRenderedFrame) {
+        this.hasRenderedFrame = true
+        this.onFirstFrame()
+      }
+    } catch (error) {
+      reportMicroVizError(error)
+      this.stopped = true
+      this.onHoverFocusChange(null)
+      this.onRenderFailure()
     }
   }
 
@@ -238,8 +267,10 @@ export const MicroLayerView = forwardRef<MicroLayerViewHandle, MicroLayerViewPro
       contextTokens,
       vizFrame,
       sceneModelData,
+      theme,
       onHoverFocusChange,
       onRenderModeChange,
+      onRenderIssueChange,
     },
     ref,
   ) {
@@ -317,33 +348,81 @@ export const MicroLayerView = forwardRef<MicroLayerViewHandle, MicroLayerViewPro
       let firstFrameSeen = false
       let canvasRenderLocal: MicroCanvasRender | null = null
       let resizeObserver: ResizeObserver | null = null
+      let loadTimeoutHandle = 0
+      let firstFrameTimeoutHandle = 0
+      const atlasAbortController = new AbortController()
       const handleWheel = (event: WheelEvent) => event.preventDefault()
       const supportsWebgl = !!activeCanvas.getContext('webgl2')
+      const clearTimers = () => {
+        if (loadTimeoutHandle) {
+          window.clearTimeout(loadTimeoutHandle)
+          loadTimeoutHandle = 0
+        }
+        if (firstFrameTimeoutHandle) {
+          window.clearTimeout(firstFrameTimeoutHandle)
+          firstFrameTimeoutHandle = 0
+        }
+      }
+      const failToFallback = (message: string, error?: unknown) => {
+        if (stale) {
+          return
+        }
+        clearTimers()
+        if (error) {
+          reportMicroVizError(error)
+        } else {
+          reportMicroVizError(new Error(message))
+        }
+        onHoverFocusChange(null)
+        onRenderIssueChange(message)
+        onRenderModeChange('fallback')
+      }
+
+      onRenderIssueChange(null)
+      onRenderModeChange('loading')
 
       if (!supportsWebgl) {
         onHoverFocusChange(null)
+        onRenderIssueChange('WebGL2 is unavailable in this browser.')
         onRenderModeChange('fallback')
         return
       }
 
+      loadTimeoutHandle = window.setTimeout(() => {
+        atlasAbortController.abort('Timed out while loading the model viewer font atlas.')
+        failToFallback('Model viewer timed out while loading its font atlas.')
+      }, FONT_ATLAS_TIMEOUT_MS)
+
       async function bootstrap() {
         try {
-          const fontAtlasData = await loadMicroVizFontAtlas()
+          const fontAtlasData = await loadMicroVizFontAtlas(theme, {
+            signal: atlasAbortController.signal,
+          })
           if (stale) {
             return
+          }
+          if (loadTimeoutHandle) {
+            window.clearTimeout(loadTimeoutHandle)
+            loadTimeoutHandle = 0
           }
           canvasRenderLocal = new MicroCanvasRender(
             activeCanvas,
             null,
             sceneModelData,
             fontAtlasData,
+            theme,
             onHoverFocusChange,
             () => {
               if (stale || firstFrameSeen) {
                 return
               }
               firstFrameSeen = true
+              clearTimers()
+              onRenderIssueChange(null)
               onRenderModeChange('webgl')
+            },
+            () => {
+              failToFallback('Model viewer failed while rendering the scene.')
             },
           )
           resizeObserver = new ResizeObserver(() => {
@@ -354,10 +433,12 @@ export const MicroLayerView = forwardRef<MicroLayerViewHandle, MicroLayerViewPro
           activeCanvas.addEventListener('wheel', handleWheel, { passive: false })
           setCanvasRender(canvasRenderLocal)
           setDebugProgramState(canvasRenderLocal.progState)
-        } catch {
-          if (!stale) {
-            onHoverFocusChange(null)
-            onRenderModeChange('fallback')
+          firstFrameTimeoutHandle = window.setTimeout(() => {
+            failToFallback('Model viewer never produced its first frame.')
+          }, FIRST_FRAME_TIMEOUT_MS)
+        } catch (error) {
+          if (!stale && !atlasAbortController.signal.aborted) {
+            failToFallback('Model viewer failed to load its font atlas.', error)
           }
         }
       }
@@ -366,15 +447,23 @@ export const MicroLayerView = forwardRef<MicroLayerViewHandle, MicroLayerViewPro
 
       return () => {
         stale = true
+        atlasAbortController.abort()
+        clearTimers()
         onHoverFocusChange(null)
-        onRenderModeChange('loading')
         activeCanvas.removeEventListener('wheel', handleWheel)
         resizeObserver?.disconnect()
         canvasRenderLocal?.destroy()
         setDebugProgramState(null)
         setCanvasRender(null)
       }
-    }, [canvasEl, onHoverFocusChange, onRenderModeChange, sceneModelData])
+    }, [
+      canvasEl,
+      onHoverFocusChange,
+      onRenderIssueChange,
+      onRenderModeChange,
+      sceneModelData,
+      theme,
+    ])
 
     useEffect(() => {
       canvasRender?.setData(sceneData)

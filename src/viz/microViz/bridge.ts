@@ -18,6 +18,7 @@ import {
 } from '../../vendor/llmVizOriginal/utils/renderPhases'
 import { Vec3 } from '../../vendor/llmVizOriginal/utils/vector'
 import { DimStyle } from '../../vendor/llmVizOriginal/llm/walkthrough/WalkthroughTools'
+import { siteMicroVizTheme, type MicroVizTheme } from './theme'
 
 const headBlockIds: MicroVizBlockId[] = [
   'attention-head-1',
@@ -488,6 +489,7 @@ export function buildMicroVizPhaseState(
   phase: PhaseDefinition,
   frame: VizFrame,
   layout: MicroVizLayout,
+  theme: MicroVizTheme = siteMicroVizTheme,
 ): MicroVizPhaseState {
   const focusBlockIds = unique(mapNodeToBlocks(frame.focusNodeId))
   const emphasisBlockIds = unique(
@@ -517,8 +519,16 @@ export function buildMicroVizPhaseState(
   for (const blockId of Object.keys(layout.blockMap) as MicroVizBlockId[]) {
     const isFocused = focusBlockIds.includes(blockId)
     const isEmphasized = emphasisBlockIds.includes(blockId)
-    opacityByBlockId[blockId] = isFocused ? 1 : isEmphasized ? 0.96 : 0.86
-    highlightByBlockId[blockId] = isFocused ? 0.9 : isEmphasized ? 0.45 : 0.08
+    opacityByBlockId[blockId] = isFocused
+      ? theme.emphasis.focusOpacity
+      : isEmphasized
+        ? theme.emphasis.emphasisOpacity
+        : theme.emphasis.baseOpacity
+    highlightByBlockId[blockId] = isFocused
+      ? theme.emphasis.focusHighlight
+      : isEmphasized
+        ? theme.emphasis.emphasisHighlight
+        : theme.emphasis.baseHighlight
   }
 
   const dimHover =

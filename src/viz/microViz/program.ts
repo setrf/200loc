@@ -29,7 +29,7 @@ import {
 import { RenderPhase } from '../../vendor/llmVizOriginal/llm/render/sharedRender'
 import { Mat4f } from '../../vendor/llmVizOriginal/utils/matrix'
 import { Subscriptions } from '../../vendor/llmVizOriginal/utils/hooks'
-import { Vec3, Vec4 } from '../../vendor/llmVizOriginal/utils/vector'
+import { Vec3 } from '../../vendor/llmVizOriginal/utils/vector'
 import type { IMovementInfo } from '../../vendor/llmVizOriginal/llm/components/MovementControls'
 import { MovementAction } from '../../vendor/llmVizOriginal/llm/components/MovementControls'
 import { createMicroVizTextures } from './bridge'
@@ -46,6 +46,10 @@ import type {
   MicroVizRenderContext,
   MicroVizStaticModel,
 } from './types'
+import {
+  siteMicroVizTheme,
+  type MicroVizTheme,
+} from './theme'
 
 export interface MicroVizProgramData {
   phase: PhaseDefinition
@@ -55,6 +59,7 @@ export interface MicroVizProgramData {
 }
 
 export interface MicroVizProgramState {
+  theme: MicroVizTheme
   render: MicroVizRenderContext['renderState']
   camera: ICamera
   mouse: {
@@ -93,6 +98,27 @@ export interface MicroVizProgramState {
 }
 
 const MANUAL_ZOOM_EPSILON = 0.2
+
+function resolveFocusedHeadIndex(phaseState: MicroVizPhaseState) {
+  for (const blockId of phaseState.focusBlockIds) {
+    const match = /^attention-head-(\d+)$/.exec(blockId)
+    if (match) {
+      return Number(match[1]) - 1
+    }
+  }
+
+  return null
+}
+
+function resolveLabelSemantics(
+  phaseState: MicroVizPhaseState,
+  theme: MicroVizTheme,
+) {
+  return {
+    theme,
+    activeHeadIndex: resolveFocusedHeadIndex(phaseState),
+  }
+}
 
 export function shouldUpdateDesiredCamera(
   previousPhaseState: MicroVizPhaseState | null,
@@ -156,16 +182,25 @@ export function createCamera(initialCenter: Vec3, initialAngle: Vec3): ICamera {
   }
 }
 
-export async function loadMicroVizFontAtlas(): Promise<IFontAtlasData> {
-  return fetchFontAtlasData()
+export async function loadMicroVizFontAtlas(
+  theme: MicroVizTheme = siteMicroVizTheme,
+  options?: {
+    signal?: AbortSignal
+  },
+): Promise<IFontAtlasData> {
+  return fetchFontAtlasData({
+    imageSrc: theme.typography.fontAtlasSrc,
+    fontDefSrc: theme.typography.fontDefSrc,
+  }, options)
 }
 
 export function initMicroVizProgramState(
   canvasEl: HTMLCanvasElement,
   fontAtlasData: IFontAtlasData,
   sceneModelData: MicroVizStaticModel,
+  theme: MicroVizTheme = siteMicroVizTheme,
 ): MicroVizProgramState {
-  const render = initRender(canvasEl, fontAtlasData)
+  const render = initRender(canvasEl, fontAtlasData, theme)
   if (!render) {
     throw new Error('WebGL2 unavailable')
   }
@@ -187,6 +222,7 @@ export function initMicroVizProgramState(
   }
 
   return {
+    theme,
     render,
     camera,
     mouse: {
@@ -240,6 +276,7 @@ export function setMicroVizProgramData(
     data.phase,
     data.vizFrame,
     state.microViz.renderContext.layout,
+    state.theme,
   )
   state.microViz.phaseState = phaseState
   state.camera.zoomReference = phaseState.cameraTarget.angle.z
@@ -406,25 +443,33 @@ export function runMicroVizProgram(
   updateCamera(state as never, view)
   genModelViewMatrices(state as never, state.layout as never)
 
-  drawMicroVizArrows(state.render, state.layout, phaseState)
+  state.render.sharedRender.activePhase = RenderPhase.Arrows
+  drawMicroVizArrows(state.render, state.layout, phaseState, state.theme)
+  state.render.sharedRender.activePhase = RenderPhase.Overlay
   if (phaseState.cameraPoseId === 'overview') {
     drawModelCard(
       state as never,
       state.layout as never,
       'microgpt',
       state.microViz.renderContext.currentCardOffset,
+      state.theme,
     )
   }
-  drawBlockInfo(state as never)
+  drawBlockInfo(state as never, state.theme)
   runMouseHitTesting(state as never)
-  state.render.sharedRender.activePhase = RenderPhase.Opaque
-  drawBlockLabels(state.render as never, state.layout as never)
+  state.render.sharedRender.activePhase = RenderPhase.Overlay
+  drawBlockLabels(
+    state.render as never,
+    state.layout as never,
+    resolveLabelSemantics(phaseState, state.theme),
+  )
 
   state.render.sharedRender.activePhase = RenderPhase.Overlay2D
   const opts: IFontOpts = {
-    color: Vec4.fromHexColor('#000000', 0.76),
+    color: state.theme.scene.overlayText,
     size: 14,
     mtx: new Mat4f(),
+    faceName: state.theme.typography.fontFaceName,
   }
   for (let lineIndex = 0; lineIndex < state.display.lines.length; lineIndex += 1) {
     const line = state.display.lines[lineIndex]!

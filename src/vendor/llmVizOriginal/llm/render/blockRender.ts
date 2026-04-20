@@ -5,15 +5,24 @@ import type { IGLContext } from "@llmviz/utils/shader";
 import { Vec3, Vec4 } from "@llmviz/utils/vector";
 import { Colors } from "../walkthrough/WalkthroughTools";
 import { modelViewUboText, UboBindings } from "./sharedRender";
+import { siteMicroVizTheme, type MicroVizTheme } from "../../../../viz/microViz/theme";
 
 
 export type IBlockRender = ReturnType<typeof initBlockRender>;
 
-export function initBlockRender(ctx: IGLContext | null) {
+function vec3Shader(color: Vec4) {
+    return `vec3(${color.x.toFixed(6)}, ${color.y.toFixed(6)}, ${color.z.toFixed(6)})`;
+}
+
+export function initBlockRender(
+    ctx: IGLContext | null,
+    theme: MicroVizTheme = siteMicroVizTheme,
+) {
     if (!ctx) {
         return null!;
     }
     let gl = ctx.gl;
+    let shaderTheme = theme.scene.blocks;
 
     let blockUboText = /*glsl*/`
     layout (std140) uniform BlockUbo {
@@ -159,13 +168,13 @@ export function initBlockRender(ctx: IGLContext | null) {
             float dist = distance(u_camPos, v_modelPos);
             float t = clamp((dist - minDist) / (maxDist - minDist), 0.0, 1.0);
 
-            vec3 baseColor = mix(u_baseColor.rgb, vec3(0.5, 0.5, 0.5), 0.5);
+            vec3 baseColor = mix(u_baseColor.rgb, ${vec3Shader(shaderTheme.textureZero)}, 0.45);
             if (cellDark) {
                 baseColor *= mix(0.9, 1.0, t);
             }
 
             if (u_accessTexScale > 0.0 && dist < maxDist) { // have access texture
-                vec3 texBaseColor = mix(baseColor, vec3(0.5, 0.5, 0.5), 0.8);
+                vec3 texBaseColor = mix(baseColor, ${vec3Shader(shaderTheme.textureZero)}, 0.74);
 
                 vec3 d = fract(v_blockPos) - 0.5;
                 float r2 = 0.3*0.3;
@@ -181,9 +190,9 @@ export function initBlockRender(ctx: IGLContext | null) {
 
                     float weight = clamp(abs(val), 0.0, 1.0);
 
-                    vec3 negColor = vec3(0.0, 0.0, 0.0);
+                    vec3 negColor = ${vec3Shader(shaderTheme.textureNegative)};
                     vec3 posColor = u_baseColor.rgb; // vec3(0.0, 1.0, 0.0);
-                    vec3 zeroColor = vec3(0.5, 0.5, 0.5);
+                    vec3 zeroColor = ${vec3Shader(shaderTheme.textureZero)};
                     texBaseColor = mix(mix(zeroColor, negColor, weight), mix(zeroColor, posColor, weight), step(0.0, val));
                 }
 
@@ -194,9 +203,9 @@ export function initBlockRender(ctx: IGLContext | null) {
                 vec3 block16 = v_blockPos / 16.0;
                 vec3 pxPerBlock16 = 1.0 / fwidth(block16);
                 float strength16 = min(min(pxPerBlock16.x, pxPerBlock16.y), pxPerBlock16.z);
-                vec3 colorEdge = vec3(1.0, 1.0, 1.0);
-                vec3 color16 = vec3(1.0, 1.0, 1.0) * 0.7;
-                vec3 color256 = vec3(1.0, 1.0, 1.0);
+                vec3 colorEdge = ${vec3Shader(shaderTheme.gridEdge)};
+                vec3 color16 = ${vec3Shader(shaderTheme.gridMinor)};
+                vec3 color256 = ${vec3Shader(shaderTheme.gridMajor)};
 
                 // if we're zoomed out enough, show 256 & (256 * 16) grid lines
                 // the 16 grid lines are faded out by this point (fade out between 10px -> 1px)
@@ -205,8 +214,7 @@ export function initBlockRender(ctx: IGLContext | null) {
                     pxPerBlock16 = 1.0 / fwidth(block16);
                     strength16 = min(min(pxPerBlock16.x, pxPerBlock16.y), pxPerBlock16.z);
                     color16 = color256;
-                    // orange
-                    color256 = vec3(1.0, 0.7, 0.4);
+                    color256 = mix(${vec3Shader(shaderTheme.gridMajor)}, ${vec3Shader(shaderTheme.gridEdge)}, 0.35);
                 }
 
                 float visibility16 = smoothstep(2.0, 10.0, strength16); // below 10px between lines, fade out
@@ -347,7 +355,8 @@ export function renderBlocksSimple(blockRender: IBlockRender, cubes: IBlkDef[]) 
     for (let cube of cubes) {
         gl.uniform3f(locs.u_size, cube.dx, cube.dy, cube.dz);
         gl.uniform3f(locs.u_offset, cube.x, cube.y, cube.z);
-        let baseColor = (cube.t === 'w' ? new Vec4(0.3, 0.3, 1.0, 1) : new Vec4(0.4, 0.8, 0.4, 1)).mul(cube.highlight);
+        let color = (cube.t === 'w' ? Colors.Weights : cube.t === 'i' ? Colors.Intermediates : Colors.Aggregates);
+        let baseColor = new Vec4(color.x, color.y, color.z, 1).mul(cube.highlight);
         gl.uniform4f(locs.u_baseColor, baseColor.x, baseColor.y, baseColor.z, baseColor.w);
         gl.drawArrays(geom.type, 0, geom.numVerts);
     }
