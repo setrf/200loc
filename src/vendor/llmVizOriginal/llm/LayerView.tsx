@@ -163,7 +163,10 @@ export function LayerView({
     useEffect(() => {
         let stale = false;
         async function getData() {
-            let data = await fetchFontAtlasData();
+            let data = await fetchFontAtlasData({
+                imageSrc: 'fonts/microviz-geist-mono-atlas.png',
+                fontDefSrc: 'fonts/microviz-geist-mono.json',
+            });
             if (stale) return;
             setFontAtlasData(data);
         }

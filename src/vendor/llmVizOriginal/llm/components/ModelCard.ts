@@ -15,6 +15,7 @@ import { DimStyle, dimStyleColor } from "../walkthrough/WalkthroughTools";
 import { lineHeight } from "./TextLayout";
 import type { IColorMix } from "../Annotations";
 import { clamp } from "@llmviz/utils/data";
+import { getCurrentMicroVizTheme, type MicroVizTheme } from "../../../../viz/microViz/theme";
 
 export interface IModelCardLayoutMetrics {
     tl: Vec3;
@@ -31,6 +32,15 @@ export interface IModelCardVisibility {
     opacity: number;
 }
 
+function themedFont(size: number, color: Vec4, mtx?: Mat4f, theme: MicroVizTheme = getCurrentMicroVizTheme()): IFontOpts {
+    return {
+        color,
+        size,
+        mtx,
+        faceName: theme.typography.fontFaceName,
+    };
+}
+
 function fitTextScale(textWidth: number, preferredScale: number, maxWidth: number, minScale: number) {
     if (textWidth <= 0 || maxWidth <= 0) {
         return preferredScale;
@@ -42,20 +52,22 @@ export function computeModelCardLayout(
     titleWidthAtUnitScale: number,
     paramLabelWidthAtUnitScale: number,
     paramValueWidthAtUnitScale: number,
+    theme: MicroVizTheme = getCurrentMicroVizTheme(),
 ) : IModelCardLayoutMetrics {
+    let scale = theme.typography.scale;
     const innerPaddingX = 8;
     const titleTopPadding = 4;
     const contentGap = 4;
     const bottomPadding = 5;
 
-    const preferredTitleScale = 13;
-    const preferredParamLabelScale = 4;
-    const preferredParamValueScale = 8;
+    const preferredTitleScale = scale.xl;
+    const preferredParamLabelScale = scale.sm;
+    const preferredParamValueScale = scale.md;
 
     const titleFillRatio = 0.94;
-    const minTitleScale = 9;
-    const minParamLabelScale = 3.2;
-    const minParamValueScale = 6.4;
+    const minTitleScale = scale.lg;
+    const minParamLabelScale = scale.xs;
+    const minParamValueScale = scale.sm;
 
     const minInnerWidth = 74;
     const maxInnerWidth = 102;
@@ -123,15 +135,21 @@ export function computeModelCardVisibilityFromDelta(
     }
 
     let zoomRatio = clamp(currentZoom / referenceZoom, 0.0, 2.0);
-    let zoomOpacity = clamp((zoomRatio - 0.62) / 0.28, 0.0, 1.0);
+    let zoomOpacity = clamp((zoomRatio - 0.56) / 0.3, 0.0, 1.0);
     let centerOpacity = clamp(1.0 - centerDelta / 48.0, 0.0, 1.0);
     let angleOpacity = clamp(1.0 - angleDelta / 18.0, 0.0, 1.0);
     let opacity = Math.min(zoomOpacity, centerOpacity, angleOpacity);
-    let scale = lerp(0.72, 1.0, opacity);
+    let scale = lerp(0.84, 1.04, opacity);
     return { scale, opacity };
 }
 
-export function drawModelCard(state: IProgramState, layout: IGptModelLayout, title: string, offset: Vec3) {
+export function drawModelCard(
+    state: IProgramState,
+    layout: IGptModelLayout,
+    title: string,
+    offset: Vec3,
+    theme: MicroVizTheme = getCurrentMicroVizTheme(),
+) {
     let { render } = state;
     let { camPos } = cameraToMatrixView(state.camera);
     let dist = camPos.dist(new Vec3(0, 0, -30)); //.add(offset));
@@ -155,6 +173,7 @@ export function drawModelCard(state: IProgramState, layout: IGptModelLayout, tit
         measureTextWidth(render.modelFontBuf, title, 1),
         measureTextWidth(render.modelFontBuf, nParamsText, 1),
         measureTextWidth(render.modelFontBuf, weightCountText, 1),
+        theme,
     );
     // Keep the card legible, but let it participate in scene zoom instead of
     // behaving like a fixed-size screen overlay. Scale around the card bottom
@@ -166,9 +185,10 @@ export function drawModelCard(state: IProgramState, layout: IGptModelLayout, tit
         .mul(Mat4f.fromTranslation(new Vec3(0, -pivotY, 0)));
 
     let thick = 1.0 / 10.0 * scale;
-    let borderColor = Vec4.fromHexColor("#555599", 0.8 * visibility.opacity);
-    let backgroundColor = Vec4.fromHexColor("#93c5fd", 0.3 * visibility.opacity);
-    let titleColor = Vec4.fromHexColor("#000000", visibility.opacity);
+    let borderColor = theme.scene.modelCardBorder.mul(visibility.opacity);
+    let backgroundColor = theme.scene.modelCardBackground.mul(visibility.opacity);
+    let titleColor = theme.scene.modelCardText.mul(visibility.opacity);
+    let detailColor = theme.scene.modelCardMutedText.mul(visibility.opacity);
     let n = new Vec3(0, 0, 1);
 
     let lineOpts: ILineOpts = { color: borderColor, mtx, thick, n };
@@ -181,7 +201,16 @@ export function drawModelCard(state: IProgramState, layout: IGptModelLayout, tit
     let midX = (tl.x + br.x) / 2;
     let titleFontScale = cardLayout.titleFontScale;
     let titleW = measureTextWidth(render.modelFontBuf, title, titleFontScale);
-    writeTextToBuffer(render.modelFontBuf, title, titleColor, midX - titleW / 2, cardLayout.titleY, titleFontScale, mtx);
+    writeTextToBuffer(
+        render.modelFontBuf,
+        title,
+        titleColor,
+        midX - titleW / 2,
+        cardLayout.titleY,
+        titleFontScale,
+        mtx,
+        theme.typography.fontFaceName,
+    );
 
     // layout.weightCount = 150000000000;
 
@@ -195,8 +224,26 @@ export function drawModelCard(state: IProgramState, layout: IGptModelLayout, tit
     let paramOff = cardLayout.paramY;
     let weightX = midX - (weightCountW + weightTitleW) / 2;
 
-    writeTextToBuffer(render.modelFontBuf, nParamsText, titleColor, weightX, paramOff - paramFontScale / 2, paramFontScale, mtx);
-    writeTextToBuffer(render.modelFontBuf, weightCountText, titleColor, weightX + weightTitleW, paramOff - weightSize / 2, weightSize, mtx);
+    writeTextToBuffer(
+        render.modelFontBuf,
+        nParamsText,
+        detailColor,
+        weightX,
+        paramOff - paramFontScale / 2,
+        paramFontScale,
+        mtx,
+        theme.typography.fontFaceName,
+    );
+    writeTextToBuffer(
+        render.modelFontBuf,
+        weightCountText,
+        titleColor,
+        weightX + weightTitleW,
+        paramOff - weightSize / 2,
+        weightSize,
+        mtx,
+        theme.typography.fontFaceName,
+    );
     // addParam("C (channels) = ", C.toString(), dimStyleColor(DimStyle.C));
     // addParam("T (time) = ", T.toString(), dimStyleColor(DimStyle.T));
     // addParam("B (batches) = ", B.toString(), dimStyleColor(DimStyle.B));
@@ -233,12 +280,13 @@ export interface IInputBoxOpts {
 }
 
 export function renderInputBoxes(state: IProgramState, layout: IGptModelLayout, tl: Vec3, br: Vec3, cellW: number, fontSize: number, lineOpts: ILineOpts, opts?: IInputBoxOpts) {
+    let theme = getCurrentMicroVizTheme();
     let render = state.render;
     let { T } = layout.shape;
     let inCellH = br.y - tl.y;
 
-    let tokTextOpts: IFontOpts = { color: Vec4.fromHexColor("#000000", 1.0), mtx: lineOpts.mtx, size: fontSize };
-    let idxTextOpts: IFontOpts = { color: Vec4.fromHexColor("#666666", 1.0), mtx: lineOpts.mtx, size: fontSize * 0.6 };
+    let tokTextOpts = themedFont(fontSize, theme.scene.modelCardText, lineOpts.mtx);
+    let idxTextOpts = themedFont(fontSize * 0.6, theme.scene.modelCardMutedText, lineOpts.mtx);
 
     let dimmedTokTextOpts: IFontOpts = { ...tokTextOpts, color: tokTextOpts.color.mul(0.3) };
     let dimmedIdxTextOpts: IFontOpts = { ...idxTextOpts, color: idxTextOpts.color.mul(0.3) };
@@ -279,6 +327,7 @@ export interface IOutputBoxOpts {
 }
 
 export function renderOutputBoxes(state: IProgramState, layout: IGptModelLayout, tl: Vec3, br: Vec3, cellW: number, fontSize: number, lineOpts: ILineOpts, opts?: IOutputBoxOpts) {
+    let theme = getCurrentMicroVizTheme();
     let render = state.render;
     let { T, vocabSize } = layout.shape;
     let outCellH = br.y - tl.y;
@@ -287,8 +336,8 @@ export function renderOutputBoxes(state: IProgramState, layout: IGptModelLayout,
     let boldLast = opts?.boldLast ?? true;
 
     lineOpts = { ...lineOpts, color: lineOpts.color.mul(opacity ?? 1.0) };
-    let tokTextOpts: IFontOpts = { color: Vec4.fromHexColor("#000000", opacity), mtx: lineOpts.mtx, size: fontSize };
-    let idxTextOpts: IFontOpts = { color: Vec4.fromHexColor("#666666", opacity), mtx: lineOpts.mtx, size: fontSize * 0.6 };
+    let tokTextOpts = themedFont(fontSize, theme.scene.modelCardText.mul(opacity), lineOpts.mtx);
+    let idxTextOpts = themedFont(fontSize * 0.6, theme.scene.modelCardMutedText.mul(opacity), lineOpts.mtx);
 
     let dimmedTokTextOpts: IFontOpts = { ...tokTextOpts, color: tokTextOpts.color.mul(0.3) };
     let dimmedIdxTextOpts: IFontOpts = { ...idxTextOpts, color: idxTextOpts.color.mul(0.3) };
@@ -386,6 +435,7 @@ function numberToCommaSep(a: number) {
 }
 
 function renderInputAtTop(state: IProgramState) {
+    let theme = getCurrentMicroVizTheme();
     let layout = state.layout;
     let render = state.render;
 
@@ -402,8 +452,8 @@ function renderInputAtTop(state: IProgramState) {
 
     let outputOpacity = state.display.topOutputOpacity ?? 1.0;
 
-    let lineOpts = makeLineOpts({ color: Vec4.fromHexColor("#000000", 0.2), mtx: new Mat4f(), thick: 1.5 });
-    let titleTextOpts: IFontOpts = { color: Vec4.fromHexColor("#666666", 1.0), mtx: lineOpts.mtx, size: 1.9 };
+    let lineOpts = makeLineOpts({ color: theme.scene.modelCardDivider, mtx: new Mat4f(), thick: 1.5 });
+    let titleTextOpts = themedFont(1.9, theme.scene.modelCardMutedText, lineOpts.mtx);
 
     renderInputBoxes(state, layout, tl, br, inCellW, 4, lineOpts, { tokMixes: state.display.tokenColors, idxMixes: state.display.tokenIdxColors });
 
@@ -447,6 +497,7 @@ function renderInputAtTop(state: IProgramState) {
 }
 
 function renderOutputAtBottom(state: IProgramState) {
+    let theme = getCurrentMicroVizTheme();
     let layout = state.layout;
 
     let softmax = layout.logitsSoftmax;
@@ -461,7 +512,7 @@ function renderOutputAtBottom(state: IProgramState) {
     let tl = new Vec3(topMid.x - outCellW * nCells / 2, topMid.y);
     let br = new Vec3(topMid.x + outCellW * nCells / 2, topMid.y + outCellH);
 
-    let lineOpts = makeLineOpts({ color: Vec4.fromHexColor("#000000", 0.2), mtx: new Mat4f(), thick: 1.5 });
+    let lineOpts = makeLineOpts({ color: theme.scene.modelCardDivider, mtx: new Mat4f(), thick: 1.5 });
 
     renderOutputBoxes(state, layout, tl, br, outCellW, 4, lineOpts, { boldLast: true, tokMixes: state.display.tokenOutputColors });
 

@@ -633,6 +633,9 @@ describe('ui components', () => {
     expect(screen.queryByText('Original llm-viz')).not.toBeInTheDocument()
     expect(screen.queryByTestId('vendored-layer-view')).not.toBeInTheDocument()
     expect(screen.queryByText('Readable history for this moment')).not.toBeInTheDocument()
+    expect(
+      screen.getByLabelText('Architecture scene').getAttribute('style'),
+    ).toContain('--scene-viz-viewport-bg')
 
     const scene = screen.getByLabelText('Architecture scene')
     fireEvent.mouseEnter(scene)

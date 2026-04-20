@@ -262,14 +262,14 @@ export function drawBlock(render: IRenderState, blk: ITextBlock) {
         let sqrtY = blk.offset.y - subY * 0.9;
         let sqrtSize = subY * 1.8;
 
-        let mathOpts: IFontOpts = { ...blk.opts, faceName: 'cmsy10', size: sqrtSize };
+        let mathOpts: IFontOpts = { ...blk.opts, size: sqrtSize };
 
         let lineOpts = makeLineOpts({ color: blk.opts.color, n: new Vec3(0,0,1), mtx: blk.opts.mtx, thick: 0.4 });
         let lineX = sqrtX + sqrtSize * 0.5;
         let lineY = sqrtY + sqrtSize * 0.5;
         addLine2(render.lineRender, new Vec3(lineX, lineY).round_(), new Vec3(sub.offset.x + sub.size.x, lineY).round_(), lineOpts);
 
-        drawText(render.modelFontBuf, '\u0070', sqrtX, sqrtY, mathOpts);
+        drawText(render.modelFontBuf, '√', sqrtX, sqrtY, mathOpts);
         drawBlock(render, sub);
         break;
     }

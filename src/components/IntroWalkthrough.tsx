@@ -88,7 +88,10 @@ export function IntroWalkthrough({
   }, [clearCloseTimer, clearHoverTimer])
 
   useEffect(() => {
-    closeAnnotation()
+    const handle = window.setTimeout(() => {
+      closeAnnotation()
+    }, 0)
+    return () => window.clearTimeout(handle)
   }, [activeStepIndex, closeAnnotation])
 
   function syncAnnotation(triggerKey: string, glossaryId: GlossaryId, pinned: boolean) {

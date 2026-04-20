@@ -764,10 +764,12 @@ export default function App() {
       >
         {desktopTopPanel}
 
-        {!isCompact && showCodeColumn ? (
-          <div className="left-column">
+        {showCodeColumn ? (
+          <div className={isCompact ? '' : 'left-column'}>
             <aside
-              className={`code-column ${state.mobileTab === 'code' ? 'is-active' : ''}`}
+              className={`code-column ${
+                state.mobileTab === 'code' ? 'is-active' : ''
+              }${isCompact ? ' code-column--compact' : ''}`}
               data-lab-tour="code"
             >
               <div className="code-column__sticky">

@@ -5,16 +5,15 @@ import {
 } from '../../vendor/llmVizOriginal/llm/components/Arrow'
 import type { IBlkDef } from '../../vendor/llmVizOriginal/llm/GptModelLayout'
 import type { IRenderState } from '../../vendor/llmVizOriginal/llm/render/modelRender'
-import { Vec3, Vec4 } from '../../vendor/llmVizOriginal/utils/vector'
+import { Vec3 } from '../../vendor/llmVizOriginal/utils/vector'
 import type { MicroVizEdgeId, MicroVizLayout, MicroVizPhaseState } from './types'
+import type { MicroVizTheme } from './theme'
 
 const pad = 2
 const residualWidth = 6
-const weightColor = Vec4.fromHexColor('#3333aa')
-const dataColor = Vec4.fromHexColor('#33aa33')
 
-function blockColor(block: IBlkDef) {
-  return block.t === 'w' ? weightColor : dataColor
+function blockColor(block: IBlkDef, theme: MicroVizTheme) {
+  return block.t === 'w' ? theme.scene.arrows.weights : theme.scene.arrows.data
 }
 
 function midpoint(block: IBlkDef, pos: BlockPos) {
@@ -31,12 +30,14 @@ function midpoint(block: IBlkDef, pos: BlockPos) {
   }
 }
 
-function edgeOpacity(active: boolean, left: IBlkDef, right: IBlkDef) {
+function edgeOpacity(active: boolean, left: IBlkDef, right: IBlkDef, theme: MicroVizTheme) {
   const base = Math.min(left.opacity, right.opacity)
   if (base <= 0) {
     return 0
   }
-  return active ? Math.min(1, base * 1.05) : base * 0.74
+  return active
+    ? Math.min(1, base * theme.emphasis.arrowActiveBoost)
+    : base * theme.emphasis.arrowIdleOpacity
 }
 
 function drawArrowBetween(
@@ -47,15 +48,16 @@ function drawArrowBetween(
   dest: IBlkDef,
   destPos: BlockPos,
   edgeId: MicroVizEdgeId | null,
+  theme: MicroVizTheme,
   width = 6,
 ) {
   const active = edgeId ? activeEdges.has(edgeId) : false
-  const opacity = edgeOpacity(active, src, dest)
+  const opacity = edgeOpacity(active, src, dest, theme)
   if (opacity <= 0) {
     return
   }
 
-  const color = blockColor(src).mul(opacity)
+  const color = blockColor(src, theme).mul(opacity)
   const normal = new Vec3(0, 0, 1)
   const start = midpoint(src, srcPos)
   const end = midpoint(dest, destPos)
@@ -97,9 +99,10 @@ function drawVerticalArrow(
   src: IBlkDef,
   dest: IBlkDef,
   edgeId: MicroVizEdgeId | null,
+  theme: MicroVizTheme,
   width = 6,
 ) {
-  drawArrowBetween(state, activeEdges, src, BlockPos.Bot, dest, BlockPos.Top, edgeId, width)
+  drawArrowBetween(state, activeEdges, src, BlockPos.Bot, dest, BlockPos.Top, edgeId, theme, width)
 }
 
 function drawHorizontalArrow(
@@ -108,9 +111,10 @@ function drawHorizontalArrow(
   src: IBlkDef,
   dest: IBlkDef,
   edgeId: MicroVizEdgeId | null,
+  theme: MicroVizTheme,
   width = 6,
 ) {
-  drawArrowBetween(state, activeEdges, src, BlockPos.Right, dest, BlockPos.Left, edgeId, width)
+  drawArrowBetween(state, activeEdges, src, BlockPos.Right, dest, BlockPos.Left, edgeId, theme, width)
 }
 
 function drawResidualSplit(
@@ -119,10 +123,11 @@ function drawResidualSplit(
   src: IBlkDef,
   dest: IBlkDef,
   edgeId: MicroVizEdgeId | null,
+  theme: MicroVizTheme,
   width = 6,
 ) {
   const active = edgeId ? activeEdges.has(edgeId) : false
-  const opacity = edgeOpacity(active, src, dest)
+  const opacity = edgeOpacity(active, src, dest, theme)
   if (opacity <= 0) {
     return
   }
@@ -136,7 +141,7 @@ function drawResidualSplit(
     end,
     width,
     new Vec3(0, 0, 1),
-    blockColor(src).mul(opacity),
+    blockColor(src, theme).mul(opacity),
     true,
   )
 }
@@ -149,11 +154,12 @@ function drawBottomToSide(
   dest: IBlkDef,
   edgeId: MicroVizEdgeId | null,
   offset: number,
+  theme: MicroVizTheme,
   width = 6,
   forceOffset = false,
 ) {
   const active = edgeId ? activeEdges.has(edgeId) : false
-  const opacity = edgeOpacity(active, src, dest)
+  const opacity = edgeOpacity(active, src, dest, theme)
   if (opacity <= 0) {
     return
   }
@@ -177,7 +183,7 @@ function drawBottomToSide(
     end,
     width,
     new Vec3(0, 0, 1),
-    blockColor(src).mul(opacity),
+    blockColor(src, theme).mul(opacity),
     true,
     CornerMode.None,
     endDir,
@@ -188,12 +194,13 @@ export function drawMicroVizArrows(
   state: IRenderState,
   layout: MicroVizLayout,
   phaseState: MicroVizPhaseState,
+  theme: MicroVizTheme,
 ) {
   const activeEdges = new Set(phaseState.emphasisEdgeIds)
   let prevResidual = layout.residual0
 
-  drawVerticalArrow(state, activeEdges, layout.idxObj, layout.residual0, 'context-to-token-embedding')
-  drawHorizontalArrow(state, activeEdges, layout.tokEmbedObj, layout.residual0, 'token-embedding-to-residual-stream')
+  drawVerticalArrow(state, activeEdges, layout.idxObj, layout.residual0, 'context-to-token-embedding', theme)
+  drawHorizontalArrow(state, activeEdges, layout.tokEmbedObj, layout.residual0, 'token-embedding-to-residual-stream', theme)
   drawArrowBetween(
     state,
     activeEdges,
@@ -202,34 +209,35 @@ export function drawMicroVizArrows(
     layout.residual0,
     BlockPos.Right,
     'position-embedding-to-residual-stream',
+    theme,
   )
 
   for (const block of layout.blocks) {
-    drawVerticalArrow(state, activeEdges, prevResidual, block.attnResidual, 'attention-out-to-residual-add-1')
-    drawResidualSplit(state, activeEdges, prevResidual, block.ln1.lnResid, 'residual-stream-to-norm-1')
-    drawResidualSplit(state, activeEdges, prevResidual, block.ln1.lnAgg2, 'residual-stream-to-norm-1', 2)
-    drawVerticalArrow(state, activeEdges, block.ln1.lnAgg2, block.ln1.lnResid, 'residual-stream-to-norm-1', 2)
+    drawVerticalArrow(state, activeEdges, prevResidual, block.attnResidual, 'attention-out-to-residual-add-1', theme)
+    drawResidualSplit(state, activeEdges, prevResidual, block.ln1.lnResid, 'residual-stream-to-norm-1', theme)
+    drawResidualSplit(state, activeEdges, prevResidual, block.ln1.lnAgg2, 'residual-stream-to-norm-1', theme, 2)
+    drawVerticalArrow(state, activeEdges, block.ln1.lnAgg2, block.ln1.lnResid, 'residual-stream-to-norm-1', theme, 2)
 
     block.heads.forEach((head, headIndex) => {
       const qEdge = (`qkv-to-attention-head-${headIndex + 1}` as MicroVizEdgeId)
-      drawArrowBetween(state, activeEdges, block.ln1.lnResid, BlockPos.Left, head.qBlock, BlockPos.Right, 'norm-1-to-q-project')
-      drawArrowBetween(state, activeEdges, block.ln1.lnResid, BlockPos.Left, head.kBlock, BlockPos.Right, 'norm-1-to-k-project')
-      drawArrowBetween(state, activeEdges, block.ln1.lnResid, BlockPos.Left, head.vBlock, BlockPos.Right, 'norm-1-to-v-project')
+      drawArrowBetween(state, activeEdges, block.ln1.lnResid, BlockPos.Left, head.qBlock, BlockPos.Right, 'norm-1-to-q-project', theme)
+      drawArrowBetween(state, activeEdges, block.ln1.lnResid, BlockPos.Left, head.kBlock, BlockPos.Right, 'norm-1-to-k-project', theme)
+      drawArrowBetween(state, activeEdges, block.ln1.lnResid, BlockPos.Left, head.vBlock, BlockPos.Right, 'norm-1-to-v-project', theme)
 
-      drawHorizontalArrow(state, activeEdges, head.qBiasBlock, head.qWeightBlock, null)
-      drawHorizontalArrow(state, activeEdges, head.kBiasBlock, head.kWeightBlock, null)
-      drawHorizontalArrow(state, activeEdges, head.vBiasBlock, head.vWeightBlock, null)
-      drawHorizontalArrow(state, activeEdges, head.qWeightBlock, head.qBlock, 'norm-1-to-q-project')
-      drawHorizontalArrow(state, activeEdges, head.kWeightBlock, head.kBlock, 'norm-1-to-k-project')
-      drawHorizontalArrow(state, activeEdges, head.vWeightBlock, head.vBlock, 'norm-1-to-v-project')
+      drawHorizontalArrow(state, activeEdges, head.qBiasBlock, head.qWeightBlock, null, theme)
+      drawHorizontalArrow(state, activeEdges, head.kBiasBlock, head.kWeightBlock, null, theme)
+      drawHorizontalArrow(state, activeEdges, head.vBiasBlock, head.vWeightBlock, null, theme)
+      drawHorizontalArrow(state, activeEdges, head.qWeightBlock, head.qBlock, 'norm-1-to-q-project', theme)
+      drawHorizontalArrow(state, activeEdges, head.kWeightBlock, head.kBlock, 'norm-1-to-k-project', theme)
+      drawHorizontalArrow(state, activeEdges, head.vWeightBlock, head.vBlock, 'norm-1-to-v-project', theme)
 
-      drawBottomToSide(state, layout, activeEdges, head.qBlock, head.attnMtx, qEdge, 0, 6, head.qBlock.y !== head.kBlock.y)
-      drawBottomToSide(state, layout, activeEdges, head.kBlock, head.attnMtx, qEdge, 0, 6, head.kBlock.y !== head.qBlock.y)
-      drawBottomToSide(state, layout, activeEdges, head.vBlock, head.vOutBlock, qEdge, 0, 6, head.vBlock.y !== head.kBlock.y)
+      drawBottomToSide(state, layout, activeEdges, head.qBlock, head.attnMtx, qEdge, 0, theme, 6, head.qBlock.y !== head.kBlock.y)
+      drawBottomToSide(state, layout, activeEdges, head.kBlock, head.attnMtx, qEdge, 0, theme, 6, head.kBlock.y !== head.qBlock.y)
+      drawBottomToSide(state, layout, activeEdges, head.vBlock, head.vOutBlock, qEdge, 0, theme, 6, head.vBlock.y !== head.kBlock.y)
 
-      drawArrowBetween(state, activeEdges, head.attnMtx, BlockPos.Left, head.attnMtxAgg2, BlockPos.Right, qEdge)
-      drawArrowBetween(state, activeEdges, head.attnMtxAgg1, BlockPos.Left, head.attnMtxSm, BlockPos.Right, qEdge)
-      drawArrowBetween(state, activeEdges, head.attnMtxSm, BlockPos.Bot, head.vOutBlock, BlockPos.Left, qEdge)
+      drawArrowBetween(state, activeEdges, head.attnMtx, BlockPos.Left, head.attnMtxAgg2, BlockPos.Right, qEdge, theme)
+      drawArrowBetween(state, activeEdges, head.attnMtxAgg1, BlockPos.Left, head.attnMtxSm, BlockPos.Right, qEdge, theme)
+      drawArrowBetween(state, activeEdges, head.attnMtxSm, BlockPos.Bot, head.vOutBlock, BlockPos.Left, qEdge, theme)
       drawArrowBetween(
         state,
         activeEdges,
@@ -238,33 +246,34 @@ export function drawMicroVizArrows(
         block.attnOut,
         BlockPos.Top,
         (`attention-head-${headIndex + 1}-to-attention-out` as MicroVizEdgeId),
+        theme,
       )
     })
 
-    drawVerticalArrow(state, activeEdges, block.attnResidual, block.mlpResidual, 'residual-add-1-to-norm-2')
-    drawHorizontalArrow(state, activeEdges, block.attnOut, block.attnResidual, 'attention-out-to-residual-add-1')
-    drawHorizontalArrow(state, activeEdges, block.projBias, block.projWeight, null)
-    drawHorizontalArrow(state, activeEdges, block.projWeight, block.attnOut, 'attention-head-1-to-attention-out')
+    drawVerticalArrow(state, activeEdges, block.attnResidual, block.mlpResidual, 'residual-add-1-to-norm-2', theme)
+    drawHorizontalArrow(state, activeEdges, block.attnOut, block.attnResidual, 'attention-out-to-residual-add-1', theme)
+    drawHorizontalArrow(state, activeEdges, block.projBias, block.projWeight, null, theme)
+    drawHorizontalArrow(state, activeEdges, block.projWeight, block.attnOut, 'attention-head-1-to-attention-out', theme)
 
-    drawResidualSplit(state, activeEdges, block.attnResidual, block.ln2.lnAgg2, 'residual-add-1-to-norm-2', 2)
-    drawVerticalArrow(state, activeEdges, block.ln2.lnAgg2, block.ln2.lnResid, 'residual-add-1-to-norm-2', 2)
-    drawResidualSplit(state, activeEdges, block.attnResidual, block.ln2.lnResid, 'residual-add-1-to-norm-2')
-    drawArrowBetween(state, activeEdges, block.ln2.lnResid, BlockPos.Bot, block.mlpFc, BlockPos.Right, 'norm-2-to-mlp-fc1')
+    drawResidualSplit(state, activeEdges, block.attnResidual, block.ln2.lnAgg2, 'residual-add-1-to-norm-2', theme, 2)
+    drawVerticalArrow(state, activeEdges, block.ln2.lnAgg2, block.ln2.lnResid, 'residual-add-1-to-norm-2', theme, 2)
+    drawResidualSplit(state, activeEdges, block.attnResidual, block.ln2.lnResid, 'residual-add-1-to-norm-2', theme)
+    drawArrowBetween(state, activeEdges, block.ln2.lnResid, BlockPos.Bot, block.mlpFc, BlockPos.Right, 'norm-2-to-mlp-fc1', theme)
 
-    drawVerticalArrow(state, activeEdges, block.mlpFcBias, block.mlpFcWeight, null)
-    drawVerticalArrow(state, activeEdges, block.mlpFcWeight, block.mlpFc, 'norm-2-to-mlp-fc1', 12)
-    drawVerticalArrow(state, activeEdges, block.mlpFc, block.mlpAct, 'mlp-fc1-to-mlp-relu', 12)
-    drawHorizontalArrow(state, activeEdges, block.mlpProjBias, block.mlpProjWeight, null)
-    drawHorizontalArrow(state, activeEdges, block.mlpProjWeight, block.mlpResult, 'mlp-relu-to-mlp-fc2')
-    drawHorizontalArrow(state, activeEdges, block.mlpResult, block.mlpResidual, 'mlp-fc2-to-logits')
-    drawArrowBetween(state, activeEdges, block.mlpAct, BlockPos.Right, block.mlpResult, BlockPos.Top, 'mlp-relu-to-mlp-fc2')
+    drawVerticalArrow(state, activeEdges, block.mlpFcBias, block.mlpFcWeight, null, theme)
+    drawVerticalArrow(state, activeEdges, block.mlpFcWeight, block.mlpFc, 'norm-2-to-mlp-fc1', theme, 12)
+    drawVerticalArrow(state, activeEdges, block.mlpFc, block.mlpAct, 'mlp-fc1-to-mlp-relu', theme, 12)
+    drawHorizontalArrow(state, activeEdges, block.mlpProjBias, block.mlpProjWeight, null, theme)
+    drawHorizontalArrow(state, activeEdges, block.mlpProjWeight, block.mlpResult, 'mlp-relu-to-mlp-fc2', theme)
+    drawHorizontalArrow(state, activeEdges, block.mlpResult, block.mlpResidual, 'mlp-fc2-to-logits', theme)
+    drawArrowBetween(state, activeEdges, block.mlpAct, BlockPos.Right, block.mlpResult, BlockPos.Top, 'mlp-relu-to-mlp-fc2', theme)
 
     prevResidual = block.mlpResidual
   }
 
-  drawVerticalArrow(state, activeEdges, prevResidual, layout.logits, 'mlp-fc2-to-logits')
-  drawHorizontalArrow(state, activeEdges, layout.lmHeadWeight, layout.logits, 'mlp-fc2-to-logits')
-  drawVerticalArrow(state, activeEdges, layout.logits, layout.logitsAgg2, 'logits-to-probabilities')
-  drawVerticalArrow(state, activeEdges, layout.logitsAgg1, layout.logitsSoftmax, 'logits-to-probabilities')
-  drawVerticalArrow(state, activeEdges, layout.logitsSoftmax, layout.sampleBlock, 'probabilities-to-sample')
+  drawVerticalArrow(state, activeEdges, prevResidual, layout.logits, 'mlp-fc2-to-logits', theme)
+  drawHorizontalArrow(state, activeEdges, layout.lmHeadWeight, layout.logits, 'mlp-fc2-to-logits', theme)
+  drawVerticalArrow(state, activeEdges, layout.logits, layout.logitsAgg2, 'logits-to-probabilities', theme)
+  drawVerticalArrow(state, activeEdges, layout.logitsAgg1, layout.logitsSoftmax, 'logits-to-probabilities', theme)
+  drawVerticalArrow(state, activeEdges, layout.logitsSoftmax, layout.sampleBlock, 'probabilities-to-sample', theme)
 }

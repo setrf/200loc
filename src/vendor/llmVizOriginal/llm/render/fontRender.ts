@@ -33,7 +33,6 @@ export interface IFontCommonDef {
     scaleW: number;
     scaleH: number;
     pages: number;
-    // assume multi-color msdf font
 }
 
 const floatsPerSegment = 16 + 4;
@@ -63,22 +62,75 @@ export interface IFontAtlasData {
     fontDef: any;
 }
 
-export async function fetchFontAtlasData(): Promise<IFontAtlasData> {
-    let imgEl = document.createElement('img');
-    let imgP = new Promise<HTMLImageElement>((resolve, reject) => {
-        imgEl.onload = () => resolve(imgEl);
-        imgEl.onerror = () => reject();
-    });
-    imgEl.src = 'fonts/font-atlas.png';
+export interface IFontAtlasSource {
+    imageSrc?: string;
+    fontDefSrc?: string;
+}
 
-    let fontDefP = fetch('fonts/font-def.json').then(r => {
+export interface IFontAtlasLoadOptions {
+    signal?: AbortSignal;
+}
+
+function abortedError(reason: unknown) {
+    if (reason instanceof Error) {
+        return reason;
+    }
+    return new DOMException(String(reason ?? 'The operation was aborted.'), 'AbortError');
+}
+
+async function loadImageElementFromBlob(blob: Blob, signal?: AbortSignal) {
+    let url = URL.createObjectURL(blob);
+    let imgEl = document.createElement('img');
+    return await new Promise<HTMLImageElement>((resolve, reject) => {
+        let settled = false;
+        const cleanup = () => {
+            imgEl.onload = null;
+            imgEl.onerror = null;
+            signal?.removeEventListener('abort', handleAbort);
+            URL.revokeObjectURL(url);
+        };
+        const finish = (fn: () => void) => {
+            if (settled) {
+                return;
+            }
+            settled = true;
+            cleanup();
+            fn();
+        };
+        const handleAbort = () => finish(() => reject(abortedError(signal?.reason)));
+        imgEl.onload = () => finish(() => resolve(imgEl));
+        imgEl.onerror = () => finish(() => reject(new Error('Failed to decode font atlas image.')));
+        signal?.addEventListener('abort', handleAbort, { once: true });
+        if (signal?.aborted) {
+            handleAbort();
+            return;
+        }
+        imgEl.src = url;
+    });
+}
+
+export async function fetchFontAtlasData(
+    source: IFontAtlasSource = {},
+    options: IFontAtlasLoadOptions = {},
+): Promise<IFontAtlasData> {
+    let imageSrc = source.imageSrc ?? 'fonts/microviz-geist-mono-atlas.png';
+    let fontDefSrc = source.fontDefSrc ?? 'fonts/microviz-geist-mono.json';
+
+    let imageBlobP = fetch(imageSrc, { signal: options.signal }).then(r => {
+        if (!r.ok) {
+            throw new Error(`Failed to load font atlas image: ${r.status}`);
+        }
+        return r.blob();
+    });
+    let fontDefP = fetch(fontDefSrc, { signal: options.signal }).then(r => {
         if (!r.ok) {
             throw new Error(`Failed to load font definition: ${r.status}`);
         }
         return r.json();
     });
 
-    let [fontAtlasImage, fontDef] = await Promise.all([imgP, fontDefP]);
+    let [imageBlob, fontDef] = await Promise.all([imageBlobP, fontDefP]);
+    let fontAtlasImage = await loadImageElementFromBlob(imageBlob, options.signal);
 
     return {
         fontAtlasImage,
@@ -137,37 +189,19 @@ export function setupFontAtlas(ctx: IGLContext, data: IFontAtlasData) {
     `, /*glsl*/`#version 300 es
         precision highp float;
         uniform sampler2D u_tex;
-        uniform float pxRange; // set to distance field's pixel range
         in vec2 v_uv;
         in vec4 v_fgColor;
         in vec4 v_bgColor;
         out vec4 color;
 
-        float median(float r, float g, float b) {
-            return max(min(r, g), min(max(r, g), b));
-        }
-
-        float screenPxRange() {
-            vec2 unitRange = vec2(pxRange) / vec2(textureSize(u_tex, 0));
-            vec2 screenTexSize = vec2(1.0) / fwidth(v_uv);
-            return max(0.5*dot(unitRange, screenTexSize), 1.0);
-        }
-
         void main() {
-            vec3 msd = texture(u_tex, v_uv).rgb;
-            float sd = median(msd.r, msd.g, msd.b);
-            float screenRange = screenPxRange();
-            float screenPxDistance = screenRange*(sd - 0.5);
-            float opacity = clamp(screenPxDistance + 0.5, 0.0, 1.0);
-
-            float blurOpacity = 0.0; //smoothstep(0.5 - 0.4, 0.5, sd);
-
-            if (opacity == 0.0 && blurOpacity == 0.0) {
+            float opacity = texture(u_tex, v_uv).r;
+            if (opacity <= 0.0) {
                 discard;
             }
-            color = mix(vec4(0,0,0,1.0) * blurOpacity, v_fgColor, opacity);
+            color = v_fgColor * opacity;
         }
-    `, ['u_tex', 'u_transformTex', 'pxRange'], { uboBindings: { 'ModelViewUbo': UboBindings.ModelView } })!;
+    `, ['u_tex', 'u_transformTex'], { uboBindings: { 'ModelViewUbo': UboBindings.ModelView } })!;
 
     ensureShadersReady(ctx.shaderManager);
 
@@ -429,9 +463,6 @@ export function renderAllText(fontBuf: IFontBuffers, renderPhase: RenderPhase) {
     gl.depthMask(false);
 
     gl.useProgram(atlas.program.program);
-
-    let locs = atlas.program.locs;
-    gl.uniform1f(locs.pxRange, 4);
 
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, atlas.atlasTex);

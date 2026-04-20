@@ -244,10 +244,10 @@ describe('App', () => {
     expect(screen.queryByTestId('scene-viewport')).not.toBeInTheDocument()
     expect(screen.queryByLabelText('Step explanation')).not.toBeInTheDocument()
 
-    const expandButtons = screen.getAllByRole('button', { name: 'Expand' })
+    const expandButtons = screen.getAllByRole('button', { name: /Expand .* panel/ })
     fireEvent.click(expandButtons[0]!)
-    fireEvent.click(screen.getAllByRole('button', { name: 'Expand' })[0]!)
-    fireEvent.click(screen.getAllByRole('button', { name: 'Expand' })[0]!)
+    fireEvent.click(screen.getAllByRole('button', { name: /Expand .* panel/ })[0]!)
+    fireEvent.click(screen.getAllByRole('button', { name: /Expand .* panel/ })[0]!)
 
     expect(screen.getByText('microgpt.py')).toBeInTheDocument()
     expect(screen.getByLabelText('Step explanation')).toBeInTheDocument()

@@ -31,7 +31,7 @@ App URL: `http://127.0.0.1:5173/`
 
 - The scene now stays in the explicit `loading scene…` state until the first WebGL frame actually renders.
 - This avoids showing a misleading empty scene panel during Safari's slow first paint path.
-- The font atlas loader now fetches `fonts/font-def.json` as a normal same-origin JSON request instead of using `mode: 'no-cors'`, which was a fragile fit for Safari.
+- The font atlas loader now fetches the bundled Geist Mono font definition as a normal same-origin JSON request instead of using `mode: 'no-cors'`, which was a fragile fit for Safari.
 
 ## Follow-up worth doing
 

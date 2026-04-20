@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ArchitectureScene } from '../components/ArchitectureScene'
 import { inferencePhases, vizFocusRanges } from '../walkthrough/phases'
 import type { SceneModelData, VizFrame } from '../viz/llmViz/types'
+import type { MicroVizTheme } from '../viz/microViz/theme'
 import { loadBundle, makeTrace } from './helpers/fixtures'
 
 const resetToCameraPose = vi.fn()
@@ -16,6 +17,7 @@ vi.mock('../viz/microViz/LayerView', () => {
       onRenderModeChange: (mode: 'loading' | 'webgl' | 'fallback') => void
       vizFrame: VizFrame
       sceneModelData: SceneModelData
+      theme: MicroVizTheme
     }
   >(function MockLayerView({ onHoverFocusChange, onRenderModeChange }, ref) {
     useImperativeHandle(ref, () => ({
@@ -67,6 +69,10 @@ describe('ArchitectureScene webgl path', () => {
     await waitFor(() => {
       expect(onFocusRanges).toHaveBeenCalledWith(vizFocusRanges.context)
     })
+
+    expect(
+      screen.getByLabelText('Architecture scene').getAttribute('style'),
+    ).toContain('--scene-viz-viewport-bg')
 
     const viewport = screen.getByTestId('scene-viewport')
     fireEvent.doubleClick(viewport)

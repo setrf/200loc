@@ -2,6 +2,8 @@ import { render, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MicroLayerView } from '../viz/microViz/LayerView'
 import { buildVizFrame } from '../viz/llmViz/frame'
+import * as programModule from '../viz/microViz/program'
+import { siteMicroVizTheme } from '../viz/microViz/theme'
 import { loadBundle, makeTrace } from './helpers/fixtures'
 import { inferencePhases } from '../walkthrough/phases'
 import { Vec3 } from '../vendor/llmVizOriginal/utils/vector'
@@ -89,11 +91,14 @@ describe('MicroLayerView first frame readiness', () => {
     })
     vi.stubGlobal('requestAnimationFrame', originalRequestAnimationFrame)
     vi.stubGlobal('cancelAnimationFrame', originalCancelAnimationFrame)
+    vi.useRealTimers()
+    vi.clearAllMocks()
   })
 
   it('waits for the first rendered frame before switching to webgl mode', async () => {
     const onHoverFocusChange = vi.fn()
     const onRenderModeChange = vi.fn()
+    const onRenderIssueChange = vi.fn()
 
     render(
       <MicroLayerView
@@ -108,8 +113,10 @@ describe('MicroLayerView first frame readiness', () => {
           (tokenId) => (tokenId === bundle.config.bosToken ? 'BOS' : bundle.vocab[tokenId] ?? '?'),
         )}
         sceneModelData={bundle}
+        theme={siteMicroVizTheme}
         onHoverFocusChange={onHoverFocusChange}
         onRenderModeChange={onRenderModeChange}
+        onRenderIssueChange={onRenderIssueChange}
       />,
     )
 
@@ -119,5 +126,43 @@ describe('MicroLayerView first frame readiness', () => {
     await waitFor(() => {
       expect(onRenderModeChange).toHaveBeenCalledWith('webgl')
     })
+  })
+
+  it('falls back when font atlas bootstrap never resolves', async () => {
+    vi.useFakeTimers()
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    vi.mocked(programModule.loadMicroVizFontAtlas).mockReturnValueOnce(
+      new Promise(() => {}) as never,
+    )
+
+    const onHoverFocusChange = vi.fn()
+    const onRenderModeChange = vi.fn()
+    const onRenderIssueChange = vi.fn()
+
+    render(
+      <MicroLayerView
+        phase={inferencePhases[0]!}
+        trace={makeTrace()}
+        contextTokens={['BOS']}
+        vizFrame={buildVizFrame(
+          makeTrace(),
+          inferencePhases[0]!,
+          bundle,
+          ['BOS'],
+          (tokenId) => (tokenId === bundle.config.bosToken ? 'BOS' : bundle.vocab[tokenId] ?? '?'),
+        )}
+        sceneModelData={bundle}
+        theme={siteMicroVizTheme}
+        onHoverFocusChange={onHoverFocusChange}
+        onRenderModeChange={onRenderModeChange}
+        onRenderIssueChange={onRenderIssueChange}
+      />,
+    )
+
+    await vi.advanceTimersByTimeAsync(4100)
+    expect(onRenderModeChange).toHaveBeenCalledWith('fallback')
+    expect(onRenderIssueChange).toHaveBeenCalledWith(
+      'Model viewer timed out while loading its font atlas.',
+    )
   })
 })

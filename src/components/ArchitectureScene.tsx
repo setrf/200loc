@@ -16,6 +16,10 @@ import {
   MicroLayerView,
   type MicroLayerViewHandle,
 } from '../viz/microViz/LayerView'
+import {
+  microVizCssVariables,
+  siteMicroVizTheme,
+} from '../viz/microViz/theme'
 
 interface ArchitectureSceneProps {
   trace: TokenStepTrace
@@ -170,11 +174,17 @@ export function ArchitectureScene({
   const [renderMode, setRenderMode] = useState<'loading' | 'webgl' | 'fallback'>(
     'loading',
   )
+  const [renderIssue, setRenderIssue] = useState<string | null>(null)
   const [hoverFocusId, setHoverFocusId] = useState<{
     phaseToken: number
     focusId: FocusRangeKey | null
   }>({ phaseToken: 0, focusId: null })
   const viewportSize = useViewportSize(viewportRef)
+  const sceneTheme = siteMicroVizTheme
+  const sceneThemeStyle = useMemo(
+    () => microVizCssVariables(sceneTheme),
+    [sceneTheme],
+  )
 
   const vizFrame = useMemo(
     () =>
@@ -266,6 +276,7 @@ export function ArchitectureScene({
     <section
       className="scene-panel"
       aria-label="Architecture scene"
+      style={sceneThemeStyle}
       onMouseEnter={() => onFocusRanges(phase.codeRanges)}
       onMouseLeave={() => {
         setHoverFocusState(null)
@@ -284,16 +295,18 @@ export function ArchitectureScene({
         {renderMode === 'fallback' ? (
           renderFallbackScene(projectedScene, phase, onFocusRanges)
         ) : (
-          <MicroLayerView
-            ref={layerViewRef}
-            phase={phase}
-            trace={trace}
-            contextTokens={contextTokens}
-            vizFrame={vizFrame}
-            sceneModelData={sceneModelData}
-            onHoverFocusChange={handleLayerHoverChange}
-            onRenderModeChange={setRenderMode}
-          />
+            <MicroLayerView
+              ref={layerViewRef}
+              phase={phase}
+              trace={trace}
+              contextTokens={contextTokens}
+              vizFrame={vizFrame}
+              sceneModelData={sceneModelData}
+              theme={sceneTheme}
+              onHoverFocusChange={handleLayerHoverChange}
+              onRenderModeChange={setRenderMode}
+              onRenderIssueChange={setRenderIssue}
+            />
         )}
 
         <div className="scene-panel__overlay-layer">
@@ -302,6 +315,11 @@ export function ArchitectureScene({
           </div>
           {renderMode === 'loading' ? (
             <div className="scene-panel__loading">loading scene…</div>
+          ) : null}
+          {renderMode === 'fallback' && renderIssue ? (
+            <div className="scene-panel__loading scene-panel__loading--error">
+              {renderIssue}
+            </div>
           ) : null}
         </div>
       </div>

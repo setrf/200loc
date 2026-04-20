@@ -532,7 +532,7 @@ export function buildMicroVizLayout(model: SceneModelData): MicroVizLayout {
       cz: shape.B,
       dimX: DimStyle.None,
       dimY: DimStyle.T,
-      name: '',
+      name: 'attention exp',
       small: true,
     })
     attnMtxAgg1.access = createAccess([0, 0, 0], [0, 1, 0], 1)
@@ -550,7 +550,7 @@ export function buildMicroVizLayout(model: SceneModelData): MicroVizLayout {
       cz: shape.B,
       dimX: DimStyle.None,
       dimY: DimStyle.T,
-      name: '',
+      name: 'attention max',
       small: true,
     })
     attnMtxAgg2.access = createAccess([0, 0, 0], [0, 1, 0], 1)

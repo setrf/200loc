@@ -348,7 +348,7 @@ export const TocDiagram: React.FC<{
             return null;
         }
         let ctx = canvas.getContext('2d')!;
-        ctx.font = '16px Merriweather';
+        ctx.font = "16px 'Geist'";
 
         let textSegs = ['How', ' to', ' predict'];
         let ids = [2437, 284, 4331];
