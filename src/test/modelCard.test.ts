@@ -31,25 +31,24 @@ describe('model card layout', () => {
     expect(layout.br.x - layout.tl.x).toBeLessThanOrEqual(102)
   })
 
-  it('fades the overview card as manual zoom moves into the model', () => {
+  it('keeps the overview card visible as manual zoom moves into the model', () => {
     const full = computeModelCardVisibility(11.2, 11.2)
     const mid = computeModelCardVisibility(8, 11.2)
-    const hidden = computeModelCardVisibility(6.16, 11.2)
+    const close = computeModelCardVisibility(6.16, 11.2)
 
     expect(full.opacity).toBe(1)
-    expect(full.scale).toBeGreaterThan(1)
-    expect(mid.opacity).toBeGreaterThan(0)
-    expect(mid.opacity).toBeLessThan(1)
-    expect(mid.scale).toBeLessThan(full.scale)
-    expect(hidden.opacity).toBe(0)
-    expect(hidden.scale).toBeLessThan(1)
+    expect(full.scale).toBe(1)
+    expect(mid.opacity).toBe(1)
+    expect(mid.scale).toBe(1)
+    expect(close.opacity).toBe(1)
+    expect(close.scale).toBe(1)
   })
 
-  it('also fades the overview card when the camera moves away from the overview shot', () => {
+  it('keeps the overview card visible when the camera moves away from the overview shot', () => {
     const panned = computeModelCardVisibilityFromDelta(11.2, 11.2, 60, 0)
     const rotated = computeModelCardVisibilityFromDelta(11.2, 11.2, 0, 24)
 
-    expect(panned.opacity).toBe(0)
-    expect(rotated.opacity).toBe(0)
+    expect(panned.opacity).toBe(1)
+    expect(rotated.opacity).toBe(1)
   })
 })

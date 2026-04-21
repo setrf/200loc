@@ -7,6 +7,7 @@ import type { IFontOpts } from "../render/fontRender";
 import { addLine, addLine2 as drawLine, drawLineSegs, makeLineOpts } from "../render/lineRender";
 import type { ILineOpts } from "../render/lineRender";
 import type { IRenderState } from "../render/modelRender";
+import { RenderPhase } from "../render/sharedRender";
 import { addQuad } from "../render/triRender";
 import { lerp } from "@llmviz/utils/math";
 import { Mat4f } from "@llmviz/utils/matrix";
@@ -125,22 +126,12 @@ export function computeModelCardVisibility(currentZoom: number, referenceZoom: n
 }
 
 export function computeModelCardVisibilityFromDelta(
-    currentZoom: number,
-    referenceZoom: number,
-    centerDelta: number,
-    angleDelta: number,
+    _currentZoom: number,
+    _referenceZoom: number,
+    _centerDelta: number,
+    _angleDelta: number,
 ) : IModelCardVisibility {
-    if (referenceZoom <= 0) {
-        return { scale: 1.0, opacity: 1.0 };
-    }
-
-    let zoomRatio = clamp(currentZoom / referenceZoom, 0.0, 2.0);
-    let zoomOpacity = clamp((zoomRatio - 0.56) / 0.3, 0.0, 1.0);
-    let centerOpacity = clamp(1.0 - centerDelta / 48.0, 0.0, 1.0);
-    let angleOpacity = clamp(1.0 - angleDelta / 18.0, 0.0, 1.0);
-    let opacity = Math.min(zoomOpacity, centerOpacity, angleOpacity);
-    let scale = lerp(0.84, 1.04, opacity);
-    return { scale, opacity };
+    return { scale: 1.0, opacity: 1.0 };
 }
 
 export function drawModelCard(
@@ -154,18 +145,18 @@ export function drawModelCard(
     let { camPos } = cameraToMatrixView(state.camera);
     let dist = camPos.dist(new Vec3(0, 0, -30)); //.add(offset));
 
-    let overviewPose = (layout as IGptModelLayout & { cameraPoses?: { overview?: { center: Vec3; angle: Vec3 } } }).cameraPoses?.overview;
-    let centerDelta = overviewPose ? state.camera.center.dist(overviewPose.center) : 0;
-    let angleDelta = overviewPose ? state.camera.angle.sub(overviewPose.angle).len() : 0;
     let visibility = computeModelCardVisibilityFromDelta(
         state.camera.angle.z,
         state.camera.zoomReference ?? state.camera.angle.z,
-        centerDelta,
-        angleDelta,
+        0,
+        0,
     );
     if (visibility.opacity <= 0.02) {
         return;
     }
+
+    let previousPhase = render.sharedRender.activePhase;
+    render.sharedRender.activePhase = RenderPhase.Overlay;
 
     let nParamsText = `n_params = `;
     let weightCountText = numberToCommaSep(layout.weightCount);
@@ -268,6 +259,8 @@ export function drawModelCard(
     renderOutputAtBottom(state);
 
     renderInputAtTop(state);
+
+    render.sharedRender.activePhase = previousPhase;
 }
 
 export function sortABCInputTokenToString(a: number) {

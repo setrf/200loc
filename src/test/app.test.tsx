@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { useEffect, useRef } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { INTRO_SEEN_STORAGE_KEY } from '../intro/storage'
@@ -357,6 +357,43 @@ describe('App', () => {
     })
   })
 
+  it('keeps the hidden-panel dock reachable when the compact code tab is collapsed', async () => {
+    Object.defineProperty(window, 'matchMedia', {
+      writable: true,
+      value: vi.fn((query: string) => ({
+        matches: query === '(hover: none), (pointer: coarse), (max-width: 1023px)',
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      })),
+    })
+
+    const runtime = makeRuntime()
+    runtime.reset.mockResolvedValue({
+      trace: makeTrace({ sampledTokenId: 26 }),
+      session: { visibleTokenIds: [4, 12], done: false },
+      diagnostics: {
+        activeBackend: 'cpu',
+        fallbackReason: 'WebGPU unavailable',
+      },
+    })
+
+    loadModelBundleMock.mockResolvedValue(bundleStub)
+    createTokenizerMock.mockReturnValue(makeTokenizer())
+    runtimeCtorMock.mockImplementation(function () {
+      return runtime
+    })
+    mockSourceFetch(sourceText)
+
+    const { default: App } = await import('../App')
+    render(<App />)
+
+    await screen.findByText('How LLM systems actually work')
+    fireEvent.click(screen.getByRole('button', { name: 'Code' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Collapse' }))
+
+    expect(screen.getByRole('button', { name: 'Expand code panel' })).toBeInTheDocument()
+  })
+
   it('applies the prefix when Enter is pressed and shows the context-full terminal status', async () => {
     const runtime = makeRuntime()
     runtime.reset
@@ -400,7 +437,7 @@ describe('App', () => {
     fireEvent.keyDown(prefix, { key: 'Enter' })
 
     await waitFor(() => {
-      expect(runtime.reset).toHaveBeenLastCalledWith('em')
+      expect(runtime.reset).toHaveBeenLastCalledWith('em', expect.any(Function))
     })
     expect(screen.getByText('Context full')).toBeInTheDocument()
   })
@@ -711,6 +748,9 @@ describe('App', () => {
     fireEvent.mouseEnter(screen.getAllByText(`step 1 / ${phaseCount}`)[0])
     expect(findCodeLine('line 23').closest('li')).toHaveClass('is-active')
     fireEvent.mouseLeave(screen.getAllByText(`step 1 / ${phaseCount}`)[0])
+    fireEvent.focus(screen.getByLabelText('Current stage: Tokenize Prefix, step 1 of 34'))
+    expect(findCodeLine('line 23').closest('li')).toHaveClass('is-active')
+    fireEvent.blur(screen.getByLabelText('Current stage: Tokenize Prefix, step 1 of 34'))
     fireEvent.mouseEnter(screen.getByLabelText('Architecture scene'))
     expect(document.querySelectorAll('.code-viewer__line.is-active').length).toBeGreaterThan(0)
     fireEvent.mouseLeave(screen.getByLabelText('Architecture scene'))
@@ -720,7 +760,7 @@ describe('App', () => {
     })
     fireEvent.click(screen.getByRole('button', { name: /Reset|Apply text/ }))
     await waitFor(() => {
-      expect(runtime.reset).toHaveBeenLastCalledWith('em')
+      expect(runtime.reset).toHaveBeenLastCalledWith('em', expect.any(Function))
     })
 
     for (let index = 0; index < 3; index += 1) {
@@ -1081,6 +1121,37 @@ describe('App', () => {
     initDeferred.resolve({ activeBackend: 'cpu' })
     await Promise.resolve()
     expect(runtime.dispose).toHaveBeenCalled()
+
+    const resetDeferred = deferred<{
+      trace: ReturnType<typeof makeTrace>
+      session: { visibleTokenIds: number[]; done: boolean }
+      diagnostics: { activeBackend: 'cpu'; fallbackReason?: string }
+    }>()
+    const resetRuntime = makeRuntime()
+    resetRuntime.reset.mockReturnValue(resetDeferred.promise)
+    loadModelBundleMock.mockResolvedValue(bundleStub)
+    createTokenizerMock.mockReturnValue(makeTokenizer())
+    runtimeCtorMock.mockImplementation(function () {
+      return resetRuntime
+    })
+    mockSourceFetch(sourceText)
+    const cancelledAfterResetStarted = render(<App />)
+    await waitFor(() => {
+      expect(resetRuntime.reset).toHaveBeenCalled()
+    })
+    cancelledAfterResetStarted.unmount()
+    await act(async () => {
+      resetDeferred.resolve({
+        trace: makeTrace({ sampledTokenId: 26 }),
+        session: { visibleTokenIds: [4, 12], done: false },
+        diagnostics: {
+          activeBackend: 'cpu',
+          fallbackReason: 'WebGPU unavailable',
+        },
+      })
+      await resetDeferred.promise
+    })
+    expect(resetRuntime.dispose).toHaveBeenCalled()
   })
 
   it('ignores stale reset results after the prefix changes again', async () => {
@@ -1117,21 +1188,206 @@ describe('App', () => {
     fireEvent.click(screen.getByRole('button', { name: /Reset|Apply text/ }))
     fireEvent.change(prefix, { target: { value: 'emi' } })
 
-    deferredReset.resolve({
-      trace: makeTrace({ positionId: 3, tokenId: 8, sampledTokenId: 8 }),
-      session: { visibleTokenIds: [4, 12, 8], done: false },
-      diagnostics: {
-        activeBackend: 'cpu',
-        fallbackReason: 'WebGPU unavailable',
-      },
+    await act(async () => {
+      deferredReset.resolve({
+        trace: makeTrace({ positionId: 3, tokenId: 8, sampledTokenId: 8 }),
+        session: { visibleTokenIds: [4, 12, 8], done: false },
+        diagnostics: {
+          activeBackend: 'cpu',
+          fallbackReason: 'WebGPU unavailable',
+        },
+      })
+      await deferredReset.promise
     })
 
     await waitFor(() => {
       expect(prefix).toHaveValue('emi')
     })
-    expect(runtime.reset).toHaveBeenLastCalledWith('em')
+    expect(runtime.reset).toHaveBeenLastCalledWith('em', expect.any(Function))
     expect(screen.getAllByText(`step 1 / ${phaseCount}`).length).toBeGreaterThan(0)
     expect(screen.queryByText('Loading the model and canonical source…')).not.toBeInTheDocument()
+  })
+
+  it('ignores stale advance results after a reset starts', async () => {
+    const runtime = makeRuntime()
+    const deferredAdvance = deferred<{
+      trace: ReturnType<typeof makeTrace>
+      session: { visibleTokenIds: number[]; done: boolean }
+      diagnostics: { activeBackend: 'cpu'; fallbackReason?: string }
+    }>()
+
+    runtime.reset
+      .mockResolvedValueOnce({
+        trace: makeTrace({ sampledTokenId: 26 }),
+        session: { visibleTokenIds: [4, 12], done: false },
+        diagnostics: {
+          activeBackend: 'cpu',
+          fallbackReason: 'WebGPU unavailable',
+        },
+      })
+      .mockResolvedValueOnce({
+        trace: makeTrace({ positionId: 3, tokenId: 8, sampledTokenId: 8 }),
+        session: { visibleTokenIds: [4, 12, 8], done: false },
+        diagnostics: {
+          activeBackend: 'cpu',
+          fallbackReason: 'WebGPU unavailable',
+        },
+      })
+    runtime.advance.mockReturnValueOnce(deferredAdvance.promise)
+
+    loadModelBundleMock.mockResolvedValue(bundleStub)
+    createTokenizerMock.mockReturnValue(makeTokenizer())
+    runtimeCtorMock.mockImplementation(function () {
+      return runtime
+    })
+    mockSourceFetch(sourceText)
+
+    const { default: App } = await import('../App')
+    render(<App />)
+
+    const prefix = await screen.findByRole('textbox', { name: 'Starting text' })
+    for (let index = 0; index < phaseCount - 1; index += 1) {
+      fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+    }
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+    expect(runtime.advance).toHaveBeenCalledTimes(1)
+
+    fireEvent.change(prefix, { target: { value: 'emi' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Apply text' }))
+    await waitFor(() => {
+      expect(runtime.reset).toHaveBeenLastCalledWith('emi', expect.any(Function))
+    })
+    await waitFor(() => {
+      expect(screen.getByLabelText('Current text')).toHaveTextContent('emi')
+    })
+
+    await act(async () => {
+      deferredAdvance.resolve({
+        trace: makeTrace({ positionId: 3, tokenId: 7, sampledTokenId: 7 }),
+        session: { visibleTokenIds: [4, 12, 7], done: false },
+        diagnostics: {
+          activeBackend: 'cpu',
+          fallbackReason: 'WebGPU unavailable',
+        },
+      })
+      await deferredAdvance.promise
+    })
+
+    expect(screen.getByLabelText('Current text')).toHaveTextContent('emi')
+    expect(screen.queryByText('Failed to load the walkthrough.')).not.toBeInTheDocument()
+  })
+
+  it('ignores stale advance failures after a reset starts', async () => {
+    const runtime = makeRuntime()
+    const deferredAdvance = deferred<never>()
+
+    runtime.reset
+      .mockResolvedValueOnce({
+        trace: makeTrace({ sampledTokenId: 26 }),
+        session: { visibleTokenIds: [4, 12], done: false },
+        diagnostics: {
+          activeBackend: 'cpu',
+          fallbackReason: 'WebGPU unavailable',
+        },
+      })
+      .mockResolvedValueOnce({
+        trace: makeTrace({ positionId: 3, tokenId: 8, sampledTokenId: 8 }),
+        session: { visibleTokenIds: [4, 12, 8], done: false },
+        diagnostics: {
+          activeBackend: 'cpu',
+          fallbackReason: 'WebGPU unavailable',
+        },
+      })
+    runtime.advance.mockReturnValueOnce(deferredAdvance.promise)
+
+    loadModelBundleMock.mockResolvedValue(bundleStub)
+    createTokenizerMock.mockReturnValue(makeTokenizer())
+    runtimeCtorMock.mockImplementation(function () {
+      return runtime
+    })
+    mockSourceFetch(sourceText)
+
+    const { default: App } = await import('../App')
+    render(<App />)
+
+    const prefix = await screen.findByRole('textbox', { name: 'Starting text' })
+    for (let index = 0; index < phaseCount - 1; index += 1) {
+      fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+    }
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+    expect(runtime.advance).toHaveBeenCalledTimes(1)
+
+    fireEvent.change(prefix, { target: { value: 'emi' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Apply text' }))
+    await waitFor(() => {
+      expect(runtime.reset).toHaveBeenLastCalledWith('emi', expect.any(Function))
+    })
+    await waitFor(() => {
+      expect(screen.getByLabelText('Current text')).toHaveTextContent('emi')
+    })
+
+    await act(async () => {
+      deferredAdvance.reject(new Error('stale advance failed'))
+      await deferredAdvance.promise.catch(() => {})
+    })
+
+    expect(screen.getByLabelText('Current text')).toHaveTextContent('emi')
+    expect(screen.queryByText('Failed to load the walkthrough.')).not.toBeInTheDocument()
+    expect(screen.queryByText('stale advance failed')).not.toBeInTheDocument()
+  })
+
+  it('keeps an in-flight advance visible when the user only edits the draft prefix', async () => {
+    const runtime = makeRuntime()
+    const deferredAdvance = deferred<{
+      trace: ReturnType<typeof makeTrace>
+      session: { visibleTokenIds: number[]; done: boolean }
+      diagnostics: { activeBackend: 'cpu'; fallbackReason?: string }
+    }>()
+
+    runtime.reset.mockResolvedValue({
+      trace: makeTrace({ sampledTokenId: 26 }),
+      session: { visibleTokenIds: [4, 12], done: false },
+      diagnostics: {
+        activeBackend: 'cpu',
+        fallbackReason: 'WebGPU unavailable',
+      },
+    })
+    runtime.advance.mockReturnValueOnce(deferredAdvance.promise)
+
+    loadModelBundleMock.mockResolvedValue(bundleStub)
+    createTokenizerMock.mockReturnValue(makeTokenizer())
+    runtimeCtorMock.mockImplementation(function () {
+      return runtime
+    })
+    mockSourceFetch(sourceText)
+
+    const { default: App } = await import('../App')
+    render(<App />)
+
+    const prefix = await screen.findByRole('textbox', { name: 'Starting text' })
+    for (let index = 0; index < phaseCount - 1; index += 1) {
+      fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+    }
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+    expect(runtime.advance).toHaveBeenCalledTimes(1)
+
+    fireEvent.change(prefix, { target: { value: 'emi' } })
+
+    await act(async () => {
+      deferredAdvance.resolve({
+        trace: makeTrace({ positionId: 3, tokenId: 7, sampledTokenId: 7 }),
+        session: { visibleTokenIds: [4, 12, 7], done: false },
+        diagnostics: {
+          activeBackend: 'cpu',
+          fallbackReason: 'WebGPU unavailable',
+        },
+      })
+      await deferredAdvance.promise
+    })
+
+    expect(screen.getByLabelText('Current text')).toHaveTextContent('emh')
+    expect(screen.getByRole('button', { name: 'Apply text' })).toBeInTheDocument()
+    expect(screen.getByText('Reset required')).toBeInTheDocument()
   })
 
   it('treats starting-text edits as a draft and pauses the active run until applied', async () => {
@@ -1160,7 +1416,7 @@ describe('App', () => {
     fireEvent.change(prefix, { target: { value: 'em' } })
     fireEvent.click(screen.getByRole('button', { name: 'Apply text' }))
     await waitFor(() => {
-      expect(runtime.reset).toHaveBeenLastCalledWith('em')
+      expect(runtime.reset).toHaveBeenLastCalledWith('em', expect.any(Function))
     })
 
     fireEvent.click(screen.getByRole('button', { name: 'Play' }))

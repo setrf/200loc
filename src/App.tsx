@@ -1,363 +1,56 @@
-import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react'
+import { useAppShellController } from './app/useAppShellController'
+import { useWalkthroughController, phaseCount } from './app/useWalkthroughController'
 import {
-  createTokenizer,
-  loadModelBundle,
-  MicrogptRuntime,
-  resolveAssetPath,
-} from './model'
-import { normalizePrefixInput } from './prefixNormalization'
-import { ArchitectureScene } from './components/ArchitectureScene'
-import { CodeViewer } from './components/CodeViewer'
-import { Controls } from './components/Controls'
+  buildWalkthroughViewModel,
+} from './app/walkthroughViewModel'
+import { AppHeader } from './components/AppHeader'
 import { IntroWalkthrough } from './components/IntroWalkthrough'
 import { LabTourOverlay } from './components/LabTourOverlay'
+import { ProjectInfoDialog } from './components/ProjectInfoDialog'
 import { SegmentTabs } from './components/SegmentTabs'
-import { useAutoplay } from './hooks/useAutoplay'
+import { WalkthroughControls } from './components/WalkthroughControls'
+import { WalkthroughLayout } from './components/WalkthroughLayout'
 import { introSteps } from './intro/steps'
-import { readHasSeenIntro, writeHasSeenIntro } from './intro/storage'
-import {
-  readHasSeenLabTour,
-  writeHasSeenLabTour,
-} from './labTour/storage'
-import {
-  desktopLabTourSteps,
-  mobileLabTourSteps,
-} from './labTour/steps'
-import {
-  inferencePhases,
-  type LineRange,
-} from './walkthrough/phases'
-import {
-  initialWalkthroughState,
-  type WalkthroughStatus,
-  walkthroughReducer,
-} from './walkthrough/reducer'
-import type { SceneModelData } from './viz/llmViz/types'
+import { inferencePhases } from './walkthrough/phases'
 import './App.css'
 
-const phaseCount = inferencePhases.length
-type AppMode = 'intro' | 'lab'
-type PanelKey = 'code' | 'scene' | 'story'
-const COMPACT_QUERY = '(hover: none), (pointer: coarse), (max-width: 1023px)'
-
-function isCompactViewport() {
-  /* c8 ignore next -- defensive fallback for non-browser evaluation */
-  if (typeof window === 'undefined' || !window.matchMedia) {
-    return false
-  }
-  return window.matchMedia(COMPACT_QUERY).matches
-}
-
 export default function App() {
-  const hasSeenIntro = readHasSeenIntro()
-  const [appMode, setAppMode] = useState<AppMode>(() => (hasSeenIntro ? 'lab' : 'intro'))
-  const [introStepIndex, setIntroStepIndex] = useState(0)
-  const [isCompact, setIsCompact] = useState(isCompactViewport)
-  const [showLabTour, setShowLabTour] = useState(
-    () => hasSeenIntro && !readHasSeenLabTour(),
-  )
-  const [showProjectInfo, setShowProjectInfo] = useState(false)
-  const [labTourStepIndex, setLabTourStepIndex] = useState(0)
-  const [collapsedPanels, setCollapsedPanels] = useState<Record<PanelKey, boolean>>({
-    code: false,
-    scene: false,
-    story: false,
+  const {
+    advance,
+    dispatch,
+    handleFocusRanges,
+    handlePrefixChange,
+    hydrate,
+    sceneModelData,
+    source,
+    state,
+    tokenizer,
+  } = useWalkthroughController()
+  const {
+    activeLabTourStepIndex,
+    appMode,
+    collapsedPanels,
+    finishLabTour,
+    introStepIndex,
+    isCompact,
+    labTourSteps,
+    openLab,
+    reopenIntro,
+    setIntroStepIndex,
+    setLabTourStepIndex,
+    setShowProjectInfo,
+    showLabTour,
+    showProjectInfo,
+    startLabTour,
+    togglePanel,
+  } = useAppShellController({
+    dispatch,
+    mobileTab: state.mobileTab,
+    walkthroughStatus: state.status,
   })
-  const [state, dispatch] = useReducer(
-    walkthroughReducer,
-    initialWalkthroughState,
-  )
-  const [source, setSource] = useState('')
-  const [sceneModelData, setSceneModelData] = useState<SceneModelData | null>(null)
-  const runtimeRef = useRef<MicrogptRuntime | null>(null)
-  const tokenizerRef = useRef<ReturnType<typeof createTokenizer> | null>(null)
-  const advancingRef = useRef(false)
-  const hydrateRequestRef = useRef(0)
-  const prefixVersionRef = useRef(0)
-  const lastStableStatusRef = useRef<WalkthroughStatus>('idle')
-  const [reducedMotion, setReducedMotion] = useState(false)
-  const labTourSteps = useMemo(
-    () => (isCompact ? mobileLabTourSteps : desktopLabTourSteps),
-    [isCompact],
-  )
-
-  const togglePanel = useCallback((panel: PanelKey) => {
-    setCollapsedPanels((current) => ({
-      ...current,
-      [panel]: !current[panel],
-    }))
-  }, [])
-
-  useEffect(() => {
-    const media = window.matchMedia('(prefers-reduced-motion: reduce)')
-    const update = () => setReducedMotion(media.matches)
-    update()
-    media.addEventListener('change', update)
-    return () => {
-      media.removeEventListener('change', update)
-    }
-  }, [])
-
-  useEffect(() => {
-    if (!showProjectInfo) {
-      return
-    }
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setShowProjectInfo(false)
-      }
-    }
-
-    window.addEventListener('keydown', handleKeyDown)
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown)
-    }
-  }, [showProjectInfo])
-
-  useEffect(() => {
-    const media = window.matchMedia(COMPACT_QUERY)
-    const update = () => setIsCompact(media.matches)
-    update()
-    media.addEventListener('change', update)
-    return () => {
-      media.removeEventListener('change', update)
-    }
-  }, [])
-
-  useEffect(() => {
-    setLabTourStepIndex((currentIndex) =>
-      Math.min(currentIndex, labTourSteps.length - 1),
-    )
-  }, [labTourSteps.length])
-
-  useEffect(() => {
-    if (state.status !== 'loading' && state.status !== 'error') {
-      lastStableStatusRef.current = state.status
-    }
-  }, [state.status])
-
-  async function hydrate(prefixInput: string) {
-    const runtime = runtimeRef.current!
-    const tokenizer = tokenizerRef.current!
-    const normalization = tokenizer.normalizePrefix(prefixInput)
-    const requestId = ++hydrateRequestRef.current
-    const prefixVersion = prefixVersionRef.current
-    dispatch({ type: 'loading' })
-    try {
-      const result = await runtime.reset(normalization.normalized)
-      if (
-        requestId !== hydrateRequestRef.current ||
-        prefixVersion !== prefixVersionRef.current
-      ) {
-        return
-      }
-      dispatch({
-        type: 'reset',
-        prefixInput: normalization.normalized,
-        normalization,
-        trace: result.trace,
-        sequenceTokenIds: result.session.visibleTokenIds,
-        backend: result.diagnostics.activeBackend,
-        fallbackReason: result.diagnostics.fallbackReason,
-        terminal: result.session.done,
-        doneReason: result.session.doneReason,
-      })
-    } catch (error) {
-      if (
-        requestId !== hydrateRequestRef.current ||
-        prefixVersion !== prefixVersionRef.current
-      ) {
-        return
-      }
-      dispatch({
-        type: 'error',
-        error: error instanceof Error ? error.message : 'Failed to reset walkthrough.',
-      })
-    }
-  }
-
-  const handleFocusRanges = useCallback((ranges: LineRange[] | null) => {
-    dispatch({ type: 'setHoverRanges', ranges })
-  }, [])
-
-  const handlePrefixChange = useCallback((value: string) => {
-    const draftNormalization = normalizePrefixInput(tokenizerRef.current, value)
-    const nextStatus =
-      state.status === 'playing'
-        ? 'paused'
-        : state.status === 'loading' && state.traces.length > 0
-          ? lastStableStatusRef.current === 'playing'
-            ? 'paused'
-            : lastStableStatusRef.current
-          : undefined
-
-    prefixVersionRef.current += 1
-    dispatch({
-      type: 'setPrefixInput',
-      prefixInput: draftNormalization.normalized,
-      draftNormalization,
-      status: nextStatus,
-    })
-  }, [state.status, state.traces.length])
-
-  useEffect(() => {
-    let cancelled = false
-
-    async function bootstrap() {
-      dispatch({ type: 'loading' })
-      try {
-        const [bundle, sourceText] = await Promise.all([
-          loadModelBundle(),
-          fetch(resolveAssetPath('assets/microgpt.py')).then((response) => {
-            if (!response.ok) {
-              throw new Error('Failed to load microgpt.py')
-            }
-            return response.text()
-          }),
-        ])
-
-        if (cancelled) {
-          return
-        }
-
-        const runtime = new MicrogptRuntime(bundle)
-        await runtime.init()
-
-        if (cancelled) {
-          runtime.dispose()
-          return
-        }
-
-        runtimeRef.current = runtime
-        tokenizerRef.current = createTokenizer(bundle)
-        setSceneModelData({
-          config: bundle.config,
-          vocab: bundle.vocab,
-          weights: bundle.weights,
-        })
-        setSource(sourceText)
-        const normalization = tokenizerRef.current.normalizePrefix('')
-        hydrateRequestRef.current += 1
-        const result = await runtime.reset(normalization.normalized)
-        dispatch({
-          type: 'reset',
-          prefixInput: '',
-          normalization,
-          trace: result.trace,
-          sequenceTokenIds: result.session.visibleTokenIds,
-          backend: result.diagnostics.activeBackend,
-          fallbackReason: result.diagnostics.fallbackReason,
-          terminal: result.session.done,
-          doneReason: result.session.doneReason,
-        })
-      } catch (error) {
-        if (!cancelled) {
-          dispatch({
-            type: 'error',
-            error:
-              error instanceof Error ? error.message : 'Failed to initialize app.',
-          })
-        }
-      }
-    }
-
-    void bootstrap()
-
-    return () => {
-      cancelled = true
-      runtimeRef.current?.dispose()
-    }
-  }, [])
-
-  async function advance() {
-    if (advancingRef.current || !runtimeRef.current) {
-      return
-    }
-
-    if (
-      state.activePhaseIndex < phaseCount - 1 ||
-      state.activeTraceIndex < state.traces.length - 1
-    ) {
-      dispatch({ type: 'phaseNext', phaseCount })
-      return
-    }
-
-    advancingRef.current = true
-
-    try {
-      const result = await runtimeRef.current.advance()
-      dispatch({
-        type: 'appendTrace',
-        trace: result.trace,
-        sequenceTokenIds: result.session.visibleTokenIds,
-        backend: result.diagnostics.activeBackend,
-        fallbackReason: result.diagnostics.fallbackReason,
-        terminal: result.session.done,
-        doneReason: result.session.doneReason,
-      })
-    } catch (error) {
-      dispatch({
-        type: 'error',
-        error: error instanceof Error ? error.message : 'Failed to advance model.',
-      })
-    } finally {
-      advancingRef.current = false
-    }
-  }
-
-  useAutoplay(
-    state.status === 'playing',
-    () => {
-      void advance()
-    },
-    reducedMotion ? 1800 : 1100,
-  )
 
   const trace = state.traces[state.activeTraceIndex]
   const phase = inferencePhases[state.activePhaseIndex]
-
-  function openLab() {
-    writeHasSeenIntro(true)
-    setAppMode('lab')
-    if (!readHasSeenLabTour()) {
-      setLabTourStepIndex(0)
-      setShowLabTour(true)
-      return
-    }
-
-    setShowLabTour(false)
-  }
-
-  function reopenIntro() {
-    setShowLabTour(false)
-    setIntroStepIndex(0)
-    setAppMode('intro')
-  }
-
-  function startLabTour() {
-    if (state.status === 'playing') {
-      dispatch({ type: 'setPlaying', playing: false })
-    }
-    setLabTourStepIndex(0)
-    setShowLabTour(true)
-  }
-
-  function finishLabTour() {
-    writeHasSeenLabTour(true)
-    setShowLabTour(false)
-  }
-
-  useEffect(() => {
-    if (!showLabTour) {
-      return
-    }
-
-    const currentTourStep = labTourSteps[labTourStepIndex]
-    if (currentTourStep?.mobileTab && state.mobileTab !== currentTourStep.mobileTab) {
-      dispatch({ type: 'setMobileTab', tab: currentTourStep.mobileTab })
-    }
-  }, [labTourStepIndex, labTourSteps, showLabTour, state.mobileTab])
 
   if (appMode === 'intro') {
     return (
@@ -392,7 +85,7 @@ export default function App() {
     )
   }
 
-  if (!trace || !phase || !source || !sceneModelData) {
+  if (!trace || !phase || !source || !sceneModelData || !tokenizer) {
     return (
       <div className="app-shell app-shell--centered">
         <div className="empty-state">
@@ -407,350 +100,74 @@ export default function App() {
     )
   }
 
-  const tokenLabel = tokenizerRef.current!.tokenLabel
-  const currentText = tokenizerRef.current!.decode(state.sequenceTokenIds)
-  const currentTokenLabel = tokenLabel(trace.tokenId)
-  const hasPendingPrefixChange = state.prefixInput !== state.appliedPrefixInput
-  const prefixChars = [...state.appliedNormalization.normalized]
-  const generatedBeforeCurrent =
-    state.activeTraceIndex > 0
-      ? state.traces
-          .slice(0, Math.max(0, state.activeTraceIndex - 1))
-          .map((item) => tokenLabel(item.sampledTokenId))
-          .filter((token) => token !== 'BOS')
-      : []
-  const beforeCurrentTokens =
-    state.activeTraceIndex === 0
-      ? prefixChars.slice(0, Math.max(prefixChars.length - 1, 0))
-      : [...prefixChars, ...generatedBeforeCurrent]
-  const contextTokens =
-    currentTokenLabel === 'BOS' && trace.positionId === 0
-      ? ['BOS']
-      : ['BOS', ...beforeCurrentTokens, currentTokenLabel]
-  const activeRanges = state.hoverRanges ?? phase.codeRanges
-  const canPrev = state.activePhaseIndex > 0 || state.activeTraceIndex > 0
-  const canNext =
-    state.activePhaseIndex < phaseCount - 1 ||
-    state.activeTraceIndex < state.traces.length - 1 ||
-    state.status !== 'terminal'
-  const controlsLocked = state.status === 'loading'
-  const navigationBlocked = controlsLocked || hasPendingPrefixChange
-  const currentTextStatus =
-    hasPendingPrefixChange
-      ? 'Reset required'
-      : state.status === 'loading'
-      ? 'Resetting'
-      : state.status === 'playing'
-        ? 'Generating'
-        : state.status === 'paused'
-          ? 'Paused'
-          : state.status === 'terminal'
-            ? state.stopReason === 'context'
-              ? 'Context full'
-              : 'Stopped at BOS'
-            : 'Ready'
-  const hasCollapsedPanels =
-    collapsedPanels.code || collapsedPanels.scene || collapsedPanels.story
-  const showCodeColumn =
-    !collapsedPanels.code && (!isCompact || state.mobileTab === 'code')
-  const showScenePanel =
-    !collapsedPanels.scene && (!isCompact || state.mobileTab === 'scene')
-  const showStoryPanel =
-    !collapsedPanels.story && (!isCompact || state.mobileTab === 'story')
-  const showDesktopStoryPanel = !isCompact && showStoryPanel
-  const showCompactStoryPanel = isCompact && showStoryPanel
-  const showStoryScene = isCompact ? state.mobileTab !== 'code' : showScenePanel
-  const layoutStyle = isCompact
-    ? undefined
-    : {
-        gridTemplateColumns: showCodeColumn && showScenePanel
-          ? 'minmax(560px, 1fr) minmax(520px, 1fr)'
-          : 'minmax(0, 1fr)',
-        gridTemplateRows: showCodeColumn || showScenePanel
-          ? 'auto minmax(0, 1fr)'
-          : 'auto',
-      }
+  const tokenLabel = tokenizer.tokenLabel
+  const currentText = tokenizer.decode(state.sequenceTokenIds)
+  const viewModel = buildWalkthroughViewModel({
+    collapsedPanels,
+    isCompact,
+    phase,
+    phaseCount,
+    state,
+    tokenLabel,
+    trace,
+  })
+  const {
+    activeRanges,
+    canNext,
+    canPrev,
+    contextTokens,
+    controlsLocked,
+    currentTextStatus,
+    hasPendingPrefixChange,
+    layoutStyle,
+    navigationBlocked,
+  } = viewModel
 
   const controlsPanelContent = (
-    <>
-      <div className="story-scene__toolbar-bar">
-        <div className="story-scene__toolbar-stage">
-          <div
-            className="scene-panel__stage-chip"
-            data-lab-tour="stage"
-            onMouseEnter={() => handleFocusRanges(phase.codeRanges)}
-            onMouseLeave={() => handleFocusRanges(null)}
-          >
-            <div className="scene-panel__stage-chip-main">
-              <div className="scene-panel__stage-chip-copy">
-                <span className="eyebrow">Current stage</span>
-                <strong>{phase.groupTitle}</strong>
-              </div>
-              <span className="scene-panel__stage-step">
-                step {state.activePhaseIndex + 1} / {phaseCount}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <div className="story-panel__actions story-panel__actions--toolbar">
-          <button
-            type="button"
-            onClick={() => {
-              dispatch({ type: 'setPlaying', playing: false })
-              void hydrate(state.prefixInput)
-            }}
-            disabled={controlsLocked}
-          >
-            {hasPendingPrefixChange ? 'Apply text' : 'Reset'}
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              dispatch({ type: 'setPlaying', playing: false })
-              dispatch({ type: 'phasePrev', phaseCount })
-            }}
-            disabled={!canPrev || navigationBlocked}
-          >
-            Prev
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              dispatch({ type: 'setPlaying', playing: false })
-              void advance()
-            }}
-            disabled={!canNext || navigationBlocked}
-          >
-            Next
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              if (state.status === 'playing') {
-                dispatch({ type: 'setPlaying', playing: false })
-              } else {
-                dispatch({ type: 'setPlaying', playing: true })
-              }
-            }}
-            disabled={!canNext || navigationBlocked}
-          >
-            {state.status === 'playing' ? 'Pause' : 'Play'}
-          </button>
-        </div>
-      </div>
-
-      <div className="story-scene__toolbar-inputs">
-        <label
-          className="story-panel__field story-panel__field--editable"
-          htmlFor="prefix-input"
-        >
-          <div className="story-panel__field-head">
-            <span className="eyebrow">Starting text</span>
-          </div>
-          <input
-            id="prefix-input"
-            className="story-panel__input"
-            aria-label="Starting text"
-            value={state.prefixInput}
-            onChange={(event) => handlePrefixChange(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter' && !controlsLocked) {
-                dispatch({ type: 'setPlaying', playing: false })
-                void hydrate(state.prefixInput)
-              }
-            }}
-            placeholder="em"
-            autoComplete="off"
-            spellCheck={false}
-          />
-        </label>
-
-        <div
-          className={`story-panel__field story-panel__field--readonly${
-            hasPendingPrefixChange ? ' is-stale' : ''
-          }`}
-        >
-          <div className="story-panel__field-head">
-            <span className="eyebrow">Current text</span>
-            <span className="story-panel__field-status">{currentTextStatus}</span>
-          </div>
-          <output
-            className={`story-panel__readout${currentText ? '' : ' is-empty'}`}
-            aria-label="Current text"
-            aria-live="polite"
-          >
-            {currentText || 'Nothing generated yet'}
-          </output>
-        </div>
-      </div>
-
-      <p className="story-panel__field-note">
-        {hasPendingPrefixChange
-          ? 'Current run still uses the previous starting text. Apply text to restart from your draft.'
-          : 'Edit the starting text, then reset when you want the model to restart from it.'}
-      </p>
-    </>
-  )
-
-  const renderHiddenPanelsDock = (className?: string) =>
-    hasCollapsedPanels ? (
-      <div
-        className={`panel-dock-shell${className ? ` ${className}` : ''}`}
-        aria-label="Hidden panels"
-      >
-        <div className="panel-dock panel-dock--toolbar">
-          {collapsedPanels.code ? (
-            <button
-              type="button"
-              className="panel-dock__button panel-dock__button--code"
-              onClick={() => togglePanel('code')}
-              aria-label="Expand code panel"
-            >
-              <span className="panel-dock__button-title">Code</span>
-            </button>
-          ) : null}
-          {collapsedPanels.scene ? (
-            <button
-              type="button"
-              className="panel-dock__button panel-dock__button--scene"
-              onClick={() => togglePanel('scene')}
-              aria-label="Expand model viewer panel"
-            >
-              <span className="panel-dock__button-title">Model viewer</span>
-            </button>
-          ) : null}
-          {collapsedPanels.story ? (
-            <button
-              type="button"
-              className="panel-dock__button panel-dock__button--story"
-              onClick={() => togglePanel('story')}
-              aria-label="Expand explanation panel"
-            >
-              <span className="panel-dock__button-title">Explanation</span>
-            </button>
-          ) : null}
-        </div>
-      </div>
-    ) : null
-
-  const toolbarPanel = (
-    <div className="story-scene__toolbar">
-      <div className="story-scene__toolbar-main">
-        <div className="story-scene__toolbar-panel" data-lab-tour="controls">
-          {controlsPanelContent}
-        </div>
-
-        {renderHiddenPanelsDock()}
-      </div>
-    </div>
-  )
-
-  const desktopTopPanel = !isCompact ? (
-    <section className="panel-shell desktop-top-panel">
-      <div className="desktop-top-panel__body">
-        <div
-          className={`desktop-top-panel__main${
-            showDesktopStoryPanel ? '' : ' is-single'
-          }`}
-        >
-          <div
-            className={`desktop-top-panel__controls${
-              showDesktopStoryPanel ? '' : ' is-full'
-            }`}
-            data-lab-tour="controls"
-          >
-            {controlsPanelContent}
-          </div>
-
-          {showDesktopStoryPanel ? (
-            <div className="desktop-top-panel__story" data-lab-tour="story">
-              <div className="desktop-top-panel__story-header">
-                <span className="panel-shell__title">Explanation</span>
-                <button
-                  type="button"
-                  className="panel-shell__toggle"
-                  onClick={() => togglePanel('story')}
-                  aria-expanded="true"
-                  aria-controls="story-panel-body"
-                >
-                  Collapse
-                </button>
-              </div>
-              <div id="story-panel-body" className="desktop-top-panel__story-body">
-                <Controls
-                  key={`desktop-${state.mobileTab}-${phase.stepId}-${trace.positionId}-${trace.tokenId}-${trace.sampledTokenId}`}
-                  beats={phase.copy.beats}
-                />
-              </div>
-            </div>
-          ) : null}
-        </div>
-
-        {renderHiddenPanelsDock('panel-dock-shell--inline')}
-      </div>
-    </section>
-  ) : null
-
-  const storyPanel = (
-    <div
-      className={`story-scene__story ${state.mobileTab === 'story' ? 'is-active' : ''}`}
-      data-lab-tour="story"
-    >
-      <div className="panel-shell panel-shell--story">
-        <div className="panel-shell__header">
-          <span className="panel-shell__title">Explanation</span>
-          <button
-            type="button"
-            className="panel-shell__toggle"
-            onClick={() => togglePanel('story')}
-            aria-expanded="true"
-            aria-controls="story-panel-body"
-          >
-            Collapse
-          </button>
-        </div>
-        <div id="story-panel-body" className="panel-shell__body">
-          <Controls
-            key={`${state.mobileTab}-${phase.stepId}-${trace.positionId}-${trace.tokenId}-${trace.sampledTokenId}`}
-            beats={phase.copy.beats}
-          />
-        </div>
-      </div>
-    </div>
+    <WalkthroughControls
+      activePhaseIndex={state.activePhaseIndex}
+      canNext={canNext}
+      canPrev={canPrev}
+      controlsLocked={controlsLocked}
+      currentText={currentText}
+      currentTextStatus={currentTextStatus}
+      hasPendingPrefixChange={hasPendingPrefixChange}
+      isPlaying={state.status === 'playing'}
+      navigationBlocked={navigationBlocked}
+      onApplyPrefix={() => {
+        dispatch({ type: 'setPlaying', playing: false })
+        void hydrate(state.prefixInput)
+      }}
+      onFocusRanges={handleFocusRanges}
+      onNext={() => {
+        dispatch({ type: 'setPlaying', playing: false })
+        void advance()
+      }}
+      onPlayToggle={() => {
+        if (state.status === 'playing') {
+          dispatch({ type: 'setPlaying', playing: false })
+        } else {
+          dispatch({ type: 'setPlaying', playing: true })
+        }
+      }}
+      onPrefixChange={handlePrefixChange}
+      onPrev={() => {
+        dispatch({ type: 'setPlaying', playing: false })
+        dispatch({ type: 'phasePrev', phaseCount })
+      }}
+      phase={phase}
+      phaseCount={phaseCount}
+      prefixInput={state.prefixInput}
+    />
   )
 
   return (
     <div className="app-shell">
-      <header className="app-header" data-lab-tour="header">
-        <div>
-          <p className="eyebrow">200loc</p>
-          <h2 className="app-header__title">How LLM systems actually work</h2>
-        </div>
-        <div className="app-header__actions">
-          <button
-            type="button"
-            className="ghost-button ghost-button--quiet"
-            onClick={() => setShowProjectInfo(true)}
-          >
-            About
-          </button>
-          <button
-            type="button"
-            className="ghost-button ghost-button--quiet"
-            onClick={startLabTour}
-          >
-            Show lab tour
-          </button>
-          <button
-            type="button"
-            className="ghost-button"
-            onClick={reopenIntro}
-          >
-            Start intro again
-          </button>
-        </div>
-      </header>
+      <AppHeader
+        onAbout={() => setShowProjectInfo(true)}
+        onReopenIntro={reopenIntro}
+        onStartLabTour={startLabTour}
+      />
 
       <div className="mobile-only" data-lab-tour="tabs">
         <SegmentTabs
@@ -759,94 +176,27 @@ export default function App() {
         />
       </div>
 
-      <main
-        className="walkthrough-layout"
-        style={layoutStyle}
-      >
-        {desktopTopPanel}
-
-        {showCodeColumn ? (
-          <div className={isCompact ? '' : 'left-column'}>
-            <aside
-              className={`code-column ${
-                state.mobileTab === 'code' ? 'is-active' : ''
-              }${isCompact ? ' code-column--compact' : ''}`}
-              data-lab-tour="code"
-            >
-              <div className="code-column__sticky">
-                <section className="panel-shell panel-shell--code">
-                  <div className="panel-shell__header">
-                    <span className="panel-shell__title">Code</span>
-                    <button
-                      type="button"
-                      className="panel-shell__toggle"
-                      onClick={() => togglePanel('code')}
-                      aria-expanded="true"
-                      aria-controls="code-panel-body"
-                    >
-                      Collapse
-                    </button>
-                  </div>
-                  <div id="code-panel-body" className="panel-shell__body">
-                    <CodeViewer source={source} activeRanges={activeRanges} />
-                  </div>
-                </section>
-              </div>
-            </aside>
-          </div>
-        ) : null}
-
-        {showStoryScene ? (
-          <section
-            className={`story-scene ${
-              state.mobileTab === 'code' ? '' : 'is-active'
-            }`}
-          >
-            {isCompact ? toolbarPanel : null}
-
-            {showScenePanel ? (
-              <div
-                className={`story-scene__scene ${
-                  state.mobileTab === 'scene' ? 'is-active' : ''
-                }`}
-                data-lab-tour="scene"
-              >
-                <div className="panel-shell panel-shell--scene">
-                  <div className="panel-shell__header">
-                    <span className="panel-shell__title">Model viewer</span>
-                    <button
-                      type="button"
-                      className="panel-shell__toggle"
-                      onClick={() => togglePanel('scene')}
-                      aria-expanded="true"
-                      aria-controls="scene-panel-body"
-                    >
-                      Collapse
-                    </button>
-                  </div>
-                  <div id="scene-panel-body" className="panel-shell__body">
-                    <ArchitectureScene
-                      trace={trace}
-                      phase={phase}
-                      contextTokens={contextTokens}
-                      tokenLabel={tokenLabel}
-                      sceneModelData={sceneModelData}
-                      onFocusRanges={handleFocusRanges}
-                    />
-                  </div>
-                </div>
-              </div>
-            ) : null}
-
-            {showCompactStoryPanel ? storyPanel : null}
-          </section>
-        ) : null}
-
-      </main>
+      <WalkthroughLayout
+        activeRanges={activeRanges}
+        collapsedPanels={collapsedPanels}
+        contextTokens={contextTokens}
+        controlsPanelContent={controlsPanelContent}
+        isCompact={isCompact}
+        layoutStyle={layoutStyle}
+        mobileTab={state.mobileTab}
+        onFocusRanges={handleFocusRanges}
+        onTogglePanel={togglePanel}
+        phase={phase}
+        sceneModelData={sceneModelData}
+        source={source}
+        tokenLabel={tokenLabel}
+        trace={trace}
+        viewModel={viewModel}
+      />
 
       {showLabTour ? (
         <LabTourOverlay
-          activeStepIndex={labTourStepIndex}
+          activeStepIndex={activeLabTourStepIndex}
           layoutVersion={state.mobileTab}
           steps={labTourSteps}
           onBack={() => {
@@ -862,93 +212,7 @@ export default function App() {
       ) : null}
 
       {showProjectInfo ? (
-        <div
-          className="project-splash"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Project information"
-        >
-          <button
-            type="button"
-            className="project-splash__backdrop"
-            aria-label="Close project information"
-            onClick={() => setShowProjectInfo(false)}
-          />
-          <div className="project-splash__card">
-            <div className="project-splash__header">
-              <div>
-                <p className="eyebrow">200loc</p>
-                <h3>About this project</h3>
-              </div>
-              <button
-                type="button"
-                className="ghost-button ghost-button--quiet"
-                onClick={() => setShowProjectInfo(false)}
-              >
-                Close
-              </button>
-            </div>
-
-            <p className="project-splash__summary">
-              A compact, interactive walkthrough of how a GPT-style language model
-              reads context, steps through inference, and maps code to the model
-              state you see on screen.
-            </p>
-
-            <div className="project-splash__section">
-              <p className="project-splash__label">Links</p>
-              <div className="project-splash__links">
-                <a href="https://mertgulsun.com/" target="_blank" rel="noreferrer">
-                  mertgulsun.com
-                </a>
-                <a
-                  href="https://www.linkedin.com/in/mert-gulsun"
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  linkedin.com/in/mert-gulsun
-                </a>
-                <a href="https://github.com/setrf" target="_blank" rel="noreferrer">
-                  github.com/setrf
-                </a>
-              </div>
-            </div>
-
-            <div className="project-splash__section">
-              <p className="project-splash__label">Credits</p>
-              <p>
-                Inspired by{' '}
-                <a href="https://github.com/karpathy" target="_blank" rel="noreferrer">
-                  Andrej Karpathy
-                </a>{' '}
-                and adapted from Brendan Bycroft&apos;s{' '}
-                <a href="https://bbycroft.net/llm" target="_blank" rel="noreferrer">
-                  LLM Visualization
-                </a>{' '}
-                and the underlying{' '}
-                <a
-                  href="https://github.com/bbycroft/llm-viz"
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  llm-viz
-                </a>{' '}
-                project.
-              </p>
-            </div>
-
-            <div className="project-splash__section">
-              <p className="project-splash__label">License</p>
-              <p>
-                This project is released under the{' '}
-                <a href="/LICENSE" target="_blank" rel="noreferrer">
-                  MIT License
-                </a>
-                .
-              </p>
-            </div>
-          </div>
-        </div>
+        <ProjectInfoDialog onClose={() => setShowProjectInfo(false)} />
       ) : null}
     </div>
   )

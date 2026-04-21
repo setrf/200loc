@@ -243,6 +243,12 @@ export function renderModel(state: IProgramState) {
         }
 
         if (phase === RenderPhase.Overlay || phase === RenderPhase.Overlay2D) {
+            gl.disable(gl.DEPTH_TEST);
+        } else {
+            gl.enable(gl.DEPTH_TEST);
+        }
+
+        if (phase === RenderPhase.Overlay || phase === RenderPhase.Overlay2D) {
             gl.enable(gl.POLYGON_OFFSET_FILL);
         } else {
             gl.disable(gl.POLYGON_OFFSET_FILL);
@@ -252,5 +258,6 @@ export function renderModel(state: IProgramState) {
         renderAllLines(args.lineRender, phase);
     }
     gl.disable(gl.POLYGON_OFFSET_FILL);
+    gl.enable(gl.DEPTH_TEST);
 
 }

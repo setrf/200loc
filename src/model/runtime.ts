@@ -55,14 +55,25 @@ export class MicrogptRuntime {
     return this.diagnostics
   }
 
-  async reset(prefix: string) {
+  async reset(prefix: string, shouldCommit: () => boolean = () => true) {
     const prefixTokenIds = this.tokenizer.encode(prefix)
     const cpuSession = await this.cpu.runPrefix(prefixTokenIds)
-    const gpuSession =
-      this.backend === 'webgpu' ? await this.gpu.runPrefix(prefixTokenIds) : null
+    let gpuSession: SessionState | null = null
+
+    if (this.backend === 'webgpu') {
+      try {
+        gpuSession = await this.gpu.runPrefix(prefixTokenIds)
+      } catch (error) {
+        console.warn('WebGPU reset failed, falling back to CPU.', error)
+        this.fallbackToCpu('WebGPU failed while resetting inference.')
+      }
+    }
+
     const result = await this.stepSessions(cpuSession, gpuSession)
-    this.cpuSession = cpuSession
-    this.gpuSession = result.gpuSession
+    if (shouldCommit()) {
+      this.cpuSession = cpuSession
+      this.gpuSession = result.gpuSession
+    }
     return {
       trace: result.trace,
       diagnostics: result.diagnostics,

@@ -19,6 +19,7 @@ type BrowserIssue = {
 const ignoredWarningPatterns = [
   /GL Driver Message .*ReadPixels/i,
   /^No available adapters\.$/i,
+  /^WebGPU reset failed, falling back to CPU\./i,
 ]
 
 function shouldIgnoreWarning(text: string) {

@@ -220,17 +220,48 @@ describe('MicrogptRuntime', () => {
     expect(gpu.dispose).toHaveBeenCalled()
   })
 
-  it('keeps existing runtime state if the gpu prefix path fails during reset', async () => {
-    const runtime = new MicrogptRuntime(loadBundle()) as any
+  it('returns stale reset results without replacing the live runtime sessions', async () => {
+    const trace = makeTrace()
     const previousCpuSession = makeSession({ currentTokenId: 4 })
-    const previousGpuSession = makeSession({ backend: 'webgpu', currentTokenId: 4 })
+    const previousGpuSession = makeSession({ backend: 'webgpu', currentTokenId: 5 })
+    const nextCpuSession = makeSession({ currentTokenId: 12 })
+    const nextGpuSession = makeSession({ backend: 'webgpu', currentTokenId: 13 })
+    const runtime = new MicrogptRuntime(loadBundle()) as any
+    runtime.cpu = {
+      init: vi.fn(),
+      runPrefix: vi.fn().mockResolvedValue(nextCpuSession),
+      step: vi.fn().mockResolvedValue(trace),
+      dispose: vi.fn(),
+    }
+    runtime.gpu = {
+      supported: true,
+      init: vi.fn(),
+      runPrefix: vi.fn().mockResolvedValue(nextGpuSession),
+      step: vi.fn().mockResolvedValue(trace),
+      dispose: vi.fn(),
+    }
+    runtime.backend = 'webgpu'
     runtime.cpuSession = previousCpuSession
     runtime.gpuSession = previousGpuSession
+
+    const result = await runtime.reset('em', () => false)
+
+    expect(result.trace).toEqual(trace)
+    expect(result.session).toBe(nextCpuSession)
+    expect(runtime.cpuSession).toBe(previousCpuSession)
+    expect(runtime.gpuSession).toBe(previousGpuSession)
+  })
+
+  it('falls back to cpu if the gpu prefix path fails during reset', async () => {
+    const trace = makeTrace()
+    const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const runtime = new MicrogptRuntime(loadBundle()) as any
+    const cpuSession = makeSession({ currentTokenId: 12 })
     runtime.backend = 'webgpu'
     runtime.cpu = {
       init: vi.fn(),
-      runPrefix: vi.fn().mockResolvedValue(makeSession({ currentTokenId: 12 })),
-      step: vi.fn(),
+      runPrefix: vi.fn().mockResolvedValue(cpuSession),
+      step: vi.fn().mockResolvedValue(trace),
       dispose: vi.fn(),
     }
     runtime.gpu = {
@@ -241,9 +272,23 @@ describe('MicrogptRuntime', () => {
       dispose: vi.fn(),
     }
 
-    await expect(runtime.reset('em')).rejects.toThrow('gpu prefix failed')
-    expect(runtime.cpuSession).toBe(previousCpuSession)
-    expect(runtime.gpuSession).toBe(previousGpuSession)
+    const result = await runtime.reset('em')
+
+    expect(result.trace).toEqual(trace)
+    expect(result.session).toBe(cpuSession)
+    expect(result.session.backend).toBe('cpu')
+    expect(result.diagnostics).toEqual({
+      activeBackend: 'cpu',
+      fallbackReason: 'WebGPU failed while resetting inference.',
+    })
+    expect(runtime.cpuSession).toBe(cpuSession)
+    expect(runtime.gpuSession).toBeNull()
+    expect(runtime.gpu.dispose).toHaveBeenCalled()
+    expect(consoleWarn).toHaveBeenCalledWith(
+      'WebGPU reset failed, falling back to CPU.',
+      expect.any(Error),
+    )
+    consoleWarn.mockRestore()
   })
 
   it('throws before reset and falls back when gpu drift or step errors occur', async () => {

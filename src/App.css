@@ -1652,7 +1652,7 @@ button.annotation-trigger:focus-visible {
   color: var(--accent-strong);
 }
 
-@media (max-width: 1023px) {
+@media (hover: none), (pointer: coarse), (max-width: 1023px) {
   .app-shell--intro {
     padding: var(--space-24) var(--space-16);
   }

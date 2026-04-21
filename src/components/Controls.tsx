@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type MouseEvent } from 'react'
+import { useCompactViewport } from '../hooks/useCompactViewport'
 import { getGlossaryEntry, type GlossaryId } from '../walkthrough/glossary'
 import type { StoryBeat } from '../walkthrough/phases'
 import { AnnotationPopup } from './AnnotationPopup'
@@ -16,17 +17,9 @@ interface OpenAnnotation {
 
 const HOVER_OPEN_DELAY_MS = 280
 const HOVER_CLOSE_DELAY_MS = 140
-const COMPACT_QUERY = '(hover: none), (pointer: coarse), (max-width: 1023px)'
-
-function isCompactViewport() {
-  if (typeof window === 'undefined' || !window.matchMedia) {
-    return false
-  }
-  return window.matchMedia(COMPACT_QUERY).matches
-}
 
 export function Controls({ beats }: ControlsProps) {
-  const [isCompact, setIsCompact] = useState(isCompactViewport)
+  const isCompact = useCompactViewport()
   const [openAnnotation, setOpenAnnotation] = useState<OpenAnnotation | null>(
     null,
   )
@@ -34,20 +27,6 @@ export function Controls({ beats }: ControlsProps) {
   const triggerRefs = useRef(new Map<string, HTMLButtonElement>())
   const hoverTimerRef = useRef<number | null>(null)
   const closeTimerRef = useRef<number | null>(null)
-
-  useEffect(() => {
-    if (typeof window === 'undefined' || !window.matchMedia) {
-      return
-    }
-
-    const media = window.matchMedia(COMPACT_QUERY)
-    const update = () => setIsCompact(media.matches)
-    update()
-    media.addEventListener('change', update)
-    return () => {
-      media.removeEventListener('change', update)
-    }
-  }, [])
 
   const clearHoverTimer = useCallback(() => {
     if (hoverTimerRef.current !== null) {

@@ -1,5 +1,5 @@
 import type { MobileTab } from '../walkthrough/reducer'
-import type { KeyboardEvent } from 'react'
+import { useRef, type KeyboardEvent } from 'react'
 
 interface SegmentTabsProps {
   activeTab: MobileTab
@@ -9,27 +9,38 @@ interface SegmentTabsProps {
 const tabs: MobileTab[] = ['code', 'story', 'scene']
 
 export function SegmentTabs({ activeTab, onChange }: SegmentTabsProps) {
-  function handleKeyDown(event: KeyboardEvent<HTMLButtonElement>, tab: MobileTab) {
-    const currentIndex = tabs.indexOf(tab)
+  const tabRefs = useRef<Record<MobileTab, HTMLButtonElement | null>>({
+    code: null,
+    story: null,
+    scene: null,
+  })
+
+  function selectTab(tab: MobileTab) {
+    onChange(tab)
+    tabRefs.current[tab]?.focus()
+  }
+
+  function handleKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
+    const currentIndex = tabs.indexOf(activeTab)
 
     if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
       event.preventDefault()
-      onChange(tabs[(currentIndex + 1) % tabs.length]!)
+      selectTab(tabs[(currentIndex + 1) % tabs.length]!)
     }
 
     if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
       event.preventDefault()
-      onChange(tabs[(currentIndex - 1 + tabs.length) % tabs.length]!)
+      selectTab(tabs[(currentIndex - 1 + tabs.length) % tabs.length]!)
     }
 
     if (event.key === 'Home') {
       event.preventDefault()
-      onChange(tabs[0]!)
+      selectTab(tabs[0]!)
     }
 
     if (event.key === 'End') {
       event.preventDefault()
-      onChange(tabs[tabs.length - 1]!)
+      selectTab(tabs[tabs.length - 1]!)
     }
   }
 
@@ -42,7 +53,10 @@ export function SegmentTabs({ activeTab, onChange }: SegmentTabsProps) {
           className={activeTab === tab ? 'is-active' : ''}
           key={tab}
           onClick={() => onChange(tab)}
-          onKeyDown={(event) => handleKeyDown(event, tab)}
+          onKeyDown={handleKeyDown}
+          ref={(node) => {
+            tabRefs.current[tab] = node
+          }}
         >
           {tab[0].toUpperCase()}
           {tab.slice(1)}

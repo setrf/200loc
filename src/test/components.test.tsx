@@ -1,11 +1,12 @@
 import { act, fireEvent, render, screen } from '@testing-library/react'
-import { createRef } from 'react'
+import { createRef, useState } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AnnotationPopup } from '../components/AnnotationPopup'
 import { ArchitectureScene } from '../components/ArchitectureScene'
 import { getFallbackCameraPoseForPhase } from '../components/architectureSceneFallback'
 import { CodeViewer } from '../components/CodeViewer'
 import { Controls } from '../components/Controls'
+import { ProjectInfoDialog } from '../components/ProjectInfoDialog'
 import { SegmentTabs } from '../components/SegmentTabs'
 import { getCameraPose } from '../viz/llmViz/layout'
 import { getGlossaryEntry } from '../walkthrough/glossary'
@@ -518,6 +519,38 @@ describe('ui components', () => {
     expect(onChange).toHaveBeenNthCalledWith(3, 'scene')
   })
 
+  it('moves focus with repeated mobile section arrow navigation', () => {
+    const onChange = vi.fn()
+
+    function StatefulTabs() {
+      const [activeTab, setActiveTab] = useState<'code' | 'story' | 'scene'>('story')
+      return (
+        <SegmentTabs
+          activeTab={activeTab}
+          onChange={(tab) => {
+            onChange(tab)
+            setActiveTab(tab)
+          }}
+        />
+      )
+    }
+
+    render(<StatefulTabs />)
+
+    const storyTab = screen.getByRole('button', { name: 'Story' })
+    storyTab.focus()
+    fireEvent.keyDown(storyTab, { key: 'ArrowRight' })
+    expect(screen.getByRole('button', { name: 'Scene' })).toHaveFocus()
+
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Scene' }), {
+      key: 'ArrowRight',
+    })
+
+    expect(onChange).toHaveBeenNthCalledWith(1, 'scene')
+    expect(onChange).toHaveBeenNthCalledWith(2, 'code')
+    expect(screen.getByRole('button', { name: 'Code' })).toHaveFocus()
+  })
+
   it('supports reverse keyboard navigation on the mobile section buttons', () => {
     const onChange = vi.fn()
     render(<SegmentTabs activeTab="story" onChange={onChange} />)
@@ -531,6 +564,62 @@ describe('ui components', () => {
 
     expect(onChange).toHaveBeenNthCalledWith(1, 'code')
     expect(onChange).toHaveBeenNthCalledWith(2, 'code')
+  })
+
+  it('moves focus into the project dialog, traps tab focus, and restores focus on close', async () => {
+    const onClose = vi.fn()
+
+    function DialogHarness() {
+      const [isOpen, setIsOpen] = useState(false)
+      return (
+        <>
+          <button type="button" onClick={() => setIsOpen(true)}>
+            Open dialog
+          </button>
+          {isOpen ? (
+            <ProjectInfoDialog
+              onClose={() => {
+                onClose()
+                setIsOpen(false)
+              }}
+            />
+          ) : null}
+        </>
+      )
+    }
+
+    render(<DialogHarness />)
+
+    const opener = screen.getByRole('button', { name: 'Open dialog' })
+    opener.focus()
+    fireEvent.click(opener)
+
+    const dialog = screen.getByRole('dialog', { name: 'Project information' })
+    expect(screen.getByRole('button', { name: 'Close' })).toHaveFocus()
+
+    fireEvent.keyDown(dialog, { key: 'Escape' })
+    expect(onClose).not.toHaveBeenCalled()
+
+    const linkedInLink = screen.getByRole('link', {
+      name: 'linkedin.com/in/mert-gulsun',
+    })
+    linkedInLink.focus()
+    fireEvent.keyDown(dialog, { key: 'Tab' })
+    expect(linkedInLink).toHaveFocus()
+    fireEvent.keyDown(dialog, { key: 'Tab', shiftKey: true })
+    expect(linkedInLink).toHaveFocus()
+
+    const licenseLink = screen.getByRole('link', { name: 'MIT License' })
+    licenseLink.focus()
+    fireEvent.keyDown(dialog, { key: 'Tab' })
+    expect(screen.getByRole('button', { name: 'Close' })).toHaveFocus()
+
+    fireEvent.keyDown(dialog, { key: 'Tab', shiftKey: true })
+    expect(licenseLink).toHaveFocus()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }))
+    expect(onClose).toHaveBeenCalledTimes(1)
+    expect(opener).toHaveFocus()
   })
 
   it('positions floating annotation popups above or clamped inside the viewport', () => {
