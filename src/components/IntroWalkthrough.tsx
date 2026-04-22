@@ -286,7 +286,10 @@ export function IntroWalkthrough({
       <header className="intro-shell__header">
         <div>
           <p className="eyebrow">200loc</p>
-          <h1>How LLM systems actually work</h1>
+          <h1>A complete tiny LLM, step by step</h1>
+          <p className="intro-shell__subtitle">
+            Follow microgpt through code, architecture, and every inference stage.
+          </p>
         </div>
         <button
           type="button"

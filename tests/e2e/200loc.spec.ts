@@ -138,7 +138,7 @@ test.describe('desktop walkthrough', () => {
     )
     await page.goto('/')
     await expect(
-      page.getByRole('heading', { name: 'How LLM systems actually work' }),
+      page.getByRole('heading', { name: 'A complete tiny LLM, step by step' }),
     ).toBeVisible()
   })
 
@@ -146,7 +146,7 @@ test.describe('desktop walkthrough', () => {
     page,
   }) => {
     const issues = collectBrowserIssues(page)
-    const prefix = page.getByRole('textbox', { name: 'Starting text' })
+    const prefix = page.getByRole('textbox', { name: 'Name prefix' })
 
     await prefix.fill('Em-12??')
     await expect(prefix).toHaveValue('em')
@@ -179,7 +179,7 @@ test.describe('desktop walkthrough', () => {
     await page.waitForTimeout(220)
     await expect(page.getByRole('dialog')).toBeVisible()
 
-    await page.getByRole('heading', { name: 'How LLM systems actually work' }).click()
+    await page.getByRole('heading', { name: 'A complete tiny LLM, step by step' }).click()
     await expect(page.locator('.annotation-popup--floating')).toHaveCount(0)
     expect(issues).toEqual([])
   })
@@ -268,7 +268,7 @@ test.describe('desktop walkthrough', () => {
 
   test('crosses the token boundary cleanly after the thirty-fourth step', async ({ page }) => {
     const issues = collectBrowserIssues(page)
-    await page.getByRole('textbox', { name: 'Starting text' }).fill('em')
+    await page.getByRole('textbox', { name: 'Name prefix' }).fill('em')
     await page.getByRole('button', { name: /Reset|Apply text/ }).click()
     await expect(page.locator('.scene-panel__stage-chip')).toContainText('Tokenize Prefix')
 
@@ -307,9 +307,9 @@ test.describe('desktop walkthrough', () => {
     expect(issues).toEqual([])
   })
 
-  test('treats edited starting text as a draft until the user applies it', async ({ page }) => {
+  test('treats edited name prefix as a draft until the user applies it', async ({ page }) => {
     const issues = collectBrowserIssues(page)
-    const prefix = page.getByRole('textbox', { name: 'Starting text' })
+    const prefix = page.getByRole('textbox', { name: 'Name prefix' })
     const currentText = page.getByLabel('Current text')
 
     await prefix.fill('em')
@@ -326,7 +326,7 @@ test.describe('desktop walkthrough', () => {
     await expect(page.getByRole('button', { name: 'Next' })).toBeDisabled()
     await expect(currentText).toContainText('em')
     await expect(page.locator('.story-panel__field-note')).toContainText(
-      'Apply text to restart from your draft',
+      'Apply text to restart microgpt from your draft',
     )
     expect(issues).toEqual([])
   })
@@ -530,7 +530,7 @@ test.describe('desktop walkthrough', () => {
         return win.__microVizDebug?.microViz?.phaseState?.cameraPoseId ?? null
       })
 
-    for (let index = 0; index < 9; index += 1) {
+    for (let index = 0; index < 10; index += 1) {
       await advanceOnePhase(page)
     }
 
@@ -616,7 +616,7 @@ test.describe('desktop walkthrough', () => {
     await scene.scrollIntoViewIfNeeded()
     await expect(page.locator('.scene-panel canvas')).toBeVisible()
 
-    for (let index = 0; index < 9; index += 1) {
+    for (let index = 0; index < 10; index += 1) {
       await advanceOnePhase(page)
     }
     await expect(page.locator('.scene-panel__stage-chip')).toContainText('Q / K / V')
@@ -723,12 +723,12 @@ test.describe('intro walkthrough', () => {
     await page.goto('/')
 
     await expect(
-      page.getByText('A language model keeps guessing what should come next.'),
+      page.getByText('AI is everywhere these days.'),
     ).toBeVisible()
 
     await page.getByRole('button', { name: 'Next' }).click()
     await expect(
-      page.getByText('The model cannot work with raw text directly.'),
+      page.getByText('A large language model can look impossibly complicated from the outside.'),
     ).toBeVisible()
 
     await page.getByRole('button', { name: 'Skip' }).click()
@@ -744,7 +744,7 @@ test.describe('intro walkthrough', () => {
     }
     await tour.getByRole('button', { name: 'Start exploring' }).click()
     await expect(
-      page.getByRole('heading', { name: 'How LLM systems actually work' }),
+      page.getByRole('heading', { name: 'A complete tiny LLM, step by step' }),
     ).toBeVisible()
     await expect(page.getByRole('button', { name: 'Start intro again' })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Show lab tour' })).toBeVisible()
@@ -756,7 +756,7 @@ test.describe('intro walkthrough', () => {
     await page.setViewportSize({ width: 1280, height: 920 })
     await page.goto('/')
 
-    for (let index = 0; index < 9; index += 1) {
+    for (let index = 0; index < 13; index += 1) {
       await page.getByRole('button', { name: 'Next' }).click()
     }
 
@@ -771,18 +771,18 @@ test.describe('intro walkthrough', () => {
     }
     await tour.getByRole('button', { name: 'Start exploring' }).click()
     await expect(
-      page.getByRole('heading', { name: 'How LLM systems actually work' }),
+      page.getByRole('heading', { name: 'A complete tiny LLM, step by step' }),
     ).toBeVisible()
 
     await page.reload()
-    await expect(page.getByText('Step 1 of 10')).toHaveCount(0)
+    await expect(page.getByText('Step 1 of 14')).toHaveCount(0)
     await expect(
-      page.getByRole('heading', { name: 'How LLM systems actually work' }),
+      page.getByRole('heading', { name: 'A complete tiny LLM, step by step' }),
     ).toBeVisible()
 
     await page.getByRole('button', { name: 'Start intro again' }).click()
     await expect(
-      page.getByText('A language model keeps guessing what should come next.'),
+      page.getByText('AI is everywhere these days.'),
     ).toBeVisible()
     expect(issues).toEqual([])
   })
@@ -813,6 +813,9 @@ test.describe('intro walkthrough', () => {
     const issues = collectBrowserIssues(page)
     await page.setViewportSize({ width: 1280, height: 920 })
     await page.goto('/')
+    for (let index = 0; index < 4; index += 1) {
+      await page.getByRole('button', { name: 'Next' }).click()
+    }
 
     const tokenTrigger = page.getByRole('button', { name: 'token' })
     await expect(tokenTrigger).toBeVisible()
@@ -823,7 +826,7 @@ test.describe('intro walkthrough', () => {
       'One small text piece the model can read or write in a single step.',
     )
 
-    await page.getByRole('heading', { name: 'How LLM systems actually work' }).click()
+    await page.getByRole('heading', { name: 'A complete tiny LLM, step by step' }).click()
     await expect(page.locator('.annotation-popup--floating')).toHaveCount(0)
     expect(issues).toEqual([])
   })
@@ -855,7 +858,7 @@ test.describe('mobile walkthrough', () => {
 
     await page.goto('/')
     await expect(
-      page.getByText('A language model keeps guessing what should come next.'),
+      page.getByText('AI is everywhere these days.'),
     ).toBeVisible()
     await expect(page.getByRole('button', { name: 'Skip' })).toBeVisible()
 
@@ -910,7 +913,7 @@ test.describe('mobile walkthrough', () => {
     await expect(page.locator('.scene-panel')).toHaveCount(0)
 
     await page.getByRole('button', { name: 'Story', exact: true }).click()
-    await expect(page.getByRole('textbox', { name: 'Starting text' })).toBeVisible()
+    await expect(page.getByRole('textbox', { name: 'Name prefix' })).toBeVisible()
     await expect(page.locator('.story-scene__story')).toHaveCount(1)
     await expect(page.locator('.scene-panel')).toHaveCount(0)
 

@@ -80,9 +80,9 @@ export function ProjectInfoDialog({ onClose }: ProjectInfoDialogProps) {
         </div>
 
         <p className="project-splash__summary">
-          A compact, interactive walkthrough of how a GPT-style language model
-          reads context, steps through inference, and maps code to the model
-          state you see on screen.
+          200loc shows how LLMs work end to end by using microgpt, a tiny
+          complete GPT-style model. The app keeps the full Python source, model
+          architecture, and every inference step synchronized on screen.
         </p>
 
         <div className="project-splash__section">

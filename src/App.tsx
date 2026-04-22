@@ -21,6 +21,7 @@ export default function App() {
     handleFocusRanges,
     handlePrefixChange,
     hydrate,
+    modelIdentity,
     sceneModelData,
     source,
     state,
@@ -85,7 +86,7 @@ export default function App() {
     )
   }
 
-  if (!trace || !phase || !source || !sceneModelData || !tokenizer) {
+  if (!trace || !phase || !source || !modelIdentity || !sceneModelData || !tokenizer) {
     return (
       <div className="app-shell app-shell--centered">
         <div className="empty-state">
@@ -133,6 +134,7 @@ export default function App() {
       currentTextStatus={currentTextStatus}
       hasPendingPrefixChange={hasPendingPrefixChange}
       isPlaying={state.status === 'playing'}
+      modelIdentity={modelIdentity}
       navigationBlocked={navigationBlocked}
       onApplyPrefix={() => {
         dispatch({ type: 'setPlaying', playing: false })

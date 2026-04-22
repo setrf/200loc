@@ -167,7 +167,7 @@ describe('App', () => {
     const { default: App } = await import('../App')
     render(<App />)
 
-    await screen.findByText('A language model keeps guessing what should come next.')
+    await screen.findByText('AI is everywhere these days.')
     fireEvent.click(screen.getByRole('button', { name: 'Skip' }))
 
     await screen.findByRole('dialog', { name: 'Lab tour' })
@@ -204,16 +204,16 @@ describe('App', () => {
     const { default: App } = await import('../App')
     render(<App />)
 
-    await screen.findByText('A language model keeps guessing what should come next.')
+    await screen.findByText('AI is everywhere these days.')
     fireEvent.click(screen.getByRole('button', { name: 'Next' }))
     fireEvent.click(screen.getByRole('button', { name: 'Back' }))
     fireEvent.click(screen.getByRole('button', { name: 'Back' }))
     expect(
-      screen.getByText('A language model keeps guessing what should come next.'),
+      screen.getByText('AI is everywhere these days.'),
     ).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: 'Skip' }))
-    await screen.findByText('How LLM systems actually work')
+    await screen.findByText('A complete tiny LLM, step by step')
     expect(screen.queryByRole('dialog', { name: 'Lab tour' })).not.toBeInTheDocument()
   })
 
@@ -238,11 +238,16 @@ describe('App', () => {
     const { default: App } = await import('../App')
     render(<App />)
 
-    await screen.findByText('How LLM systems actually work')
+    await screen.findByText('A complete tiny LLM, step by step')
     fireEvent.click(screen.getByRole('button', { name: 'About' }))
 
     const dialog = screen.getByRole('dialog', { name: 'Project information' })
     expect(within(dialog).getByText('About this project')).toBeInTheDocument()
+    expect(
+      within(dialog).getByText(
+        /200loc shows how LLMs work end to end by using microgpt/,
+      ),
+    ).toBeInTheDocument()
     expect(within(dialog).getByText('mertgulsun.com')).toBeInTheDocument()
     expect(within(dialog).getByText('MIT License')).toBeInTheDocument()
     expect(within(dialog).getByText('Andrej Karpathy')).toBeInTheDocument()
@@ -279,8 +284,16 @@ describe('App', () => {
     const { default: App } = await import('../App')
     render(<App />)
 
-    await screen.findByText('How LLM systems actually work')
-    expect(screen.getByLabelText('Starting text')).toBeInTheDocument()
+    await screen.findByText('A complete tiny LLM, step by step')
+    expect(screen.getByLabelText('Name prefix')).toBeInTheDocument()
+    expect(
+      screen.getByText('32,033 lowercase names -> one character at a time'),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText(
+        'microgpt - browser-local - 1 layer - 4 attention heads - 16-wide vectors - 16-character context',
+      ),
+    ).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Code' }))
     expect(screen.getByText('microgpt.py')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Story' }))
@@ -387,7 +400,7 @@ describe('App', () => {
     const { default: App } = await import('../App')
     render(<App />)
 
-    await screen.findByText('How LLM systems actually work')
+    await screen.findByText('A complete tiny LLM, step by step')
     fireEvent.click(screen.getByRole('button', { name: 'Code' }))
     fireEvent.click(screen.getByRole('button', { name: 'Collapse' }))
 
@@ -430,7 +443,7 @@ describe('App', () => {
     const { default: App } = await import('../App')
     render(<App />)
 
-    const prefix = await screen.findByRole('textbox', { name: 'Starting text' })
+    const prefix = await screen.findByRole('textbox', { name: 'Name prefix' })
     fireEvent.change(prefix, { target: { value: 'Em!42' } })
     fireEvent.keyDown(prefix, { key: 'Tab' })
     expect(runtime.reset).toHaveBeenCalledTimes(1)
@@ -471,7 +484,7 @@ describe('App', () => {
     const { default: App } = await import('../App')
     render(<App />)
 
-    const prefix = await screen.findByRole('textbox', { name: 'Starting text' })
+    const prefix = await screen.findByRole('textbox', { name: 'Name prefix' })
     fireEvent.change(prefix, { target: { value: 'em' } })
     fireEvent.click(screen.getByRole('button', { name: /Reset|Apply text/ }))
 
@@ -527,7 +540,7 @@ describe('App', () => {
     const { default: App } = await import('../App')
     render(<App />)
 
-    const prefix = await screen.findByRole('textbox', { name: 'Starting text' })
+    const prefix = await screen.findByRole('textbox', { name: 'Name prefix' })
     fireEvent.click(screen.getByRole('button', { name: 'Play' }))
     expect(screen.getByRole('button', { name: 'Pause' })).toBeInTheDocument()
 
@@ -575,7 +588,7 @@ describe('App', () => {
     const { default: App } = await import('../App')
     render(<App />)
 
-    await screen.findByText('How LLM systems actually work')
+    await screen.findByText('A complete tiny LLM, step by step')
 
     fireEvent.click(document.querySelector('button[aria-controls="code-panel-body"]') as HTMLButtonElement)
     expect(screen.getByRole('button', { name: 'Expand code panel' })).toBeInTheDocument()
@@ -625,8 +638,8 @@ describe('App', () => {
     const { default: App } = await import('../App')
     render(<App />)
 
-    await screen.findByText('A language model keeps guessing what should come next.')
-    for (let index = 0; index < 9; index += 1) {
+    await screen.findByText('AI is everywhere these days.')
+    for (let index = 0; index < 13; index += 1) {
       fireEvent.click(screen.getByRole('button', { name: 'Next' }))
     }
 
@@ -646,7 +659,7 @@ describe('App', () => {
     expect(window.localStorage.getItem(LAB_TOUR_SEEN_STORAGE_KEY)).toBe('true')
 
     fireEvent.click(screen.getByRole('button', { name: 'Start intro again' }))
-    await screen.findByText('A language model keeps guessing what should come next.')
+    await screen.findByText('AI is everywhere these days.')
   })
 
   it('can replay the lab tour from the header', async () => {
@@ -670,7 +683,7 @@ describe('App', () => {
     const { default: App } = await import('../App')
     render(<App />)
 
-    await screen.findByText('How LLM systems actually work')
+    await screen.findByText('A complete tiny LLM, step by step')
     fireEvent.click(screen.getByRole('button', { name: 'Show lab tour' }))
 
     const tour = await screen.findByRole('dialog', { name: 'Lab tour' })
@@ -737,7 +750,7 @@ describe('App', () => {
       screen.getByText('Loading the model and canonical source…'),
     ).toBeInTheDocument()
 
-    await screen.findByText('How LLM systems actually work')
+    await screen.findByText('A complete tiny LLM, step by step')
     expect(screen.getByText('microgpt.py')).toBeInTheDocument()
     expect(screen.getAllByText('Tokenize Prefix').length).toBeGreaterThan(0)
     expect(screen.getByLabelText('Current text')).toHaveTextContent('em')
@@ -755,7 +768,7 @@ describe('App', () => {
     expect(document.querySelectorAll('.code-viewer__line.is-active').length).toBeGreaterThan(0)
     fireEvent.mouseLeave(screen.getByLabelText('Architecture scene'))
 
-    fireEvent.change(screen.getByLabelText('Starting text'), {
+    fireEvent.change(screen.getByLabelText('Name prefix'), {
       target: { value: 'Em!42' },
     })
     fireEvent.click(screen.getByRole('button', { name: /Reset|Apply text/ }))
@@ -823,7 +836,7 @@ describe('App', () => {
 
     const { default: App } = await import('../App')
     render(<App />)
-    await screen.findByText('How LLM systems actually work')
+    await screen.findByText('A complete tiny LLM, step by step')
 
     for (let index = 0; index < phaseCount; index += 1) {
       fireEvent.click(screen.getByRole('button', { name: 'Next' }))
@@ -853,7 +866,7 @@ describe('App', () => {
     const { default: App } = await import('../App')
     render(<App />)
 
-    await screen.findByText('How LLM systems actually work')
+    await screen.findByText('A complete tiny LLM, step by step')
     expect(screen.getByText(phaseBeat(0))).toBeInTheDocument()
   })
 
@@ -875,7 +888,7 @@ describe('App', () => {
 
     const { default: App } = await import('../App')
     render(<App />)
-    await screen.findByText('How LLM systems actually work')
+    await screen.findByText('A complete tiny LLM, step by step')
 
     for (let index = 0; index < phaseCount; index += 1) {
       fireEvent.click(screen.getByRole('button', { name: 'Next' }))
@@ -971,7 +984,7 @@ describe('App', () => {
     const { default: App } = await import('../App')
     render(<App />)
 
-    await screen.findByText('How LLM systems actually work')
+    await screen.findByText('A complete tiny LLM, step by step')
     expect(screen.getByText(`step 1 / ${phaseCount}`)).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: /Reset|Apply text/ }))
@@ -1026,7 +1039,7 @@ describe('App', () => {
 
     const { default: App } = await import('../App')
     render(<App />)
-    await screen.findByText('How LLM systems actually work')
+    await screen.findByText('A complete tiny LLM, step by step')
 
     for (let index = 0; index < phaseCount - 1; index += 1) {
       fireEvent.click(screen.getByRole('button', { name: 'Next' }))
@@ -1183,7 +1196,7 @@ describe('App', () => {
     const { default: App } = await import('../App')
     render(<App />)
 
-    const prefix = await screen.findByRole('textbox', { name: 'Starting text' })
+    const prefix = await screen.findByRole('textbox', { name: 'Name prefix' })
     fireEvent.change(prefix, { target: { value: 'em' } })
     fireEvent.click(screen.getByRole('button', { name: /Reset|Apply text/ }))
     fireEvent.change(prefix, { target: { value: 'emi' } })
@@ -1245,7 +1258,7 @@ describe('App', () => {
     const { default: App } = await import('../App')
     render(<App />)
 
-    const prefix = await screen.findByRole('textbox', { name: 'Starting text' })
+    const prefix = await screen.findByRole('textbox', { name: 'Name prefix' })
     for (let index = 0; index < phaseCount - 1; index += 1) {
       fireEvent.click(screen.getByRole('button', { name: 'Next' }))
     }
@@ -1310,7 +1323,7 @@ describe('App', () => {
     const { default: App } = await import('../App')
     render(<App />)
 
-    const prefix = await screen.findByRole('textbox', { name: 'Starting text' })
+    const prefix = await screen.findByRole('textbox', { name: 'Name prefix' })
     for (let index = 0; index < phaseCount - 1; index += 1) {
       fireEvent.click(screen.getByRole('button', { name: 'Next' }))
     }
@@ -1364,7 +1377,7 @@ describe('App', () => {
     const { default: App } = await import('../App')
     render(<App />)
 
-    const prefix = await screen.findByRole('textbox', { name: 'Starting text' })
+    const prefix = await screen.findByRole('textbox', { name: 'Name prefix' })
     for (let index = 0; index < phaseCount - 1; index += 1) {
       fireEvent.click(screen.getByRole('button', { name: 'Next' }))
     }
@@ -1411,8 +1424,8 @@ describe('App', () => {
     const { default: App } = await import('../App')
     render(<App />)
 
-    await screen.findByText('How LLM systems actually work')
-    const prefix = await screen.findByRole('textbox', { name: 'Starting text' })
+    await screen.findByText('A complete tiny LLM, step by step')
+    const prefix = await screen.findByRole('textbox', { name: 'Name prefix' })
     fireEvent.change(prefix, { target: { value: 'em' } })
     fireEvent.click(screen.getByRole('button', { name: 'Apply text' }))
     await waitFor(() => {
@@ -1431,7 +1444,7 @@ describe('App', () => {
     expect(screen.getByText('Reset required')).toBeInTheDocument()
     expect(
       screen.getByText(
-        'Current run still uses the previous starting text. Apply text to restart from your draft.',
+        'Current run still uses the previous name prefix. Apply text to restart microgpt from your draft.',
       ),
     ).toBeInTheDocument()
 
@@ -1468,7 +1481,7 @@ describe('App', () => {
     const { default: App } = await import('../App')
     render(<App />)
 
-    const prefix = await screen.findByRole('textbox', { name: 'Starting text' })
+    const prefix = await screen.findByRole('textbox', { name: 'Name prefix' })
     fireEvent.change(prefix, { target: { value: 'em' } })
     fireEvent.click(screen.getByRole('button', { name: /Reset|Apply text/ }))
     fireEvent.change(prefix, { target: { value: 'emi' } })
@@ -1504,7 +1517,7 @@ describe('App', () => {
     const { default: App } = await import('../App')
     render(<App />)
 
-    const prefix = await screen.findByRole('textbox', { name: 'Starting text' })
+    const prefix = await screen.findByRole('textbox', { name: 'Name prefix' })
     fireEvent.change(prefix, { target: { value: 'em' } })
     fireEvent.click(screen.getByRole('button', { name: /Reset|Apply text/ }))
 
@@ -1533,7 +1546,7 @@ describe('App', () => {
     const { default: App } = await import('../App')
     render(<App />)
 
-    await screen.findByText('How LLM systems actually work')
+    await screen.findByText('A complete tiny LLM, step by step')
 
     fireEvent.click(document.querySelector('.annotation-trigger') as HTMLElement)
     expect(screen.getByRole('dialog', { hidden: true })).toHaveTextContent('Context')
@@ -1582,7 +1595,7 @@ describe('App', () => {
     const { default: App } = await import('../App')
     render(<App />)
 
-    await screen.findByText('How LLM systems actually work')
+    await screen.findByText('A complete tiny LLM, step by step')
 
     fireEvent.click(document.querySelector('.annotation-trigger') as HTMLElement)
     expect(screen.getByRole('dialog', { hidden: true })).toBeInTheDocument()

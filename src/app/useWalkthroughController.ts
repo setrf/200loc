@@ -8,6 +8,7 @@ import {
 import { useAutoplay } from '../hooks/useAutoplay'
 import { normalizePrefixInput } from '../prefixNormalization'
 import { inferencePhases, type LineRange } from '../walkthrough/phases'
+import { buildModelIdentity, type ModelIdentity } from './modelIdentity'
 import {
   initialWalkthroughState,
   type WalkthroughStatus,
@@ -23,6 +24,7 @@ export function useWalkthroughController() {
     initialWalkthroughState,
   )
   const [source, setSource] = useState('')
+  const [modelIdentity, setModelIdentity] = useState<ModelIdentity | null>(null)
   const [sceneModelData, setSceneModelData] = useState<SceneModelData | null>(null)
   const [reducedMotion, setReducedMotion] = useState(false)
   const runtimeRef = useRef<MicrogptRuntime | null>(null)
@@ -147,6 +149,7 @@ export function useWalkthroughController() {
 
         runtimeRef.current = runtime
         tokenizerRef.current = createTokenizer(bundle)
+        setModelIdentity(buildModelIdentity(bundle))
         setSceneModelData({
           config: bundle.config,
           vocab: bundle.vocab,
@@ -263,6 +266,7 @@ export function useWalkthroughController() {
     handleFocusRanges,
     handlePrefixChange,
     hydrate,
+    modelIdentity,
     sceneModelData,
     source,
     state,

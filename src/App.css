@@ -48,7 +48,14 @@
 .app-header__title {
   margin-top: 4px;
   font-size: 1rem;
+  color: var(--text);
+}
+
+.app-header__subtitle,
+.intro-shell__subtitle {
+  margin: 4px 0 0;
   color: var(--text-muted);
+  font: 500 0.9rem/1.4 var(--sans);
 }
 
 .ghost-button {
@@ -162,6 +169,10 @@
   justify-content: space-between;
   gap: var(--space-16);
   padding: 4px 0 0;
+}
+
+.intro-shell__subtitle {
+  max-width: 560px;
 }
 
 .intro-stack {
@@ -341,7 +352,7 @@
 }
 
 .walkthrough-layout {
-  --top-panel-height: 192px;
+  --top-panel-height: 244px;
   flex: 1;
   min-height: 0;
   box-sizing: border-box;
@@ -797,6 +808,36 @@
   border: 1px solid rgba(229, 237, 245, 0.1);
   border-radius: var(--radius-surface);
   background: linear-gradient(180deg, rgba(20, 24, 30, 0.94), rgba(14, 18, 23, 0.9));
+}
+
+.model-identity {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(160px, 0.42fr) minmax(220px, 1fr) minmax(180px, 0.62fr);
+  align-items: center;
+  gap: var(--space-12);
+  padding: var(--space-8);
+  border: 1px solid rgba(229, 237, 245, 0.1);
+  border-radius: var(--radius-surface);
+  background: rgba(10, 12, 15, 0.46);
+}
+
+.model-identity > div {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.model-identity strong {
+  color: var(--text);
+  font: 600 0.96rem/1.1 var(--mono);
+}
+
+.model-identity p {
+  min-width: 0;
+  margin: 0;
+  color: var(--text-muted);
+  font: 500 0.78rem/1.35 var(--sans);
 }
 
 .scene-panel__stage-chip-main {
@@ -1668,6 +1709,7 @@ button.annotation-trigger:focus-visible {
     grid-template-columns: 1fr;
     gap: var(--space-12);
     padding: var(--space-12) var(--space-16) var(--space-16);
+    overflow-y: auto;
   }
 
   .desktop-top-panel {
@@ -1702,6 +1744,21 @@ button.annotation-trigger:focus-visible {
     max-height: none;
   }
 
+  .story-scene__story.is-active,
+  .story-scene__story.is-active .panel-shell--story,
+  .story-scene__story.is-active .panel-shell__body {
+    display: block;
+    height: auto;
+  }
+
+  .story-scene__story.is-active {
+    min-height: max-content;
+  }
+
+  .story-scene__story.is-active .panel-shell--story {
+    overflow: visible;
+  }
+
   .panel-shell--code,
   .panel-shell--scene,
   .panel-shell--story {
@@ -1718,6 +1775,26 @@ button.annotation-trigger:focus-visible {
     height: auto;
     min-height: 0;
     padding: var(--space-16);
+  }
+
+  .model-identity {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+    gap: 6px;
+    padding: 10px;
+  }
+
+  .model-identity p:first-of-type {
+    display: none;
+  }
+
+  .model-identity strong {
+    font-size: 0.9rem;
+  }
+
+  .model-identity p {
+    font-size: 0.76rem;
+    line-height: 1.25;
   }
 
   .story-panel__lesson {

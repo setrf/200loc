@@ -9,6 +9,11 @@ import {
   writeHasSeenIntro,
 } from '../intro/storage'
 
+const TOKEN_INTRO_STEP_INDEX = introSteps.findIndex((step) => step.id === 'what-this-is')
+const NUMBERS_INTRO_STEP_INDEX = introSteps.findIndex(
+  (step) => step.id === 'tokens-become-numbers',
+)
+
 function setMatchMedia(matches: boolean) {
   Object.defineProperty(window, 'matchMedia', {
     writable: true,
@@ -32,7 +37,7 @@ describe('intro walkthrough', () => {
   it('renders the current intro step with simple progress and actions', () => {
     render(
       <IntroWalkthrough
-        activeStepIndex={2}
+        activeStepIndex={NUMBERS_INTRO_STEP_INDEX}
         steps={introSteps}
         onBack={vi.fn()}
         onNext={vi.fn()}
@@ -115,7 +120,7 @@ describe('intro walkthrough', () => {
 
     render(
       <IntroWalkthrough
-        activeStepIndex={1}
+        activeStepIndex={TOKEN_INTRO_STEP_INDEX}
         steps={introSteps}
         onBack={onBack}
         onNext={onNext}
@@ -138,7 +143,7 @@ describe('intro walkthrough', () => {
 
     render(
       <IntroWalkthrough
-        activeStepIndex={0}
+        activeStepIndex={TOKEN_INTRO_STEP_INDEX}
         steps={introSteps}
         onBack={vi.fn()}
         onNext={vi.fn()}
@@ -166,7 +171,7 @@ describe('intro walkthrough', () => {
 
     render(
       <IntroWalkthrough
-        activeStepIndex={0}
+        activeStepIndex={TOKEN_INTRO_STEP_INDEX}
         steps={introSteps}
         onBack={vi.fn()}
         onNext={vi.fn()}
@@ -192,7 +197,7 @@ describe('intro walkthrough', () => {
 
     render(
       <IntroWalkthrough
-        activeStepIndex={0}
+        activeStepIndex={TOKEN_INTRO_STEP_INDEX}
         steps={introSteps}
         onBack={vi.fn()}
         onNext={vi.fn()}
@@ -269,7 +274,7 @@ describe('intro walkthrough', () => {
 
     const { rerender } = render(
       <IntroWalkthrough
-        activeStepIndex={0}
+        activeStepIndex={TOKEN_INTRO_STEP_INDEX}
         steps={introSteps}
         onBack={vi.fn()}
         onNext={vi.fn()}
@@ -397,7 +402,7 @@ describe('intro walkthrough', () => {
     setMatchMedia(true)
     rerender(
       <IntroWalkthrough
-        activeStepIndex={0}
+        activeStepIndex={TOKEN_INTRO_STEP_INDEX}
         steps={introSteps}
         onBack={vi.fn()}
         onNext={vi.fn()}
@@ -431,7 +436,7 @@ describe('intro walkthrough', () => {
       />,
     )
 
-    expect(screen.getByText('How LLM systems actually work')).toBeInTheDocument()
+    expect(screen.getByText('A complete tiny LLM, step by step')).toBeInTheDocument()
     expect(screen.queryByRole('dialog', { hidden: true })).not.toBeInTheDocument()
   })
 })

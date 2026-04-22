@@ -1,4 +1,5 @@
 import type { PhaseDefinition } from '../walkthrough/phases'
+import type { ModelIdentity } from '../app/modelIdentity'
 
 interface WalkthroughControlsProps {
   activePhaseIndex: number
@@ -9,6 +10,7 @@ interface WalkthroughControlsProps {
   currentTextStatus: string
   hasPendingPrefixChange: boolean
   isPlaying: boolean
+  modelIdentity: ModelIdentity
   navigationBlocked: boolean
   onApplyPrefix: () => void
   onFocusRanges: (ranges: PhaseDefinition['codeRanges'] | null) => void
@@ -30,6 +32,7 @@ export function WalkthroughControls({
   currentTextStatus,
   hasPendingPrefixChange,
   isPlaying,
+  modelIdentity,
   navigationBlocked,
   onApplyPrefix,
   onFocusRanges,
@@ -43,6 +46,15 @@ export function WalkthroughControls({
 }: WalkthroughControlsProps) {
   return (
     <>
+      <section className="model-identity" aria-label="Example model">
+        <div>
+          <span className="eyebrow">Example model</span>
+          <strong>microgpt</strong>
+        </div>
+        <p>{modelIdentity.detail}</p>
+        <p>{modelIdentity.summary}</p>
+      </section>
+
       <div className="story-scene__toolbar-bar">
         <div className="story-scene__toolbar-stage">
           <div
@@ -105,12 +117,12 @@ export function WalkthroughControls({
           htmlFor="prefix-input"
         >
           <div className="story-panel__field-head">
-            <span className="eyebrow">Starting text</span>
+            <span className="eyebrow">Name prefix</span>
           </div>
           <input
             id="prefix-input"
             className="story-panel__input"
-            aria-label="Starting text"
+            aria-label="Name prefix"
             value={prefixInput}
             onChange={(event) => onPrefixChange(event.target.value)}
             onKeyDown={(event) => {
@@ -145,8 +157,8 @@ export function WalkthroughControls({
 
       <p className="story-panel__field-note">
         {hasPendingPrefixChange
-          ? 'Current run still uses the previous starting text. Apply text to restart from your draft.'
-          : 'Edit the starting text, then reset when you want the model to restart from it.'}
+          ? 'Current run still uses the previous name prefix. Apply text to restart microgpt from your draft.'
+          : 'Edit the name prefix, then reset when you want microgpt to restart from it.'}
       </p>
     </>
   )

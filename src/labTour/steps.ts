@@ -21,7 +21,7 @@ export const desktopLabTourSteps: LabTourStepDefinition[] = [
     targetId: 'controls',
     title: 'This is how you drive the walkthrough',
     description:
-      'Edit the starting text here. Reset restarts from that text. Prev, Next, and Play move the explanation forward.',
+      'Edit the name prefix here. Reset restarts microgpt from that prefix. Prev, Next, and Play move the explanation forward.',
   },
   {
     id: 'code',
@@ -59,7 +59,7 @@ export const mobileLabTourSteps: LabTourStepDefinition[] = [
     targetId: 'controls',
     title: 'This is how you drive the walkthrough',
     description:
-      'Edit the starting text here. Reset restarts from that text. Prev, Next, and Play move the explanation forward.',
+      'Edit the name prefix here. Reset restarts microgpt from that prefix. Prev, Next, and Play move the explanation forward.',
     mobileTab: 'story',
   },
   {
