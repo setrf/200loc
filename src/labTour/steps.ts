@@ -52,7 +52,7 @@ export const mobileLabTourSteps: LabTourStepDefinition[] = [
     targetId: 'tabs',
     title: 'Use these tabs to switch views',
     description:
-      'On smaller screens, Code, Story, and Scene live behind these tabs.',
+      'On smaller screens, use these tabs to switch the supporting pane between Code and Scene. The explanation stays visible above them.',
   },
   {
     id: 'controls',
@@ -60,7 +60,6 @@ export const mobileLabTourSteps: LabTourStepDefinition[] = [
     title: 'This is how you drive the walkthrough',
     description:
       'Use Reset, Prev, Play, and Next to move through the same prediction one step at a time.',
-    mobileTab: 'story',
   },
   {
     id: 'code',
@@ -81,9 +80,8 @@ export const mobileLabTourSteps: LabTourStepDefinition[] = [
   {
     id: 'story',
     targetId: 'story',
-    title: 'This tab gives the plain-English explanation',
+    title: 'This explanation stays with you',
     description:
-      'Use it as your guide. Tappable words open quick definitions when you want more help.',
-    mobileTab: 'story',
+      'Use it as your guide while Code and Scene change underneath. Tappable words open quick definitions when you want more help.',
   },
 ]

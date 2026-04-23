@@ -10,7 +10,7 @@ export type WalkthroughStatus =
   | 'terminal'
   | 'error'
 
-export type MobileTab = 'story' | 'scene' | 'code'
+export type MobileTab = 'scene' | 'code'
 
 export interface WalkthroughState {
   status: WalkthroughStatus
@@ -85,7 +85,7 @@ export const initialWalkthroughState: WalkthroughState = {
   sequenceTokenIds: [],
   backend: 'cpu',
   hoverRanges: null,
-  mobileTab: 'story',
+  mobileTab: 'code',
 }
 
 export function walkthroughReducer(

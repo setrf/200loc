@@ -90,9 +90,13 @@ describe('ui components', () => {
       <CodeViewer
         source={'def first():\n    print("second")\nthird'}
         activeRanges={[{ start: 2, end: 2 }]}
+        codeExplainer="This line prints the second value."
       />,
     )
     expect(screen.getByText('Python')).toBeInTheDocument()
+    expect(screen.getByLabelText('Code explainer')).toHaveTextContent(
+      'This line prints the second value.',
+    )
     expect(screen.getByText('print')).toHaveClass('code-viewer__token--builtin')
     expect(screen.getByText('"second"')).toHaveClass('code-viewer__token--string')
     expect(screen.getByText('print').closest('li')).toHaveClass('is-active')
@@ -101,8 +105,34 @@ describe('ui components', () => {
   })
 
   it('renders blank code lines safely', () => {
-    render(<CodeViewer source={'first\n\nthird'} activeRanges={[]} />)
-    expect(screen.getAllByRole('listitem')).toHaveLength(3)
+    const { container } = render(
+      <CodeViewer
+        source={'first\n\nthird'}
+        activeRanges={[]}
+        codeExplainer="No active range means no note."
+      />,
+    )
+    expect(container.querySelectorAll('.code-viewer__line')).toHaveLength(3)
+    expect(screen.queryByLabelText('Code explainer')).not.toBeInTheDocument()
+  })
+
+  it('renders the code explainer before the first active line', () => {
+    const { container } = render(
+      <CodeViewer
+        source={'line one\nline two\nline three\nline four'}
+        activeRanges={[
+          { start: 3, end: 3 },
+          { start: 1, end: 1 },
+        ]}
+        codeExplainer="This note belongs above the earliest highlighted line."
+      />,
+    )
+
+    const items = Array.from(container.querySelectorAll('.code-viewer__lines > li'))
+    expect(items[0]).toHaveClass('code-viewer__explainer')
+    expect(items[1]).toHaveClass('code-viewer__line')
+    expect(items[1]).toHaveTextContent('line one')
+    expect(container.querySelectorAll('.code-viewer__explainer')).toHaveLength(1)
   })
 
   it('auto-scrolls the first active code line into view when the range changes', () => {
@@ -116,6 +146,7 @@ describe('ui components', () => {
       <CodeViewer
         source={'line one\nline two\nline three\nline four'}
         activeRanges={[{ start: 2, end: 2 }]}
+        codeExplainer="Follow this range."
       />,
     )
 
@@ -127,11 +158,12 @@ describe('ui components', () => {
       <CodeViewer
         source={'line one\nline two\nline three\nline four'}
         activeRanges={[{ start: 4, end: 4 }]}
+        codeExplainer="Follow this range."
       />,
     )
 
     expect(scrollIntoView).toHaveBeenCalledWith({ block: 'center', behavior: 'smooth' })
-    expect(screen.getAllByRole('listitem')).toHaveLength(4)
+    expect(document.querySelectorAll('.code-viewer__line')).toHaveLength(4)
   })
 
   it('does not auto-scroll when the active line is already visible', () => {
@@ -165,6 +197,7 @@ describe('ui components', () => {
       <CodeViewer
         source={'line one\nline two\nline three\nline four'}
         activeRanges={[{ start: 2, end: 2 }]}
+        codeExplainer="Follow this visible range."
       />,
     )
 
@@ -184,7 +217,7 @@ describe('ui components', () => {
     expect(container.querySelectorAll('.story-panel__beat-label')).toHaveLength(0)
     expect(screen.queryByText('New terms')).not.toBeInTheDocument()
     expect(screen.queryByText(/In the scene:/)).not.toBeInTheDocument()
-    expect(container.querySelectorAll('[data-glossary-id]').length).toBeGreaterThan(0)
+    expect(container.querySelectorAll('[data-glossary-id]').length).toBeGreaterThan(3)
   })
 
   it('renders a single guided block without term beats when absent', () => {
@@ -495,22 +528,22 @@ describe('ui components', () => {
 
   it('switches mobile tabs through the callback', () => {
     const onChange = vi.fn()
-    render(<SegmentTabs activeTab="story" onChange={onChange} />)
+    render(<SegmentTabs activeTab="code" onChange={onChange} />)
     fireEvent.click(screen.getByRole('button', { name: 'Scene' }))
     expect(onChange).toHaveBeenCalledWith('scene')
   })
 
   it('supports keyboard navigation on the mobile section buttons', () => {
     const onChange = vi.fn()
-    render(<SegmentTabs activeTab="story" onChange={onChange} />)
+    render(<SegmentTabs activeTab="code" onChange={onChange} />)
 
-    fireEvent.keyDown(screen.getByRole('button', { name: 'Story' }), {
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Code' }), {
       key: 'ArrowRight',
     })
-    fireEvent.keyDown(screen.getByRole('button', { name: 'Story' }), {
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Code' }), {
       key: 'Home',
     })
-    fireEvent.keyDown(screen.getByRole('button', { name: 'Story' }), {
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Code' }), {
       key: 'End',
     })
 
@@ -523,7 +556,7 @@ describe('ui components', () => {
     const onChange = vi.fn()
 
     function StatefulTabs() {
-      const [activeTab, setActiveTab] = useState<'code' | 'story' | 'scene'>('story')
+      const [activeTab, setActiveTab] = useState<'code' | 'scene'>('code')
       return (
         <SegmentTabs
           activeTab={activeTab}
@@ -537,9 +570,9 @@ describe('ui components', () => {
 
     render(<StatefulTabs />)
 
-    const storyTab = screen.getByRole('button', { name: 'Story' })
-    storyTab.focus()
-    fireEvent.keyDown(storyTab, { key: 'ArrowRight' })
+    const codeTab = screen.getByRole('button', { name: 'Code' })
+    codeTab.focus()
+    fireEvent.keyDown(codeTab, { key: 'ArrowRight' })
     expect(screen.getByRole('button', { name: 'Scene' })).toHaveFocus()
 
     fireEvent.keyDown(screen.getByRole('button', { name: 'Scene' }), {
@@ -553,12 +586,12 @@ describe('ui components', () => {
 
   it('supports reverse keyboard navigation on the mobile section buttons', () => {
     const onChange = vi.fn()
-    render(<SegmentTabs activeTab="story" onChange={onChange} />)
+    render(<SegmentTabs activeTab="scene" onChange={onChange} />)
 
-    fireEvent.keyDown(screen.getByRole('button', { name: 'Story' }), {
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Scene' }), {
       key: 'ArrowLeft',
     })
-    fireEvent.keyDown(screen.getByRole('button', { name: 'Story' }), {
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Scene' }), {
       key: 'ArrowUp',
     })
 

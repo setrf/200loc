@@ -82,17 +82,20 @@ export function buildWalkthroughViewModel({
                 ? 'Context full'
                 : 'Stopped at BOS'
               : 'Ready'
+  const effectiveCollapsedPanels = isCompact
+    ? { code: false, scene: false }
+    : collapsedPanels
   const hasCollapsedPanels =
-    collapsedPanels.code || collapsedPanels.scene || collapsedPanels.story
+    effectiveCollapsedPanels.code ||
+    effectiveCollapsedPanels.scene
   const showCodeColumn =
-    !collapsedPanels.code && (!isCompact || state.mobileTab === 'code')
+    !effectiveCollapsedPanels.code && (!isCompact || state.mobileTab === 'code')
   const showScenePanel =
-    !collapsedPanels.scene && (!isCompact || state.mobileTab === 'scene')
-  const showStoryPanel =
-    !collapsedPanels.story && (!isCompact || state.mobileTab === 'story')
+    !effectiveCollapsedPanels.scene && (!isCompact || state.mobileTab === 'scene')
+  const showStoryPanel = true
   const showDesktopStoryPanel = !isCompact && showStoryPanel
-  const showCompactStoryPanel = isCompact && showStoryPanel
-  const showStoryScene = isCompact ? state.mobileTab !== 'code' : showScenePanel
+  const showCompactStoryPanel = isCompact
+  const showStoryScene = isCompact ? state.mobileTab === 'scene' : showScenePanel
   const layoutStyle = isCompact
     ? undefined
     : {

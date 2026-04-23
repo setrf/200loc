@@ -3,7 +3,12 @@ import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { buildTensorWindow } from '../viz/llmViz/frame'
 import { getGlossaryEntry } from '../walkthrough/glossary'
-import { inferencePhases, trainingAppendix, vizFocusRanges } from '../walkthrough/phases'
+import {
+  getCodeExplainerText,
+  inferencePhases,
+  trainingAppendix,
+  vizFocusRanges,
+} from '../walkthrough/phases'
 import { loadBundle, makeTrace } from './helpers/fixtures'
 
 describe('phase line maps', () => {
@@ -44,6 +49,7 @@ describe('phase line maps', () => {
       expect(phase.copy.beats.every((beat) => beat.segments.length > 0)).toBe(true)
       expect(phase.copy.beats.some((beat) => beat.kind === 'scene')).toBe(true)
       expect(phase.copy.beats.some((beat) => beat.kind === 'code')).toBe(true)
+      expect(getCodeExplainerText(phase).length).toBeGreaterThan(0)
       expect(
         phase.copy.beats
           .flatMap((beat) => beat.segments)

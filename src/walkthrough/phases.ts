@@ -1,4 +1,5 @@
 import type { TokenStepTrace } from '../model'
+import { autoAnnotateText } from './autoGlossary'
 import type { GlossaryId } from './glossary'
 import type {
   CameraPoseId,
@@ -73,6 +74,18 @@ export interface AppendixSection {
   codeRanges: LineRange[]
 }
 
+export function getCodeExplainerText(phase: PhaseDefinition): string {
+  const codeBeat = phase.copy.beats.find((beat) => beat.kind === 'code')
+  if (!codeBeat) {
+    return ''
+  }
+  return codeBeat.segments
+    .map((segment) => segment.text)
+    .join('')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
 interface StepSeed {
   slug: string
   stepTitle: string
@@ -102,9 +115,9 @@ function annotate(glossaryId: GlossaryId, text: string): StorySegmentSeed {
 }
 
 function toSegments(parts: StorySegmentSeed[]): StorySegment[] {
-  return parts.map((part) =>
+  return parts.flatMap((part) =>
     typeof part === 'string'
-      ? { kind: 'text', text: part }
+      ? autoAnnotateText(part)
       : { kind: 'term', text: part.text, glossaryId: part.glossaryId },
   )
 }

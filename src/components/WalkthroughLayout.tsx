@@ -1,7 +1,11 @@
 import type { CSSProperties, ReactNode } from 'react'
 import type { TokenStepTrace } from '../model'
 import type { CollapsedPanels, PanelKey } from '../walkthrough/panels'
-import type { LineRange, PhaseDefinition } from '../walkthrough/phases'
+import {
+  getCodeExplainerText,
+  type LineRange,
+  type PhaseDefinition,
+} from '../walkthrough/phases'
 import type { MobileTab } from '../walkthrough/reducer'
 import type { SceneModelData } from '../viz/llmViz/types'
 import { ArchitectureScene } from './ArchitectureScene'
@@ -38,6 +42,13 @@ interface WalkthroughLayoutProps {
   viewModel: WalkthroughLayoutViewModel
 }
 
+function lineRangesMatch(left: LineRange[], right: LineRange[]) {
+  return left.length === right.length && left.every((range, index) => {
+    const other = right[index]
+    return other != null && range.start === other.start && range.end === other.end
+  })
+}
+
 export function WalkthroughLayout({
   activePhaseIndex,
   activeRanges,
@@ -58,6 +69,9 @@ export function WalkthroughLayout({
   viewModel,
 }: WalkthroughLayoutProps) {
   const stepLabel = `Step ${activePhaseIndex + 1} of ${phaseCount}`
+  const codeExplainer = lineRangesMatch(activeRanges, phase.codeRanges)
+    ? getCodeExplainerText(phase)
+    : ''
   const stageProps = {
     'data-lab-tour': 'stage',
     'data-group-title': phase.groupTitle,
@@ -110,15 +124,6 @@ export function WalkthroughLayout({
             </div>
             <div className="desktop-top-panel__story-tools">
               {controlsPanelContent}
-              <button
-                type="button"
-                className="panel-shell__toggle"
-                onClick={() => onTogglePanel('story')}
-                aria-expanded="true"
-                aria-controls="story-panel-body"
-              >
-                Collapse
-              </button>
             </div>
           </div>
 
@@ -134,7 +139,7 @@ export function WalkthroughLayout({
 
   const storyPanel = (
     <div
-      className={`story-scene__story ${mobileTab === 'story' ? 'is-active' : ''}`}
+      className="story-scene__story is-active"
       data-lab-tour="story"
     >
       <div className="panel-shell panel-shell--story">
@@ -145,15 +150,6 @@ export function WalkthroughLayout({
           </div>
           <div className="panel-shell__header-tools">
             {controlsPanelContent}
-            <button
-              type="button"
-              className="panel-shell__toggle"
-              onClick={() => onTogglePanel('story')}
-              aria-expanded="true"
-              aria-controls="story-panel-body"
-            >
-              Collapse
-            </button>
           </div>
         </div>
         <div id="story-panel-body" className="panel-shell__body">
@@ -170,6 +166,84 @@ export function WalkthroughLayout({
     renderHiddenPanelsDock('panel-dock-shell--inline')
   ) : null
 
+  if (isCompact) {
+    return (
+      <main
+        className="walkthrough-layout walkthrough-layout--compact"
+        style={layoutStyle}
+      >
+        {storyPanel}
+
+        {compactCodeDock}
+
+        {viewModel.showCodeColumn ? (
+          <div className="mobile-panel-slot">
+            <aside
+              className="code-column is-active code-column--compact"
+              data-lab-tour="code"
+            >
+              <div className="code-column__sticky">
+                <section className="panel-shell panel-shell--code">
+                  <div className="panel-shell__header">
+                    <span className="panel-shell__title">Code</span>
+                    <button
+                      type="button"
+                      className="panel-shell__toggle"
+                      onClick={() => onTogglePanel('code')}
+                      aria-expanded="true"
+                      aria-controls="code-panel-body"
+                    >
+                      Collapse
+                    </button>
+                  </div>
+                  <div id="code-panel-body" className="panel-shell__body">
+                    <CodeViewer
+                      source={source}
+                      activeRanges={activeRanges}
+                      codeExplainer={codeExplainer}
+                    />
+                  </div>
+                </section>
+              </div>
+            </aside>
+          </div>
+        ) : null}
+
+        {viewModel.showScenePanel ? (
+          <div
+            className="story-scene__scene is-active"
+            data-lab-tour="scene"
+          >
+            <div className="panel-shell panel-shell--scene">
+              <div className="panel-shell__header">
+                <span className="panel-shell__title">Model viewer</span>
+                <button
+                  type="button"
+                  className="panel-shell__toggle"
+                  onClick={() => onTogglePanel('scene')}
+                  aria-expanded="true"
+                  aria-controls="scene-panel-body"
+                >
+                  Collapse
+                </button>
+              </div>
+              <div id="scene-panel-body" className="panel-shell__body">
+                <ArchitectureScene
+                  trace={trace}
+                  phase={phase}
+                  contextTokens={contextTokens}
+                  tokenLabel={tokenLabel}
+                  sceneModelData={sceneModelData}
+                  onFocusRanges={onFocusRanges}
+                />
+              </div>
+            </div>
+          </div>
+        ) : null}
+      </main>
+    )
+  }
+
   return (
     <main
       className="walkthrough-layout"
@@ -180,7 +254,7 @@ export function WalkthroughLayout({
       {compactCodeDock}
 
       {viewModel.showCodeColumn ? (
-        <div className={isCompact ? '' : 'left-column'}>
+        <div className={isCompact ? 'mobile-panel-slot' : 'left-column'}>
           <aside
             className={`code-column ${
               mobileTab === 'code' ? 'is-active' : ''
@@ -202,7 +276,11 @@ export function WalkthroughLayout({
                   </button>
                 </div>
                 <div id="code-panel-body" className="panel-shell__body">
-                  <CodeViewer source={source} activeRanges={activeRanges} />
+                  <CodeViewer
+                    source={source}
+                    activeRanges={activeRanges}
+                    codeExplainer={codeExplainer}
+                  />
                 </div>
               </section>
             </div>

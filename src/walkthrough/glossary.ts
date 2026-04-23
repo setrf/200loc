@@ -1,4 +1,31 @@
 const glossaryData = {
+  llm: {
+    title: 'LLM',
+    shortDefinition: 'A language model trained to predict and generate text one token at a time.',
+    body: [
+      'LLM stands for large language model.',
+      'Modern chatbots and coding assistants are usually built around language models that repeatedly predict the next token from the context so far.',
+    ],
+    relatedIds: ['token', 'context', 'autoregressive-generation'],
+  },
+  inference: {
+    title: 'Inference',
+    shortDefinition: 'Running a trained model to produce an output.',
+    body: [
+      'Inference is what happens after training, when the model uses its learned weights to make a prediction.',
+      'This walkthrough follows inference in detail: one prefix goes in, the model computes through each block, and one next token comes out.',
+    ],
+    relatedIds: ['training', 'sampling', 'autoregressive-generation'],
+  },
+  'model-architecture': {
+    title: 'Model Architecture',
+    shortDefinition: 'The arrangement of parts that defines how information flows through the model.',
+    body: [
+      'Architecture is the model’s structure: embeddings, attention, MLP blocks, residual updates, and the output head.',
+      'microgpt is tiny, but its architecture uses the same core transformer building blocks that larger text models scale up.',
+    ],
+    relatedIds: ['token-embedding', 'attention', 'mlp'],
+  },
   prefix: {
     title: 'Prefix',
     shortDefinition: 'The text that already exists before the model predicts the next token.',

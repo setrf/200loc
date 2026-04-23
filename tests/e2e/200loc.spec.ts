@@ -76,7 +76,11 @@ async function stepTitleLabel(page: Page) {
 }
 
 function firstAnnotationTrigger(page: Page) {
-  return page.locator('.annotation-trigger').first()
+  return page.locator('[data-glossary-id="context"]').first()
+}
+
+function firstAvailableAnnotationTrigger(page: Page) {
+  return page.locator('[data-glossary-id]').first()
 }
 
 async function advanceOnePhase(page: Page) {
@@ -191,7 +195,7 @@ test.describe('desktop walkthrough', () => {
     await page.getByRole('button', { name: 'Next' }).click()
     await expect(page.locator('.annotation-popup--floating')).toHaveCount(0)
 
-    await firstAnnotationTrigger(page).click()
+    await firstAvailableAnnotationTrigger(page).click()
     await expect(page.getByRole('dialog')).toBeVisible()
     await page.getByRole('button', { name: /Reset|Apply text/ }).click()
     await expect(page.locator('.annotation-popup--floating')).toHaveCount(0)
@@ -747,7 +751,7 @@ test.describe('intro walkthrough', () => {
     await page.setViewportSize({ width: 1280, height: 920 })
     await page.goto('/')
 
-    for (let index = 0; index < 13; index += 1) {
+    for (let index = 0; index < 6; index += 1) {
       await page.getByRole('button', { name: 'Next' }).click()
     }
 
@@ -766,7 +770,7 @@ test.describe('intro walkthrough', () => {
     ).toBeVisible()
 
     await page.reload()
-    await expect(page.getByText('Step 1 of 14')).toHaveCount(0)
+    await expect(page.getByText('Step 1 of 7')).toHaveCount(0)
     await expect(
       page.getByRole('heading', { name: 'A complete tiny LLM, step by step' }),
     ).toBeVisible()
@@ -861,14 +865,14 @@ test.describe('mobile walkthrough', () => {
     await context.close()
   })
 
-  test('uses full-width tabs and only mounts the active compact pane without overflow', async ({
+  test('uses compact tabs for supporting panes without overflow', async ({
     page,
   }) => {
     const issues = collectBrowserIssues(page)
     await page.goto('/')
 
     await expect(page.getByRole('button', { name: 'Code', exact: true })).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Story', exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Story', exact: true })).toHaveCount(0)
     await expect(page.getByRole('button', { name: 'Scene', exact: true })).toBeVisible()
 
     const initialMetrics = await page.evaluate(() => {
@@ -888,22 +892,25 @@ test.describe('mobile walkthrough', () => {
 
     expect(initialMetrics.tabsWidth).toBeGreaterThan(330)
     expect(Math.max(...initialMetrics.tabWidths) - Math.min(...initialMetrics.tabWidths)).toBeLessThanOrEqual(2)
-    expect(initialMetrics.codeCount).toBe(0)
+    expect(initialMetrics.codeCount).toBe(1)
     expect(initialMetrics.sceneCount).toBe(0)
     expect(initialMetrics.storyCount).toBe(1)
 
     await page.getByRole('button', { name: 'Scene', exact: true }).click()
     await expect(page.locator('.scene-panel')).toBeVisible()
     await expect(page.getByText(/drag to pan/i)).toBeVisible()
-    await expect(page.locator('.story-scene__story')).toHaveCount(0)
+    await expect(page.locator('.story-scene__story')).toContainText(
+      'See the readable history',
+    )
     await expect(page.locator('.code-column')).toHaveCount(0)
 
     await page.getByRole('button', { name: 'Code', exact: true }).click()
     await expect(page.locator('.code-viewer')).toBeVisible()
-    await expect(page.locator('.story-scene')).toHaveCount(0)
+    await expect(page.locator('.story-scene__story')).toContainText(
+      'See the readable history',
+    )
     await expect(page.locator('.scene-panel')).toHaveCount(0)
 
-    await page.getByRole('button', { name: 'Story', exact: true }).click()
     await expect(page.locator('.prediction-console')).toHaveCount(0)
     await expect(page.getByRole('button', { name: 'Next' })).toBeVisible()
     await expect(page.locator('.story-scene__story')).toContainText(
@@ -930,13 +937,12 @@ test.describe('mobile walkthrough', () => {
     expect(issues).toEqual([])
   })
 
-  test('opens inline glossary popins on Story and closes them when tabs change', async ({
+  test('opens inline glossary popins in the persistent explanation and closes them when tabs change', async ({
     page,
   }) => {
     const issues = collectBrowserIssues(page)
     await page.goto('/')
 
-    await page.getByRole('button', { name: 'Story', exact: true }).click()
     const trigger = firstAnnotationTrigger(page)
     await trigger.click()
     await expect(page.locator('.annotation-popup--inline')).toBeVisible()

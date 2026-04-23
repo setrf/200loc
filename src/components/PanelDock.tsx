@@ -44,16 +44,6 @@ export function PanelDock({
             <span className="panel-dock__button-title">Model viewer</span>
           </button>
         ) : null}
-        {collapsedPanels.story ? (
-          <button
-            type="button"
-            className="panel-dock__button panel-dock__button--story"
-            onClick={() => onTogglePanel('story')}
-            aria-label="Expand explanation panel"
-          >
-            <span className="panel-dock__button-title">Explanation</span>
-          </button>
-        ) : null}
       </div>
     </div>
   )

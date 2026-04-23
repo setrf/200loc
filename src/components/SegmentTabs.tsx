@@ -6,12 +6,11 @@ interface SegmentTabsProps {
   onChange: (tab: MobileTab) => void
 }
 
-const tabs: MobileTab[] = ['code', 'story', 'scene']
+const tabs: MobileTab[] = ['code', 'scene']
 
 export function SegmentTabs({ activeTab, onChange }: SegmentTabsProps) {
   const tabRefs = useRef<Record<MobileTab, HTMLButtonElement | null>>({
     code: null,
-    story: null,
     scene: null,
   })
 

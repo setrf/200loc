@@ -10,9 +10,7 @@ import {
 } from '../intro/storage'
 
 const TOKEN_INTRO_STEP_INDEX = introSteps.findIndex((step) => step.id === 'what-this-is')
-const NUMBERS_INTRO_STEP_INDEX = introSteps.findIndex(
-  (step) => step.id === 'tokens-become-numbers',
-)
+const TOKENIZATION_INTRO_STEP_INDEX = introSteps.findIndex((step) => step.id === 'what-this-is')
 
 function setMatchMedia(matches: boolean) {
   Object.defineProperty(window, 'matchMedia', {
@@ -37,7 +35,7 @@ describe('intro walkthrough', () => {
   it('renders the current intro step with simple progress and actions', () => {
     render(
       <IntroWalkthrough
-        activeStepIndex={NUMBERS_INTRO_STEP_INDEX}
+        activeStepIndex={TOKENIZATION_INTRO_STEP_INDEX}
         steps={introSteps}
         onBack={vi.fn()}
         onNext={vi.fn()}
@@ -47,7 +45,10 @@ describe('intro walkthrough', () => {
     )
 
     expect(
-      screen.getByText('Each token is turned into numbers.'),
+      screen.getByText((_, element) =>
+        element?.textContent ===
+        'Those ids become small number vectors the model can compare and transform.',
+      ),
     ).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Back' })).toBeEnabled()
     expect(screen.getByRole('button', { name: 'Next' })).toBeEnabled()
@@ -141,7 +142,7 @@ describe('intro walkthrough', () => {
   it('reuses the glossary popup system for selected intro terms', () => {
     setMatchMedia(true)
 
-    render(
+    const { container } = render(
       <IntroWalkthrough
         activeStepIndex={TOKEN_INTRO_STEP_INDEX}
         steps={introSteps}
@@ -151,6 +152,8 @@ describe('intro walkthrough', () => {
         onOpenLab={vi.fn()}
       />,
     )
+
+    expect(container.querySelectorAll('[data-glossary-id]').length).toBeGreaterThan(2)
 
     fireEvent.click(screen.getByRole('button', { name: 'token' }))
 

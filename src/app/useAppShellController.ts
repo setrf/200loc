@@ -47,7 +47,6 @@ export function useAppShellController({
   const [collapsedPanels, setCollapsedPanels] = useState<CollapsedPanels>({
     code: false,
     scene: false,
-    story: false,
   })
   const labTourSteps = useMemo(
     () => (isCompact ? mobileLabTourSteps : desktopLabTourSteps),

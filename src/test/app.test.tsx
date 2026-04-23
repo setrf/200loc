@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { INTRO_SEEN_STORAGE_KEY } from '../intro/storage'
 import { LAB_TOUR_SEEN_STORAGE_KEY } from '../labTour/storage'
 import type { PrefixNormalization } from '../model'
-import { inferencePhases } from '../walkthrough/phases'
+import { getCodeExplainerText, inferencePhases } from '../walkthrough/phases'
 import { loadBundle, makeTrace } from './helpers/fixtures'
 
 const loadModelBundleMock = vi.fn()
@@ -15,6 +15,8 @@ const phaseBeat = (index: number) =>
   inferencePhases[index]!.copy.beats[0]!.segments
     .map((segment) => segment.text)
     .join('')
+const phaseCodeExplainer = (index: number) =>
+  getCodeExplainerText(inferencePhases[index]!)
 const stepControlLabel = (index: number) =>
   `Current step: ${inferencePhases[index]!.stepTitle}. Technical stage: ${inferencePhases[index]!.groupTitle}. Step ${index + 1} of ${phaseCount}.`
 
@@ -297,9 +299,13 @@ describe('App', () => {
       'Step 1 of 34',
     )
     fireEvent.click(screen.getByRole('button', { name: 'Code' }))
+    expect(screen.getByLabelText('Step explanation')).toBeInTheDocument()
+    expect(screen.getByLabelText('Step controls')).toBeInTheDocument()
     expect(screen.getByText('microgpt.py')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Story' }))
-
+    fireEvent.click(screen.getByRole('button', { name: 'Scene' }))
+    expect(screen.getByLabelText('Step explanation')).toBeInTheDocument()
+    expect(screen.getByLabelText('Step controls')).toBeInTheDocument()
+    expect(screen.getByTestId('scene-viewport')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Play' }))
     fireEvent.click(screen.getByRole('button', { name: 'Show lab tour' }))
     expect(screen.getByRole('button', { name: 'Play' })).toBeInTheDocument()
@@ -337,12 +343,9 @@ describe('App', () => {
       ),
     ).toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Story' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Collapse' }))
     expect(
-      screen.getByRole('button', { name: 'Expand explanation panel' }),
-    ).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Expand explanation panel' }))
+      screen.queryByRole('button', { name: 'Expand explanation panel' }),
+    ).not.toBeInTheDocument()
     expect(screen.getByLabelText('Step explanation')).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: 'About' }))
@@ -372,7 +375,7 @@ describe('App', () => {
     })
   })
 
-  it('keeps the hidden-panel dock reachable when the compact code tab is collapsed', async () => {
+  it('keeps compact tabs usable even when a panel has been collapsed', async () => {
     Object.defineProperty(window, 'matchMedia', {
       writable: true,
       value: vi.fn((query: string) => ({
@@ -406,7 +409,10 @@ describe('App', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Code' }))
     fireEvent.click(screen.getByRole('button', { name: 'Collapse' }))
 
-    expect(screen.getByRole('button', { name: 'Expand code panel' })).toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: 'Expand code panel' }),
+    ).not.toBeInTheDocument()
+    expect(screen.getByText('microgpt.py')).toBeInTheDocument()
   })
 
   it.skip('applies the prefix when Enter is pressed and keeps the generated text current', async () => {
@@ -569,7 +575,7 @@ describe('App', () => {
     await Promise.resolve()
   })
 
-  it('collapses and expands the main panels', async () => {
+  it('collapses and expands supporting panels while keeping explanation visible', async () => {
     const runtime = makeRuntime()
     runtime.reset.mockResolvedValue({
       trace: makeTrace({ sampledTokenId: 26 }),
@@ -600,19 +606,17 @@ describe('App', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Expand code panel' }))
 
     fireEvent.click(document.querySelector('button[aria-controls="code-panel-body"]') as HTMLButtonElement)
-    fireEvent.click(screen.getAllByRole('button', { name: 'Collapse' })[0]!)
-    fireEvent.click(screen.getAllByRole('button', { name: 'Collapse' })[0]!)
+    fireEvent.click(document.querySelector('button[aria-controls="scene-panel-body"]') as HTMLButtonElement)
 
     expect(screen.queryByText('microgpt.py')).not.toBeInTheDocument()
     expect(screen.queryByTestId('scene-viewport')).not.toBeInTheDocument()
-    expect(screen.queryByLabelText('Step explanation')).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Step explanation')).toBeInTheDocument()
 
-    const expandButtons = screen.getAllByRole('button', { name: /Expand .* panel/ })
-    fireEvent.click(expandButtons[0]!)
-    fireEvent.click(screen.getAllByRole('button', { name: /Expand .* panel/ })[0]!)
-    fireEvent.click(screen.getAllByRole('button', { name: /Expand .* panel/ })[0]!)
+    fireEvent.click(screen.getByRole('button', { name: 'Expand code panel' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Expand model viewer panel' }))
 
     expect(screen.getByText('microgpt.py')).toBeInTheDocument()
+    expect(screen.getByTestId('scene-viewport')).toBeInTheDocument()
     expect(screen.getByLabelText('Step explanation')).toBeInTheDocument()
   })
 
@@ -641,7 +645,7 @@ describe('App', () => {
     render(<App />)
 
     await screen.findByText('AI is everywhere these days.')
-    for (let index = 0; index < 13; index += 1) {
+    for (let index = 0; index < 6; index += 1) {
       fireEvent.click(screen.getByRole('button', { name: 'Next' }))
     }
 
@@ -755,6 +759,9 @@ describe('App', () => {
     await screen.findByText('A complete tiny LLM, step by step')
     expect(screen.getByText('microgpt.py')).toBeInTheDocument()
     expect(screen.getAllByText('See the readable history').length).toBeGreaterThan(0)
+    expect(screen.getByLabelText('Code explainer')).toHaveTextContent(
+      'These lines build the visible prefix',
+    )
     expect(screen.queryByLabelText('Generated text')).not.toBeInTheDocument()
     expect(await screen.findByTestId('fallback-scene')).toBeInTheDocument()
     expect(findCodeLine('line 117').closest('li')).not.toHaveClass('is-active')
@@ -789,9 +796,15 @@ describe('App', () => {
       screen.getByLabelText(stepControlLabel(3)),
     ).toBeInTheDocument()
     expectStoryPanelToContain(phaseBeat(3))
+    expect(screen.getByLabelText('Code explainer')).toHaveTextContent(
+      phaseCodeExplainer(3),
+    )
 
     fireEvent.click(screen.getByRole('button', { name: 'Prev' }))
     expectStoryPanelToContain(phaseBeat(2))
+    expect(screen.getByLabelText('Code explainer')).toHaveTextContent(
+      phaseCodeExplainer(2),
+    )
     fireEvent.click(screen.getByRole('button', { name: 'Next' }))
 
     for (let index = 0; index < 12; index += 1) {
@@ -1574,7 +1587,9 @@ describe('App', () => {
 
     await screen.findByText('A complete tiny LLM, step by step')
 
-    fireEvent.click(document.querySelector('.annotation-trigger') as HTMLElement)
+    fireEvent.click(
+      document.querySelector('[data-glossary-id="context"]') as HTMLElement,
+    )
     expect(screen.getByRole('dialog', { hidden: true })).toHaveTextContent('Context')
 
     fireEvent.click(screen.getByRole('button', { name: 'Next' }))
@@ -1591,7 +1606,7 @@ describe('App', () => {
     })
   })
 
-  it('closes a compact-story popin when the user leaves the Story tab', async () => {
+  it('closes a compact explanation popin when the user switches supporting tabs', async () => {
     Object.defineProperty(window, 'matchMedia', {
       writable: true,
       value: vi.fn().mockReturnValue({

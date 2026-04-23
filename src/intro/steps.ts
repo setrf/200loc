@@ -1,4 +1,5 @@
 import type { GlossaryId } from '../walkthrough/glossary'
+import { autoAnnotateText } from '../walkthrough/autoGlossary'
 
 export type IntroLineSegment =
   | {
@@ -30,7 +31,11 @@ function term(value: string, glossaryId: GlossaryId): IntroLineSegment {
 }
 
 function line(...segments: IntroLineSegment[]): IntroLineDefinition {
-  return { segments }
+  return {
+    segments: segments.flatMap((segment) =>
+      segment.kind === 'text' ? autoAnnotateText(segment.text) : segment,
+    ),
+  }
 }
 
 export const introSteps: IntroStepDefinition[] = [
@@ -57,16 +62,16 @@ export const introSteps: IntroStepDefinition[] = [
           'At its core, it repeats a simple loop: read the text so far, score what could come next, and choose one token.',
         ),
       ),
-      line(text('The scale is huge, but the building blocks are learnable.')),
-    ],
-  },
-  {
-    id: 'whole-thing',
-    title: 'See the whole thing',
-    lines: [
-      line(text('This app keeps the complete code, model architecture, and every inference step side by side.')),
-      line(text('Nothing important is hidden behind an API call.')),
-      line(text('By the end, you have seen the pieces needed to build a tiny LLM.')),
+      line(
+        text(
+          'This app keeps the complete code, model architecture, and every inference step side by side.',
+        ),
+      ),
+      line(
+        text(
+          'Nothing important is hidden behind an API call; the scale is huge, but the building blocks are learnable.',
+        ),
+      ),
     ],
   },
   {
@@ -82,39 +87,21 @@ export const introSteps: IntroStepDefinition[] = [
   },
   {
     id: 'what-this-is',
-    title: 'What this is',
-    lines: [
-      line(text('A language model keeps guessing what should come next.')),
-      line(text('It does not write the whole answer at once.')),
-      line(
-        text('It builds the answer one '),
-        term('token', 'token'),
-        text(' at a time.'),
-      ),
-    ],
-  },
-  {
-    id: 'text-becomes-tokens',
     title: 'Text becomes tokens',
     lines: [
-      line(text('The model cannot work with raw text directly.')),
       line(
-        text('It first breaks text into smaller pieces called '),
+        text('microgpt does not read raw text directly. It turns the starting text into '),
+        term('token', 'token'),
+        text(' ids first.'),
+      ),
+      line(
+        text('In this tiny model, the '),
         term('tokens', 'token'),
-        text('.'),
+        text(' are just lowercase characters plus a beginning marker.'),
       ),
-      line(text('A token can be a word, part of a word, or punctuation.')),
-    ],
-  },
-  {
-    id: 'tokens-become-numbers',
-    title: 'Tokens become numbers',
-    lines: [
-      line(text('Each token is turned into numbers.')),
       line(
-        text('Those numbers give the model something it can compare and transform.'),
+        text('Those ids become small number vectors the model can compare and transform.'),
       ),
-      line(text('You can think of them as a compact description of the token.')),
     ],
   },
   {
@@ -132,66 +119,21 @@ export const introSteps: IntroStepDefinition[] = [
   },
   {
     id: 'scores-next-tokens',
-    title: 'It scores possible next tokens',
+    title: 'It scores, chooses, repeats',
     lines: [
       line(
-        text('After reading the visible text, the model scores many possible next tokens.'),
+        text('After reading the visible text, the model scores every possible next character.'),
       ),
-      line(text('Some options look stronger than others.')),
-      line(text('Higher scores mean a continuation looks more likely in that moment.')),
-    ],
-  },
-  {
-    id: 'chooses-one',
-    title: 'It chooses one',
-    lines: [
-      line(text('Those scores are turned into chances.')),
       line(
-        text('Then one token is chosen through '),
+        text('Those scores become chances, and one character is chosen through '),
         term('sampling', 'sampling'),
         text('.'),
       ),
       line(
         term('Temperature', 'temperature'),
-        text(' changes how safe or adventurous that choice feels.'),
+        text(' changes how predictable or surprising that choice feels.'),
       ),
-    ],
-  },
-  {
-    id: 'repeats',
-    title: 'It repeats',
-    lines: [
-      line(text('Once a token is chosen, it is added to the text.')),
-      line(text('Then the model runs the same process again.')),
-      line(text('That repeating loop is how full sentences appear.')),
-    ],
-  },
-  {
-    id: 'how-it-learned',
-    title: 'How it learned',
-    lines: [
-      line(
-        text('Before you use the model, it spends a long time adjusting its weights on lots of text.'),
-      ),
-      line(
-        text('That process is called '),
-        term('training', 'training'),
-        text('.'),
-      ),
-      line(text('This site shows the trained model making predictions, not training itself.')),
-    ],
-  },
-  {
-    id: 'why-it-fails',
-    title: 'Why it still fails',
-    lines: [
-      line(text('A language model can sound fluent without being right.')),
-      line(text('It predicts likely continuations, not guaranteed truth.')),
-      line(
-        text('That is why it can '),
-        term('hallucinate', 'hallucination'),
-        text(' or miss facts.'),
-      ),
+      line(text('The chosen character is added to the text, and the same loop runs again.')),
     ],
   },
   {
