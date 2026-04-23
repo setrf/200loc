@@ -12,6 +12,9 @@ const runtimeCtorMock = vi.fn()
 const firstBeat = inferencePhases[0]!.copy.beats[0]!.segments
   .map((segment) => segment.text)
   .join('')
+const phaseCount = inferencePhases.length
+const stepControlLabel = (index: number) =>
+  `Current step: ${inferencePhases[index]!.stepTitle}. Technical stage: ${inferencePhases[index]!.groupTitle}. Step ${index + 1} of ${phaseCount}.`
 
 vi.mock('../model', () => ({
   loadModelBundle: loadModelBundleMock,
@@ -143,7 +146,7 @@ describe('App forced control branches', () => {
       })
     }
 
-    await screen.findByText('Append Or Stop')
+    await screen.findByLabelText(stepControlLabel(33))
 
     expect(runtime.advance).not.toHaveBeenCalled()
 

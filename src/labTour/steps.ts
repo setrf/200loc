@@ -14,14 +14,14 @@ export const desktopLabTourSteps: LabTourStepDefinition[] = [
     targetId: 'stage',
     title: 'This tells you where you are',
     description:
-      'The stage badge shows which part of the 34-step loop you are looking at right now.',
+      'The step title names the exact part of the 34-step prediction you are looking at right now.',
   },
   {
     id: 'controls',
     targetId: 'controls',
     title: 'This is how you drive the walkthrough',
     description:
-      'Edit the name prefix here. Reset restarts microgpt from that prefix. Prev, Next, and Play move the explanation forward.',
+      'Use Reset, Prev, Play, and Next to move through the same prediction one step at a time.',
   },
   {
     id: 'code',
@@ -59,7 +59,7 @@ export const mobileLabTourSteps: LabTourStepDefinition[] = [
     targetId: 'controls',
     title: 'This is how you drive the walkthrough',
     description:
-      'Edit the name prefix here. Reset restarts microgpt from that prefix. Prev, Next, and Play move the explanation forward.',
+      'Use Reset, Prev, Play, and Next to move through the same prediction one step at a time.',
     mobileTab: 'story',
   },
   {

@@ -28,7 +28,7 @@ describe('model card layout', () => {
     expect(layout.titleFontScale).toBeGreaterThanOrEqual(scale.lg)
     expect(layout.paramLabelScale).toBeGreaterThanOrEqual(scale.xs)
     expect(layout.paramValueScale).toBeGreaterThanOrEqual(scale.sm)
-    expect(layout.br.x - layout.tl.x).toBeLessThanOrEqual(102)
+    expect(layout.br.x - layout.tl.x).toBeLessThanOrEqual(126)
   })
 
   it('keeps the overview card visible as manual zoom moves into the model', () => {

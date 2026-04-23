@@ -6,11 +6,11 @@ export interface ModelIdentity {
 }
 
 export function buildModelIdentity(bundle: ModelBundle): ModelIdentity {
-  const { config, training } = bundle
+  const { training } = bundle
   const trainingDocs = training?.docs.toLocaleString('en-US') ?? '32,033'
 
   return {
-    summary: `${trainingDocs} lowercase names -> one character at a time`,
-    detail: `microgpt - browser-local - ${config.nLayer} layer - ${config.nHead} attention heads - ${config.nEmbd}-wide vectors - ${config.blockSize}-character context`,
+    summary: `microgpt · browser-local · ${trainingDocs} lowercase names · one character at a time`,
+    detail: `Start with a few lowercase letters, then step through one next-character prediction.`,
   }
 }

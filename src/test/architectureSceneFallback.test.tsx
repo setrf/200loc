@@ -84,6 +84,9 @@ describe('ArchitectureScene fallback hover path', () => {
       />,
     )
 
+    expect(screen.getByText('Static model map')).toBeInTheDocument()
+    expect(screen.getByText('Readable history for this moment')).toBeInTheDocument()
+
     const viewport = screen.getByTestId('scene-viewport')
     vi.spyOn(viewport, 'getBoundingClientRect').mockReturnValue({
       x: 0,

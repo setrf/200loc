@@ -19,6 +19,7 @@ interface WalkthroughLayoutViewModel {
 }
 
 interface WalkthroughLayoutProps {
+  activePhaseIndex: number
   activeRanges: LineRange[]
   collapsedPanels: CollapsedPanels
   contextTokens: string[]
@@ -29,6 +30,7 @@ interface WalkthroughLayoutProps {
   onFocusRanges: (ranges: LineRange[] | null) => void
   onTogglePanel: (panel: PanelKey) => void
   phase: PhaseDefinition
+  phaseCount: number
   sceneModelData: SceneModelData
   source: string
   tokenLabel: (tokenId: number) => string
@@ -37,6 +39,7 @@ interface WalkthroughLayoutProps {
 }
 
 export function WalkthroughLayout({
+  activePhaseIndex,
   activeRanges,
   collapsedPanels,
   contextTokens,
@@ -47,12 +50,26 @@ export function WalkthroughLayout({
   onFocusRanges,
   onTogglePanel,
   phase,
+  phaseCount,
   sceneModelData,
   source,
   tokenLabel,
   trace,
   viewModel,
 }: WalkthroughLayoutProps) {
+  const stepLabel = `Step ${activePhaseIndex + 1} of ${phaseCount}`
+  const stageProps = {
+    'data-lab-tour': 'stage',
+    'data-group-title': phase.groupTitle,
+    'data-step-label': stepLabel,
+    'aria-label': `Current step: ${phase.stepTitle}. Technical stage: ${phase.groupTitle}. ${stepLabel}.`,
+    tabIndex: 0,
+    onMouseEnter: () => onFocusRanges(phase.codeRanges),
+    onMouseLeave: () => onFocusRanges(null),
+    onFocus: () => onFocusRanges(phase.codeRanges),
+    onBlur: () => onFocusRanges(null),
+  }
+
   const renderHiddenPanelsDock = (className?: string) => (
     <PanelDock
       className={className}
@@ -65,45 +82,24 @@ export function WalkthroughLayout({
   const toolbarPanel = (
     <div className="story-scene__toolbar">
       <div className="story-scene__toolbar-main">
-        <div className="story-scene__toolbar-panel" data-lab-tour="controls">
-          {controlsPanelContent}
-        </div>
-
         {renderHiddenPanelsDock()}
       </div>
     </div>
   )
 
   const desktopTopPanel = !isCompact ? (
-    <section className="panel-shell desktop-top-panel">
-      <div className="desktop-top-panel__body">
-        <div
-          className={`desktop-top-panel__main${
-            viewModel.showDesktopStoryPanel ? '' : ' is-single'
-          }`}
-        >
-          <div
-            className={`desktop-top-panel__controls${
-              viewModel.showDesktopStoryPanel ? '' : ' is-full'
-            }`}
-            data-lab-tour="controls"
-          >
-            {controlsPanelContent}
-          </div>
-
-          {viewModel.showDesktopStoryPanel ? (
-            <div className="desktop-top-panel__story" data-lab-tour="story">
-              <div className="desktop-top-panel__story-header">
-                <span className="panel-shell__title">Explanation</span>
-                <button
-                  type="button"
-                  className="panel-shell__toggle"
-                  onClick={() => onTogglePanel('story')}
-                  aria-expanded="true"
-                  aria-controls="story-panel-body"
-                >
-                  Collapse
-                </button>
+    viewModel.showDesktopStoryPanel ? (
+      <section
+        className={`panel-shell desktop-top-panel${
+          viewModel.hasCollapsedPanels ? ' desktop-top-panel--with-dock' : ''
+        }`}
+      >
+        <div className="desktop-top-panel__body">
+          <div className="desktop-top-panel__story" data-lab-tour="story">
+            <div className="desktop-top-panel__story-copy">
+              <div className="panel-shell__heading" {...stageProps}>
+                <span className="panel-shell__title">Current step</span>
+                <span className="panel-shell__subtitle">{phase.stepTitle}</span>
               </div>
               <div id="story-panel-body" className="desktop-top-panel__story-body">
                 <Controls
@@ -112,12 +108,28 @@ export function WalkthroughLayout({
                 />
               </div>
             </div>
-          ) : null}
-        </div>
+            <div className="desktop-top-panel__story-tools">
+              {controlsPanelContent}
+              <button
+                type="button"
+                className="panel-shell__toggle"
+                onClick={() => onTogglePanel('story')}
+                aria-expanded="true"
+                aria-controls="story-panel-body"
+              >
+                Collapse
+              </button>
+            </div>
+          </div>
 
-        {renderHiddenPanelsDock('panel-dock-shell--inline')}
-      </div>
-    </section>
+          {renderHiddenPanelsDock('panel-dock-shell--inline')}
+        </div>
+      </section>
+    ) : viewModel.hasCollapsedPanels ? (
+      <section className="panel-shell desktop-dock-panel">
+        {renderHiddenPanelsDock('panel-dock-shell--compact')}
+      </section>
+    ) : null
   ) : null
 
   const storyPanel = (
@@ -127,16 +139,22 @@ export function WalkthroughLayout({
     >
       <div className="panel-shell panel-shell--story">
         <div className="panel-shell__header">
-          <span className="panel-shell__title">Explanation</span>
-          <button
-            type="button"
-            className="panel-shell__toggle"
-            onClick={() => onTogglePanel('story')}
-            aria-expanded="true"
-            aria-controls="story-panel-body"
-          >
-            Collapse
-          </button>
+          <div className="panel-shell__heading" {...stageProps}>
+            <span className="panel-shell__title">Current step</span>
+            <span className="panel-shell__subtitle">{phase.stepTitle}</span>
+          </div>
+          <div className="panel-shell__header-tools">
+            {controlsPanelContent}
+            <button
+              type="button"
+              className="panel-shell__toggle"
+              onClick={() => onTogglePanel('story')}
+              aria-expanded="true"
+              aria-controls="story-panel-body"
+            >
+              Collapse
+            </button>
+          </div>
         </div>
         <div id="story-panel-body" className="panel-shell__body">
           <Controls

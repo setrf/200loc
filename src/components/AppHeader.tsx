@@ -14,9 +14,6 @@ export function AppHeader({
       <div>
         <p className="eyebrow">200loc</p>
         <h2 className="app-header__title">A complete tiny LLM, step by step</h2>
-        <p className="app-header__subtitle">
-          Follow microgpt through code, architecture, and every inference stage.
-        </p>
       </div>
       <div className="app-header__actions">
         <button

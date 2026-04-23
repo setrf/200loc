@@ -316,9 +316,14 @@ export function ArchitectureScene({
           {renderMode === 'loading' ? (
             <div className="scene-panel__loading">loading scene…</div>
           ) : null}
-          {renderMode === 'fallback' && renderIssue ? (
-            <div className="scene-panel__loading scene-panel__loading--error">
-              {renderIssue}
+          {renderMode === 'fallback' ? (
+            <div className="scene-panel__fallback-card" role="status">
+              <span className="eyebrow">Static model map</span>
+              <strong>{phase.sceneCopy.windowTitle}</strong>
+              <p>{phase.sceneCopy.windowSubtitle}</p>
+              {renderIssue ? (
+                <p className="scene-panel__fallback-issue">{renderIssue}</p>
+              ) : null}
             </div>
           ) : null}
         </div>

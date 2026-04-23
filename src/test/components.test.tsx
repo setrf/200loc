@@ -600,6 +600,11 @@ describe('ui components', () => {
     fireEvent.keyDown(dialog, { key: 'Escape' })
     expect(onClose).not.toHaveBeenCalled()
 
+    expect(screen.getByRole('link', { name: 'github.com/setrf/200loc' })).toHaveAttribute(
+      'href',
+      'https://github.com/setrf/200loc',
+    )
+
     const linkedInLink = screen.getByRole('link', {
       name: 'linkedin.com/in/mert-gulsun',
     })
@@ -721,7 +726,11 @@ describe('ui components', () => {
     expect(screen.getByText('drag to pan · wheel to zoom · double click to reset')).toBeInTheDocument()
     expect(screen.queryByText('Original llm-viz')).not.toBeInTheDocument()
     expect(screen.queryByTestId('vendored-layer-view')).not.toBeInTheDocument()
-    expect(screen.queryByText('Readable history for this moment')).not.toBeInTheDocument()
+    expect(screen.getByText('Static model map')).toBeInTheDocument()
+    expect(screen.getByText('Readable history for this moment')).toBeInTheDocument()
+    expect(
+      screen.getByText('The model can read the current slot and every earlier visible slot.'),
+    ).toBeInTheDocument()
     expect(
       screen.getByLabelText('Architecture scene').getAttribute('style'),
     ).toContain('--scene-viz-viewport-bg')

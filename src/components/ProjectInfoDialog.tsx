@@ -86,7 +86,20 @@ export function ProjectInfoDialog({ onClose }: ProjectInfoDialogProps) {
         </p>
 
         <div className="project-splash__section">
-          <p className="project-splash__label">Links</p>
+          <p className="project-splash__label">Source code</p>
+          <div className="project-splash__links">
+            <a
+              href="https://github.com/setrf/200loc"
+              target="_blank"
+              rel="noreferrer"
+            >
+              github.com/setrf/200loc
+            </a>
+          </div>
+        </div>
+
+        <div className="project-splash__section">
+          <p className="project-splash__label">Follow me on</p>
           <div className="project-splash__links">
             <a href="https://mertgulsun.com/" target="_blank" rel="noreferrer">
               mertgulsun.com

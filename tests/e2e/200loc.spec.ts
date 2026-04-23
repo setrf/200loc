@@ -60,11 +60,15 @@ async function activeLineNumbers(page: Page) {
 }
 
 async function stepLabel(page: Page) {
-  return (await page.locator('.scene-panel__stage-step').textContent())?.trim() ?? ''
+  return (
+    (await page.locator('[data-lab-tour="stage"]').getAttribute('data-step-label')) ?? ''
+  )
 }
 
 async function phaseLabel(page: Page) {
-  return (await page.locator('.scene-panel__stage-chip strong').textContent())?.trim() ?? ''
+  return (
+    (await page.locator('[data-lab-tour="stage"]').getAttribute('data-group-title')) ?? ''
+  )
 }
 
 async function stepTitleLabel(page: Page) {
@@ -142,24 +146,16 @@ test.describe('desktop walkthrough', () => {
     ).toBeVisible()
   })
 
-  test('normalizes prefix input immediately and hydrates the expected deterministic state', async ({
+  test('hydrates the expected deterministic state without extra console chrome', async ({
     page,
   }) => {
     const issues = collectBrowserIssues(page)
-    const prefix = page.getByRole('textbox', { name: 'Name prefix' })
-
-    await prefix.fill('Em-12??')
-    await expect(prefix).toHaveValue('em')
-
-    await prefix.fill('abcdefghijklmnopqrstuvwxyz')
-    await expect(prefix).toHaveValue('abcdefghijklmno')
-
-    await prefix.fill('em')
-    await page.getByRole('button', { name: /Reset|Apply text/ }).click()
 
     await expect(page.locator('.story-panel__summary')).toContainText(
       'small piece of text it is allowed to use',
     )
+    await expect(page.locator('.prediction-console')).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Next' })).toBeVisible()
     expect(issues).toEqual([])
   })
 
@@ -268,19 +264,23 @@ test.describe('desktop walkthrough', () => {
 
   test('crosses the token boundary cleanly after the thirty-fourth step', async ({ page }) => {
     const issues = collectBrowserIssues(page)
-    await page.getByRole('textbox', { name: 'Name prefix' }).fill('em')
-    await page.getByRole('button', { name: /Reset|Apply text/ }).click()
-    await expect(page.locator('.scene-panel__stage-chip')).toContainText('Tokenize Prefix')
+    await expect(page.locator('[data-lab-tour="stage"]')).toHaveAttribute(
+      'data-group-title',
+      'Tokenize Prefix',
+    )
+    await expect(page.locator('.desktop-top-panel__story')).toContainText(
+      'See the readable history',
+    )
 
     for (let index = 0; index < 33; index += 1) {
       await advanceOnePhase(page)
     }
 
-    expect(await stepLabel(page)).toBe('step 34 / 34')
+    expect(await stepLabel(page)).toBe('Step 34 of 34')
     expect(await phaseLabel(page)).toBe('Append Or Stop')
 
     await advanceOnePhase(page)
-    expect(await stepLabel(page)).toBe('step 1 / 34')
+    expect(await stepLabel(page)).toBe('Step 1 of 34')
     expect(await phaseLabel(page)).toBe('Tokenize Prefix')
     expect(await stepTitleLabel(page)).toBe(
       'The model starts by checking the small piece of text it is allowed to use for this decision.',
@@ -307,27 +307,15 @@ test.describe('desktop walkthrough', () => {
     expect(issues).toEqual([])
   })
 
-  test('treats edited name prefix as a draft until the user applies it', async ({ page }) => {
+  test('keeps compact step controls in the lesson header', async ({ page }) => {
     const issues = collectBrowserIssues(page)
-    const prefix = page.getByRole('textbox', { name: 'Name prefix' })
-    const currentText = page.getByLabel('Current text')
-
-    await prefix.fill('em')
-    await page.getByRole('button', { name: /Reset|Apply text/ }).click()
-    await expect(currentText).toContainText('em')
 
     await page.getByRole('button', { name: 'Play' }).click()
     await expect(page.getByRole('button', { name: 'Pause' })).toBeVisible()
-
-    await prefix.fill('emi')
-
-    await expect(page.getByRole('button', { name: 'Apply text' })).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Play' })).toBeDisabled()
-    await expect(page.getByRole('button', { name: 'Next' })).toBeDisabled()
-    await expect(currentText).toContainText('em')
-    await expect(page.locator('.story-panel__field-note')).toContainText(
-      'Apply text to restart microgpt from your draft',
-    )
+    await page.getByRole('button', { name: 'Pause' }).click()
+    await expect(page.getByRole('button', { name: 'Reset' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Prev' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Next' })).toBeVisible()
     expect(issues).toEqual([])
   })
 
@@ -498,7 +486,7 @@ test.describe('desktop walkthrough', () => {
       seenSteps.add(await stepTitleLabel(page))
     }
 
-    expect(await stepLabel(page)).toBe('step 34 / 34')
+    expect(await stepLabel(page)).toBe('Step 34 of 34')
     expect(seenSteps.size).toBe(34)
     expect(issues).toEqual([])
   })
@@ -619,7 +607,10 @@ test.describe('desktop walkthrough', () => {
     for (let index = 0; index < 10; index += 1) {
       await advanceOnePhase(page)
     }
-    await expect(page.locator('.scene-panel__stage-chip')).toContainText('Q / K / V')
+    await expect(page.locator('[data-lab-tour="stage"]')).toHaveAttribute(
+      'data-group-title',
+      'Q / K / V',
+    )
     await page.waitForTimeout(500)
 
     const hoverPoint = await findHoverablePoint(page, eventSurface)
@@ -735,7 +726,7 @@ test.describe('intro walkthrough', () => {
     await expect(page.getByRole('dialog', { name: 'Lab tour' })).toBeVisible()
     await expect(
       page.getByText(
-        'The stage badge shows which part of the 34-step loop you are looking at right now.',
+        'The step title names the exact part of the 34-step prediction you are looking at right now.',
       ),
     ).toBeVisible()
     const tour = page.getByRole('dialog', { name: 'Lab tour' })
@@ -913,9 +904,24 @@ test.describe('mobile walkthrough', () => {
     await expect(page.locator('.scene-panel')).toHaveCount(0)
 
     await page.getByRole('button', { name: 'Story', exact: true }).click()
-    await expect(page.getByRole('textbox', { name: 'Name prefix' })).toBeVisible()
+    await expect(page.locator('.prediction-console')).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Next' })).toBeVisible()
+    await expect(page.locator('.story-scene__story')).toContainText(
+      'See the readable history',
+    )
+    await expect(page.getByText('Current step')).toBeVisible()
     await expect(page.locator('.story-scene__story')).toHaveCount(1)
     await expect(page.locator('.scene-panel')).toHaveCount(0)
+
+    const storyPlacement = await page.evaluate(() => {
+      const controls = document.querySelector('[data-lab-tour="controls"]')?.getBoundingClientRect()
+      const story = document.querySelector('.story-scene__story')?.getBoundingClientRect()
+      return {
+        controlsTop: controls?.top ?? 0,
+        storyTop: story?.top ?? 0,
+      }
+    })
+    expect(storyPlacement.controlsTop).toBeGreaterThanOrEqual(storyPlacement.storyTop)
 
     const overflow = await page.evaluate(
       () => document.documentElement.scrollWidth - window.innerWidth,

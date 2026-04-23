@@ -56,7 +56,7 @@ export function computeModelCardLayout(
     theme: MicroVizTheme = getCurrentMicroVizTheme(),
 ) : IModelCardLayoutMetrics {
     let scale = theme.typography.scale;
-    const innerPaddingX = 8;
+    const innerPaddingX = 12;
     const titleTopPadding = 4;
     const contentGap = 4;
     const bottomPadding = 5;
@@ -70,8 +70,8 @@ export function computeModelCardLayout(
     const minParamLabelScale = scale.xs;
     const minParamValueScale = scale.sm;
 
-    const minInnerWidth = 74;
-    const maxInnerWidth = 102;
+    const minInnerWidth = 96;
+    const maxInnerWidth = 126;
 
     const preferredTitleWidth = titleWidthAtUnitScale * preferredTitleScale;
     const preferredParamWidth =

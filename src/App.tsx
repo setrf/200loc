@@ -19,7 +19,6 @@ export default function App() {
     advance,
     dispatch,
     handleFocusRanges,
-    handlePrefixChange,
     hydrate,
     modelIdentity,
     sceneModelData,
@@ -102,7 +101,6 @@ export default function App() {
   }
 
   const tokenLabel = tokenizer.tokenLabel
-  const currentText = tokenizer.decode(state.sequenceTokenIds)
   const viewModel = buildWalkthroughViewModel({
     collapsedPanels,
     isCompact,
@@ -118,29 +116,21 @@ export default function App() {
     canPrev,
     contextTokens,
     controlsLocked,
-    currentTextStatus,
-    hasPendingPrefixChange,
     layoutStyle,
     navigationBlocked,
   } = viewModel
 
   const controlsPanelContent = (
     <WalkthroughControls
-      activePhaseIndex={state.activePhaseIndex}
       canNext={canNext}
       canPrev={canPrev}
       controlsLocked={controlsLocked}
-      currentText={currentText}
-      currentTextStatus={currentTextStatus}
-      hasPendingPrefixChange={hasPendingPrefixChange}
       isPlaying={state.status === 'playing'}
-      modelIdentity={modelIdentity}
       navigationBlocked={navigationBlocked}
       onApplyPrefix={() => {
         dispatch({ type: 'setPlaying', playing: false })
         void hydrate(state.prefixInput)
       }}
-      onFocusRanges={handleFocusRanges}
       onNext={() => {
         dispatch({ type: 'setPlaying', playing: false })
         void advance()
@@ -152,14 +142,10 @@ export default function App() {
           dispatch({ type: 'setPlaying', playing: true })
         }
       }}
-      onPrefixChange={handlePrefixChange}
       onPrev={() => {
         dispatch({ type: 'setPlaying', playing: false })
         dispatch({ type: 'phasePrev', phaseCount })
       }}
-      phase={phase}
-      phaseCount={phaseCount}
-      prefixInput={state.prefixInput}
     />
   )
 
@@ -179,6 +165,7 @@ export default function App() {
       </div>
 
       <WalkthroughLayout
+        activePhaseIndex={state.activePhaseIndex}
         activeRanges={activeRanges}
         collapsedPanels={collapsedPanels}
         contextTokens={contextTokens}
@@ -189,6 +176,7 @@ export default function App() {
         onFocusRanges={handleFocusRanges}
         onTogglePanel={togglePanel}
         phase={phase}
+        phaseCount={phaseCount}
         sceneModelData={sceneModelData}
         source={source}
         tokenLabel={tokenLabel}
