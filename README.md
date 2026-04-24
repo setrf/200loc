@@ -49,3 +49,9 @@ npm run test:e2e
 ```
 
 Use `npm run test:e2e:headed` for a headed browser pass.
+
+## Credits
+
+`200loc` pays respect to [Andrej Karpathy](https://github.com/karpathy) for
+`microgpt` and to Brendan Bycroft for
+[LLM Visualization](https://bbycroft.net/llm), which inspired the model viewer.
