@@ -12,6 +12,7 @@ interface AnnotationPopupProps {
   anchorRect?: DOMRect | null
   entry: GlossaryEntry
   mode: 'floating' | 'inline'
+  onDismiss?: () => void
   onMouseEnter?: MouseEventHandler<HTMLDivElement>
   onMouseLeave?: MouseEventHandler<HTMLDivElement>
 }
@@ -24,7 +25,7 @@ function clamp(value: number, min: number, max: number) {
 
 export const AnnotationPopup = forwardRef<HTMLDivElement, AnnotationPopupProps>(
   function AnnotationPopup(
-    { anchorRect, entry, mode, onMouseEnter, onMouseLeave },
+    { anchorRect, entry, mode, onDismiss, onMouseEnter, onMouseLeave },
     ref,
   ) {
     const [style, setStyle] = useState<{ top: number; left: number } | null>(null)
@@ -93,6 +94,16 @@ export const AnnotationPopup = forwardRef<HTMLDivElement, AnnotationPopupProps>(
       >
         <div className="annotation-popup__header">
           <h3 className="annotation-popup__title">{entry.title}</h3>
+          {onDismiss ? (
+            <button
+              type="button"
+              className="annotation-popup__close"
+              aria-label={`Close ${entry.title} explainer`}
+              onClick={onDismiss}
+            >
+              Close
+            </button>
+          ) : null}
         </div>
         <p className="annotation-popup__summary">{entry.shortDefinition}</p>
         <div className="annotation-popup__body">

@@ -7,6 +7,7 @@ import {
   type PhaseDefinition,
 } from '../walkthrough/phases'
 import type { MobileTab } from '../walkthrough/reducer'
+import { getPhaseTheme } from '../walkthrough/phaseTheme'
 import type { SceneModelData } from '../viz/llmViz/types'
 import { ArchitectureScene } from './ArchitectureScene'
 import { CodeViewer } from './CodeViewer'
@@ -69,6 +70,11 @@ export function WalkthroughLayout({
   viewModel,
 }: WalkthroughLayoutProps) {
   const stepLabel = `Step ${activePhaseIndex + 1} of ${phaseCount}`
+  const phaseTheme = getPhaseTheme(phase.groupId)
+  const walkthroughStyle = {
+    ...phaseTheme.cssVars,
+    ...layoutStyle,
+  }
   const codeExplainer = lineRangesMatch(activeRanges, phase.codeRanges)
     ? getCodeExplainerText(phase)
     : ''
@@ -170,7 +176,9 @@ export function WalkthroughLayout({
     return (
       <main
         className="walkthrough-layout walkthrough-layout--compact"
-        style={layoutStyle}
+        style={walkthroughStyle}
+        data-phase-family={phaseTheme.family}
+        data-phase-group={phase.groupId}
       >
         {storyPanel}
 
@@ -247,7 +255,9 @@ export function WalkthroughLayout({
   return (
     <main
       className="walkthrough-layout"
-      style={layoutStyle}
+      style={walkthroughStyle}
+      data-phase-family={phaseTheme.family}
+      data-phase-group={phase.groupId}
     >
       {desktopTopPanel}
 

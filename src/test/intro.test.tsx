@@ -11,6 +11,9 @@ import {
 
 const TOKEN_INTRO_STEP_INDEX = introSteps.findIndex((step) => step.id === 'what-this-is')
 const TOKENIZATION_INTRO_STEP_INDEX = introSteps.findIndex((step) => step.id === 'what-this-is')
+const PUNCTUATION_INTRO_STEP_INDEX = introSteps.findIndex(
+  (step) => step.id === 'llms-are-simple',
+)
 
 function setMatchMedia(matches: boolean) {
   Object.defineProperty(window, 'matchMedia', {
@@ -52,6 +55,36 @@ describe('intro walkthrough', () => {
     ).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Back' })).toBeEnabled()
     expect(screen.getByRole('button', { name: 'Next' })).toBeEnabled()
+  })
+
+  it('keeps intro punctuation attached to the preceding segment', () => {
+    const { container } = render(
+      <IntroWalkthrough
+        activeStepIndex={PUNCTUATION_INTRO_STEP_INDEX}
+        steps={introSteps}
+        onBack={vi.fn()}
+        onNext={vi.fn()}
+        onSkip={vi.fn()}
+        onOpenLab={vi.fn()}
+      />,
+    )
+
+    const architectureTrigger = screen.getByRole('button', {
+      name: 'model architecture',
+    })
+    expect(architectureTrigger).toBeInTheDocument()
+
+    const attachedPunctuation = architectureTrigger.closest(
+      '.intro-step__punctuation-keep',
+    )
+    expect(attachedPunctuation).toHaveTextContent('model architecture,')
+    expect(architectureTrigger).toHaveTextContent('model architecture')
+    expect(architectureTrigger).not.toHaveTextContent('model architecture,')
+
+    const lineChildren = Array.from(container.querySelectorAll('.intro-step__line > *'))
+    expect(
+      lineChildren.some((node) => node.textContent?.trimStart().startsWith(',')),
+    ).toBe(false)
   })
 
   it('uses the final call to action on the last step', () => {

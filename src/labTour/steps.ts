@@ -19,9 +19,9 @@ export const desktopLabTourSteps: LabTourStepDefinition[] = [
   {
     id: 'controls',
     targetId: 'controls',
-    title: 'This is how you drive the walkthrough',
+    title: 'Use these controls to move step by step',
     description:
-      'Use Reset, Prev, Play, and Next to move through the same prediction one step at a time.',
+      'The controls stay with the explanation so you can move through the same prediction one step at a time.',
   },
   {
     id: 'code',
@@ -57,9 +57,9 @@ export const mobileLabTourSteps: LabTourStepDefinition[] = [
   {
     id: 'controls',
     targetId: 'controls',
-    title: 'This is how you drive the walkthrough',
+    title: 'Use these controls to move step by step',
     description:
-      'Use Reset, Prev, Play, and Next to move through the same prediction one step at a time.',
+      'The controls stay with the explanation so you can move through the same prediction one step at a time.',
   },
   {
     id: 'code',

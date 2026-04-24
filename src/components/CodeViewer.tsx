@@ -8,10 +8,25 @@ interface CodeViewerProps {
   codeExplainer: string
 }
 
-function isLineActive(lineNumber: number, activeRanges: LineRange[]) {
-  return activeRanges.some(
+function getActiveLineClasses(lineNumber: number, activeRanges: LineRange[]) {
+  const activeRange = activeRanges.find(
     (range) => lineNumber >= range.start && lineNumber <= range.end,
   )
+  if (!activeRange) {
+    return ''
+  }
+
+  const classes = ['is-active']
+  if (lineNumber === activeRange.start) {
+    classes.push('is-active-start')
+  }
+  if (lineNumber === activeRange.end) {
+    classes.push('is-active-end')
+  }
+  if (activeRange.start === activeRange.end) {
+    classes.push('is-active-single')
+  }
+  return classes.join(' ')
 }
 
 function firstActiveLineNumber(activeRanges: LineRange[]) {
@@ -68,7 +83,7 @@ export function CodeViewer({ source, activeRanges, codeExplainer }: CodeViewerPr
       <ol className="code-viewer__lines" ref={linesRef}>
         {highlightedLines.map((line, index) => {
           const lineNumber = index + 1
-          const active = isLineActive(lineNumber, activeRanges)
+          const activeClasses = getActiveLineClasses(lineNumber, activeRanges)
           const showExplainer =
             lineNumber === activeLineNumber && trimmedCodeExplainer.length > 0
           return (
@@ -79,14 +94,14 @@ export function CodeViewer({ source, activeRanges, codeExplainer }: CodeViewerPr
                   aria-label="Code explainer"
                   ref={explainerRef}
                 >
-                  <span className="code-viewer__explainer-label">Code</span>
+                  <span className="code-viewer__explainer-label">Why these lines</span>
                   <p className="code-viewer__explainer-copy">
                     {trimmedCodeExplainer}
                   </p>
                 </li>
               ) : null}
               <li
-                className={`code-viewer__line ${active ? 'is-active' : ''}`}
+                className={`code-viewer__line ${activeClasses}`}
                 ref={(node) => {
                   if (node) {
                     lineRefs.current.set(lineNumber, node)

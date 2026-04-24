@@ -100,8 +100,30 @@ describe('ui components', () => {
     expect(screen.getByText('print')).toHaveClass('code-viewer__token--builtin')
     expect(screen.getByText('"second"')).toHaveClass('code-viewer__token--string')
     expect(screen.getByText('print').closest('li')).toHaveClass('is-active')
+    expect(screen.getByText('print').closest('li')).toHaveClass('is-active-single')
     expect(screen.getByText('first')).toHaveClass('code-viewer__token--definition')
     expect(screen.getByText('first').closest('li')).not.toHaveClass('is-active')
+  })
+
+  it('marks the start and end of multi-line active code ranges', () => {
+    render(
+      <CodeViewer
+        source={'line one\nline two\nline three'}
+        activeRanges={[{ start: 1, end: 3 }]}
+        codeExplainer="This range belongs together."
+      />,
+    )
+
+    expect(screen.getByText('line one').closest('li')).toHaveClass(
+      'is-active-start',
+    )
+    expect(screen.getByText('line two').closest('li')).toHaveClass('is-active')
+    expect(screen.getByText('line two').closest('li')).not.toHaveClass(
+      'is-active-single',
+    )
+    expect(screen.getByText('line three').closest('li')).toHaveClass(
+      'is-active-end',
+    )
   })
 
   it('renders blank code lines safely', () => {
@@ -218,6 +240,18 @@ describe('ui components', () => {
     expect(screen.queryByText('New terms')).not.toBeInTheDocument()
     expect(screen.queryByText(/In the scene:/)).not.toBeInTheDocument()
     expect(container.querySelectorAll('[data-glossary-id]').length).toBeGreaterThan(3)
+    expect(container.querySelector('.story-highlight')).toHaveTextContent(
+      'small piece of text',
+    )
+    expect(container.querySelector('.story-highlight')).toHaveAttribute(
+      'data-concept',
+      'input',
+    )
+    expect(screen.getByRole('button', { name: 'Context' })).toHaveAttribute(
+      'data-concept',
+      'input',
+    )
+    expect(container.querySelectorAll('[data-glossary-id="context"]')).toHaveLength(1)
   })
 
   it('renders a single guided block without term beats when absent', () => {

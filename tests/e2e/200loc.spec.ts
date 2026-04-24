@@ -799,7 +799,7 @@ test.describe('intro walkthrough', () => {
     await expect(tour).toBeVisible()
     await tour.getByRole('button', { name: 'Next' }).click()
     await expect(
-      tour.getByText('This is how you drive the walkthrough'),
+      tour.getByText('Use these controls to move step by step'),
     ).toBeVisible()
     expect(issues).toEqual([])
   })

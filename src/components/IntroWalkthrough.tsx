@@ -25,6 +25,38 @@ interface OpenAnnotation {
 
 const HOVER_OPEN_DELAY_MS = 280
 const HOVER_CLOSE_DELAY_MS = 140
+const LEADING_PUNCTUATION_PATTERN = /^([,.:;?!]+)(\s*)/
+
+type RenderableIntroSegment = IntroLineSegment & {
+  trailingPunctuation?: string
+}
+
+function keepLeadingPunctuationWithPreviousSegment(
+  segments: IntroLineSegment[],
+): RenderableIntroSegment[] {
+  return segments.reduce<RenderableIntroSegment[]>((normalized, segment) => {
+    let text = segment.text
+
+    if (segment.kind === 'text') {
+      const previous = normalized.at(-1)
+      const punctuationMatch = text.match(LEADING_PUNCTUATION_PATTERN)
+
+      if (previous && punctuationMatch) {
+        const punctuation = punctuationMatch[1] ?? ''
+        const spacing = punctuationMatch[2] ?? ''
+        previous.trailingPunctuation = `${previous.trailingPunctuation ?? ''}${punctuation}`
+        text = `${spacing}${text.slice(punctuation.length + spacing.length)}`
+
+        if (!text) {
+          return normalized
+        }
+      }
+    }
+
+    normalized.push({ ...segment, text })
+    return normalized
+  }, [])
+}
 
 export function IntroWalkthrough({
   activeStepIndex,
@@ -252,17 +284,39 @@ export function IntroWalkthrough({
     triggerRefs.current.delete(triggerKey)
   }
 
-  function renderSegment(segment: IntroLineSegment, lineIndex: number, segmentIndex: number) {
+  function renderSegment(
+    segment: RenderableIntroSegment,
+    lineIndex: number,
+    segmentIndex: number,
+  ) {
+    const segmentKey = `${step.id}-${lineIndex}-${segmentIndex}`
+
     if (segment.kind === 'text') {
-      return <span key={`${step.id}-${lineIndex}-${segmentIndex}`}>{segment.text}</span>
+      const segmentContent = <span>{segment.text}</span>
+
+      if (!segment.trailingPunctuation) {
+        return (
+          <span key={segmentKey}>
+            {segment.text}
+          </span>
+        )
+      }
+
+      return (
+        <span className="intro-step__punctuation-keep" key={segmentKey}>
+          {segmentContent}
+          <span className="intro-step__punctuation-mark">
+            {segment.trailingPunctuation}
+          </span>
+        </span>
+      )
     }
 
-    const triggerKey = `${step.id}-${lineIndex}-${segmentIndex}-${segment.glossaryId}`
+    const triggerKey = `${segmentKey}-${segment.glossaryId}`
     const isOpen = openAnnotation?.triggerKey === triggerKey
 
-    return (
+    const segmentContent = (
       <button
-        key={triggerKey}
         ref={(node) => registerTrigger(triggerKey, node)}
         type="button"
         className="annotation-trigger"
@@ -278,6 +332,23 @@ export function IntroWalkthrough({
       >
         {segment.text}
       </button>
+    )
+
+    if (!segment.trailingPunctuation) {
+      return (
+        <span key={segmentKey}>
+          {segmentContent}
+        </span>
+      )
+    }
+
+    return (
+      <span className="intro-step__punctuation-keep" key={segmentKey}>
+        {segmentContent}
+        <span className="intro-step__punctuation-mark">
+          {segment.trailingPunctuation}
+        </span>
+      </span>
     )
   }
 
@@ -305,14 +376,20 @@ export function IntroWalkthrough({
           <div className="intro-step__lines">
             {step.lines.map((line, lineIndex) => (
               <p className="intro-step__line" key={`${step.id}-${lineIndex}`}>
-                {line.segments.map((segment, segmentIndex) =>
-                  renderSegment(segment, lineIndex, segmentIndex),
+                {keepLeadingPunctuationWithPreviousSegment(line.segments).map(
+                  (segment, segmentIndex) =>
+                    renderSegment(segment, lineIndex, segmentIndex),
                 )}
               </p>
             ))}
           </div>
           {isCompact && openEntry ? (
-            <AnnotationPopup ref={popupRef} entry={openEntry} mode="inline" />
+            <AnnotationPopup
+              ref={popupRef}
+              entry={openEntry}
+              mode="inline"
+              onDismiss={closeAnnotation}
+            />
           ) : null}
         </section>
 
@@ -353,6 +430,7 @@ export function IntroWalkthrough({
           anchorRect={openAnnotation.anchorRect}
           entry={openEntry}
           mode="floating"
+          onDismiss={closeAnnotation}
           onMouseEnter={clearCloseTimer}
           onMouseLeave={scheduleClose}
         />

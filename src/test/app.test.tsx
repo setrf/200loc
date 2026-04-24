@@ -318,7 +318,7 @@ describe('App', () => {
     fireEvent.click(within(tour).getByRole('button', { name: 'Next' }))
     expect(
       within(screen.getByRole('dialog', { name: 'Lab tour' })).getByText(
-        'This is how you drive the walkthrough',
+        'Use these controls to move step by step',
       ),
     ).toBeInTheDocument()
 
@@ -339,7 +339,7 @@ describe('App', () => {
     )
     expect(
       within(screen.getByRole('dialog', { name: 'Lab tour' })).getByText(
-        'This is how you drive the walkthrough',
+        'Use these controls to move step by step',
       ),
     ).toBeInTheDocument()
 
@@ -695,7 +695,7 @@ describe('App', () => {
     const tour = await screen.findByRole('dialog', { name: 'Lab tour' })
     fireEvent.click(within(tour).getByRole('button', { name: 'Next' }))
     expect(
-      within(tour).getByText('This is how you drive the walkthrough'),
+      within(tour).getByText('Use these controls to move step by step'),
     ).toBeInTheDocument()
   })
 
@@ -757,6 +757,9 @@ describe('App', () => {
     ).toBeInTheDocument()
 
     await screen.findByText('A complete tiny LLM, step by step')
+    const walkthrough = document.querySelector('.walkthrough-layout') as HTMLElement
+    expect(walkthrough).toHaveAttribute('data-phase-family', 'input')
+    expect(walkthrough.style.getPropertyValue('--phase-accent')).toBe('#7cc7ff')
     expect(screen.getByText('microgpt.py')).toBeInTheDocument()
     expect(screen.getAllByText('See the readable history').length).toBeGreaterThan(0)
     expect(screen.getByLabelText('Code explainer')).toHaveTextContent(
@@ -811,11 +814,14 @@ describe('App', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Next' }))
     }
     expectStoryPanelToContain(phaseBeat(15))
+    expect(walkthrough).toHaveAttribute('data-phase-family', 'attention')
+    expect(walkthrough.style.getPropertyValue('--phase-accent')).toBe('#70d6a5')
 
     for (let index = 0; index < 13; index += 1) {
       fireEvent.click(screen.getByRole('button', { name: 'Next' }))
     }
     expectStoryPanelToContain(phaseBeat(28))
+    expect(walkthrough).toHaveAttribute('data-phase-family', 'output')
 
     for (let index = 0; index < 5; index += 1) {
       fireEvent.click(screen.getByRole('button', { name: 'Next' }))
@@ -890,7 +896,7 @@ describe('App', () => {
     render(<App />)
 
     await screen.findByText('A complete tiny LLM, step by step')
-    expect(screen.getByText(phaseBeat(0))).toBeInTheDocument()
+    expect(screen.getByLabelText('Step explanation')).toHaveTextContent(phaseBeat(0))
   })
 
   it('falls back to the generic advance error message for non-Error rejections', async () => {

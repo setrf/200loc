@@ -1,6 +1,10 @@
 import type { TokenStepTrace } from '../model'
-import { autoAnnotateText } from './autoGlossary'
+import { autoAnnotateText, type AutoGlossarySegment } from './autoGlossary'
 import type { GlossaryId } from './glossary'
+import {
+  applySemanticHighlights,
+  type SemanticHighlightSegment,
+} from './semanticHighlights'
 import type {
   CameraPoseId,
   VizEdgeId,
@@ -33,6 +37,7 @@ export type StorySegment =
       text: string
       glossaryId: GlossaryId
     }
+  | SemanticHighlightSegment
 
 export interface StoryBeat {
   kind: 'core' | 'term' | 'scene' | 'code'
@@ -115,11 +120,12 @@ function annotate(glossaryId: GlossaryId, text: string): StorySegmentSeed {
 }
 
 function toSegments(parts: StorySegmentSeed[]): StorySegment[] {
-  return parts.flatMap((part) =>
+  const annotatedSegments = parts.flatMap((part): AutoGlossarySegment[] =>
     typeof part === 'string'
       ? autoAnnotateText(part)
-      : { kind: 'term', text: part.text, glossaryId: part.glossaryId },
+      : [{ kind: 'term', text: part.text, glossaryId: part.glossaryId }],
   )
+  return applySemanticHighlights(annotatedSegments)
 }
 
 function core(...parts: StorySegmentSeed[]): StoryBeat {
@@ -138,8 +144,43 @@ function code(...parts: StorySegmentSeed[]): StoryBeat {
   return { kind: 'code', segments: toSegments(parts) }
 }
 
+function normalizeHighlightKey(text: string): string {
+  return text.toLowerCase().replace(/\s+/g, ' ').trim()
+}
+
+function dedupeDefinitionSegments(beats: StoryBeat[]): StoryBeat[] {
+  const seenGlossaryIds = new Set<GlossaryId>()
+  const seenHighlights = new Set<string>()
+
+  return beats.map((beat) => ({
+    ...beat,
+    segments: beat.segments.map((segment): StorySegment => {
+      if (segment.kind === 'term') {
+        if (seenGlossaryIds.has(segment.glossaryId)) {
+          return { kind: 'text', text: segment.text }
+        }
+
+        seenGlossaryIds.add(segment.glossaryId)
+        return segment
+      }
+
+      if (segment.kind === 'highlight') {
+        const highlightKey = normalizeHighlightKey(segment.text)
+        if (seenHighlights.has(highlightKey)) {
+          return { kind: 'text', text: segment.text }
+        }
+
+        seenHighlights.add(highlightKey)
+        return segment
+      }
+
+      return segment
+    }),
+  }))
+}
+
 function lesson(beats: StoryBeat[]): WalkthroughCopy {
-  return { beats }
+  return { beats: dedupeDefinitionSegments(beats) }
 }
 
 function defineGroup(group: GroupSeed): PhaseDefinition[] {

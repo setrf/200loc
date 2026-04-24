@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState, type MouseEvent } from 'react
 import { useCompactViewport } from '../hooks/useCompactViewport'
 import { getGlossaryEntry, type GlossaryId } from '../walkthrough/glossary'
 import type { StoryBeat } from '../walkthrough/phases'
+import { getGlossaryConceptTone } from '../walkthrough/semanticHighlights'
 import { AnnotationPopup } from './AnnotationPopup'
 
 interface ControlsProps {
@@ -253,8 +254,21 @@ export function Controls({ beats }: ControlsProps) {
                     )
                   }
 
+                  if (segment.kind === 'highlight') {
+                    return (
+                      <span
+                        key={`${beat.kind}-${beatIndex}-${segmentIndex}`}
+                        className={`story-highlight story-highlight--${segment.tone}`}
+                        data-concept={segment.tone}
+                      >
+                        {segment.text}
+                      </span>
+                    )
+                  }
+
                   const triggerKey = `${beatIndex}-${segmentIndex}-${segment.glossaryId}`
                   const isOpen = openAnnotation?.triggerKey === triggerKey
+                  const conceptTone = getGlossaryConceptTone(segment.glossaryId)
 
                   return (
                     <button
@@ -264,6 +278,7 @@ export function Controls({ beats }: ControlsProps) {
                       className="annotation-trigger"
                       data-annotation-trigger="true"
                       data-glossary-id={segment.glossaryId}
+                      data-concept={conceptTone}
                       aria-haspopup="dialog"
                       aria-expanded={isOpen ? 'true' : 'false'}
                       onMouseEnter={() =>
@@ -289,6 +304,7 @@ export function Controls({ beats }: ControlsProps) {
             ref={popupRef}
             entry={openEntry}
             mode="inline"
+            onDismiss={closeAnnotation}
           />
         ) : null}
       </section>
@@ -299,6 +315,7 @@ export function Controls({ beats }: ControlsProps) {
           anchorRect={openAnnotation.anchorRect}
           entry={openEntry}
           mode="floating"
+          onDismiss={closeAnnotation}
           onMouseEnter={clearCloseTimer}
           onMouseLeave={scheduleClose}
         />

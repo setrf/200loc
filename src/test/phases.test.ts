@@ -56,6 +56,22 @@ describe('phase line maps', () => {
           .filter((segment) => segment.kind === 'term')
           .every((segment) => getGlossaryEntry(segment.glossaryId).title.length > 0),
       ).toBe(true)
+      expect(
+        phase.copy.beats
+          .flatMap((beat) => beat.segments)
+          .filter((segment) => segment.kind === 'highlight')
+          .every((segment) => segment.tone.length > 0),
+      ).toBe(true)
+      const glossaryIds = phase.copy.beats
+        .flatMap((beat) => beat.segments)
+        .filter((segment) => segment.kind === 'term')
+        .map((segment) => segment.glossaryId)
+      const highlightKeys = phase.copy.beats
+        .flatMap((beat) => beat.segments)
+        .filter((segment) => segment.kind === 'highlight')
+        .map((segment) => segment.text.toLowerCase().replace(/\s+/g, ' ').trim())
+      expect(new Set(glossaryIds).size).toBe(glossaryIds.length)
+      expect(new Set(highlightKeys).size).toBe(highlightKeys.length)
       expect(phase.sceneCopy.windowTitle.length).toBeGreaterThan(0)
       expect(phase.sceneCopy.windowSubtitle.length).toBeGreaterThan(0)
       return phase.copy.beats[0]?.segments.map((segment) => segment.text).join('') ?? ''
